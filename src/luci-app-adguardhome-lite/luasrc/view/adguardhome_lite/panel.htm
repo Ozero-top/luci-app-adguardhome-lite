@@ -8,7 +8,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>AdGuard Home 一键版</title>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261108d">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261108e">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -39,7 +39,7 @@
 		</div>
 		<div class="agh-top-actions">
 			<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
-			<span class="agh-badge">独立页面</span>
+			<a href="#" id="agh-header-console" class="agh-badge agh-badge-link is-disabled" target="_blank" rel="noopener" aria-disabled="true">打开控制台</a>
 		</div>
 	</header>
 
@@ -383,6 +383,6 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261108c"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261108e"></script>
 </body>
 </html>

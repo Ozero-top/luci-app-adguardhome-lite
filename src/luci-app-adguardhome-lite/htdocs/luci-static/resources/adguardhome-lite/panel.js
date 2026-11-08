@@ -305,6 +305,19 @@
 				: '启用服务后即可打开面板。';
 		}
 
+		var headerConsole = $('agh-header-console');
+		if (headerConsole) {
+			if (d.running) {
+				headerConsole.href = panelUrl(d.web_port);
+				headerConsole.className = 'agh-badge agh-badge-link';
+				headerConsole.removeAttribute('aria-disabled');
+			} else {
+				headerConsole.href = '#';
+				headerConsole.className = 'agh-badge agh-badge-link is-disabled';
+				headerConsole.setAttribute('aria-disabled', 'true');
+			}
+		}
+
 		var startBtn = $('agh-start-btn');
 		var stopBtn = $('agh-stop-btn');
 		var restartBtn = $('agh-restart-btn');

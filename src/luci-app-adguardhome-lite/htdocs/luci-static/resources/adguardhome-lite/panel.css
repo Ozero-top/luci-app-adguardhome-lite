@@ -187,6 +187,23 @@ code {
 	white-space: nowrap;
 }
 
+.agh-badge-link {
+	display: inline-flex;
+	align-items: center;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.agh-badge-link:hover {
+	background: #efe2c4;
+}
+
+.agh-badge-link.is-disabled {
+	cursor: default;
+	opacity: 0.55;
+	pointer-events: none;
+}
+
 /* 标签页 */
 .agh-tabs {
 	display: flex;
