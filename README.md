@@ -50,12 +50,13 @@
 
 ## 安装
 
-前往 [Releases](../../releases) 下载对应安装包，**同一设备只能安装其中一个**：
+前往 [Releases](../../releases) 下载安装包。提供 `.ipk` 与离线 `.run` 两种形式，**同一设备只能安装其中一个版本**：
 
 | 安装包 | 适用固件 |
 |---|---|
 | `luci-app-adguardhome-lite_<版本>_all.ipk` | OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 等新版 LuCI |
 | `luci-app-adguardhome-lite_<版本>-legacy_all.ipk` | OpenWrt 22.03 及更早的原生 Lua LuCI |
+| `luci-app-adguardhome-lite_<版本>.run` | 离线自解压安装包，内含上述两个 ipk，自动选择可用版本 |
 
 **LuCI 上传安装（推荐）**
 
@@ -68,6 +69,16 @@
 ```sh
 opkg install /tmp/luci-app-adguardhome-lite_*.ipk
 ```
+
+**离线 .run 安装**
+
+将 `.run` 上传到路由器后执行：
+
+```sh
+sh /tmp/luci-app-adguardhome-lite_<版本>.run
+```
+
+脚本会自解压到临时目录，优先安装新版 LuCI 包，失败时自动回退 legacy 包，安装完成后自动清理临时文件。
 
 Release 页面同时提供 `SHA256SUMS`，下载后可校验文件完整性。
 
@@ -132,6 +143,7 @@ tail -6 /etc/dnsmasq.conf          # 应包含 BEGIN adguardhome-lite-openclash
 │   ├── root/etc/init.d/                 # procd 服务脚本
 │   └── Makefile                         # OpenWrt SDK 构建入口
 ├── tools/build_ipk.py                   # 免 SDK 直接构建 ipk
+├── tools/build_run.py                   # 构建离线自解压 .run 安装包
 ├── docs/安装与使用说明.md                # 安装、验证与排障文档
 └── README.md
 ```
@@ -149,6 +161,14 @@ python tools/build_ipk.py
 ```
 
 构建完成后会在本地生成 modern（新版 LuCI）与 legacy（旧版 Lua LuCI）两个安装包，以及 `SHA256SUMS` 校验文件。
+
+生成离线自解压安装包：
+
+```sh
+python tools/build_run.py
+```
+
+会在 ipk 基础上生成 `.run` 安装包，并将其校验值追加到 `SHA256SUMS`。
 
 ### 方式二：使用 OpenWrt SDK
 
