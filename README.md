@@ -4,6 +4,10 @@
 
 > 插件负责安装内核、接管 DNS 与服务管理；过滤规则、查询统计、家长控制等请直接在 AdGuard Home 面板中操作。
 
+<div align=center>
+<img src="https://ozero.top/media/2026/11/6af0738b04e0b3.88465351.png" width="880" height="831"> 
+</div>
+
 ---
 
 ## 项目初衷
