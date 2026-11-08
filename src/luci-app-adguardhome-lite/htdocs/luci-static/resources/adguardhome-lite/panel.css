@@ -143,7 +143,7 @@ code {
 	display: flex;
 	gap: 6px;
 	padding: 5px;
-	margin-bottom: 14px;
+	margin: 0 0 14px;
 	background: rgba(255, 253, 247, 0.88);
 	border: 1px solid var(--agh-border);
 	border-radius: 12px;

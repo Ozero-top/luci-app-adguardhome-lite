@@ -8,7 +8,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>AdGuard Home 一键版</title>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261108f">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261108h">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -30,6 +30,18 @@
 </head>
 <body>
 <div class="agh-app">
+	<div class="agh-hero">
+		<div>
+			<h2>AdGuard Home 一键版</h2>
+			<p>一个页面完成内核安装、DNS 接管和面板访问。过滤规则、家长控制、查询统计等请在 AdGuard Home 面板中设置。</p>
+		</div>
+		<div class="agh-hero-actions">
+			<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
+			<a href="#" id="agh-header-console" class="agh-badge agh-badge-link is-disabled" target="_blank" rel="noopener" aria-disabled="true">打开控制台</a>
+			<span class="agh-hero-badge">v0.107.80+</span>
+		</div>
+	</div>
+
 	<nav class="agh-tabs" id="agh-tabs">
 		<button type="button" class="agh-tab is-active" data-tab="overview">概览</button>
 		<button type="button" class="agh-tab" data-tab="settings">基础设置</button>
@@ -40,18 +52,6 @@
 
 	<main class="agh-main">
 		<section class="agh-tab-panel is-active" id="agh-tab-overview">
-			<div class="agh-hero">
-				<div>
-					<h2>AdGuard Home 一键版</h2>
-					<p>一个页面完成内核安装、DNS 接管和面板访问。过滤规则、家长控制、查询统计等请在 AdGuard Home 面板中设置。</p>
-				</div>
-				<div class="agh-hero-actions">
-					<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
-					<a href="#" id="agh-header-console" class="agh-badge agh-badge-link is-disabled" target="_blank" rel="noopener" aria-disabled="true">打开控制台</a>
-					<span class="agh-hero-badge">v0.107.80+</span>
-				</div>
-			</div>
-
 			<div class="agh-card">
 				<div class="agh-card-head">
 					<h3>运行状态</h3>
