@@ -219,6 +219,47 @@ restart_dnsmasq() {
     fi
 }
 
+# 判断本机是否有进程监听指定端口（TCP 或 UDP）
+port_listening() {
+    _lp="$1"
+    [ -n "$_lp" ] || return 1
+    netstat -lntu 2>/dev/null | grep -qE "[:.]$_lp[[:space:]]"
+}
+
+# WAN 下发的上游 DNS（排除本机回环与 fake-IP 地址）
+wan_dns_servers() {
+    [ -s /tmp/resolv.conf.d/resolv.conf.auto ] || return 0
+    awk '/^nameserver /{print $2}' /tmp/resolv.conf.d/resolv.conf.auto 2>/dev/null \
+        | grep -vE '^(127\.|::1|0\.0\.0\.0|fe80|198\.18\.)' \
+        | head -n 2 | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+}
+
+# 计算可用于 AdGuard Home 的外部上游 DNS，避免指向自身或已停止的服务。
+# 优先 Clash DNS，其次 WAN 下发的 DNS，最后才回退公共 DNS。
+detect_upstream_dns() {
+    if port_listening "$clash_dns_port"; then
+        echo "127.0.0.1:$clash_dns_port"
+        return
+    fi
+
+    _wan_dns="$(wan_dns_servers)"
+    if [ -n "$_wan_dns" ]; then
+        echo "$_wan_dns"
+        return
+    fi
+
+    echo "223.5.5.5 119.29.29.29"
+}
+
+# OpenClash 是否仍在劫持 53 端口（返回重定向目标端口）
+openclash_hijack_port() {
+    have_cmd nft || return 0
+    nft list chain inet fw4 dstnat 2>/dev/null \
+        | grep 'OpenClash DNS Hijack' \
+        | sed -n 's/.*redirect to :\([0-9][0-9]*\).*/\1/p' \
+        | head -n 1
+}
+
 # OpenClash 串联模式：在 /etc/dnsmasq.conf 写入默认转发规则，
 # 让 DNSMasq 把所有域名查询交给 AdGuard Home，同时保留 OpenClash 的 DNS 劫持。
 OC_CONF="/etc/dnsmasq.conf"
@@ -251,15 +292,6 @@ openclash_forward_add() {
         printf 'server=/#/127.0.0.1#%s\n' "$dnsport"
         printf '%s\n' "$OC_END"
     } >> "$OC_CONF"
-}
-
-# 读取 OpenClash 当前 nftables DNS 劫持的重定向端口（通常等于 DNSMasq 端口）
-openclash_hijack_port() {
-    have_cmd nft || return 0
-    nft list chain inet fw4 dstnat 2>/dev/null \
-        | grep 'OpenClash DNS Hijack' \
-        | sed -n 's/.*redirect to :\([0-9][0-9]*\).*/\1/p' \
-        | head -n 1
 }
 
 # 读取 YAML 中某个两空格缩进的列表，返回空格分隔的一行
