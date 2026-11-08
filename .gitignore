@@ -1,0 +1,11 @@
+# 构建产物仅通过 GitHub Releases 发布，不提交到仓库
+dist/
+
+# 临时文件与缓存
+.screenshots/
+__pycache__/
+*.pyc
+*.tmp
+
+# 原始 .run 插件仅作本地参考，不随项目发布
+adguardhome.run

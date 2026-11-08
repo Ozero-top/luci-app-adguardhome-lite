@@ -1,0 +1,44 @@
+# AdGuard Home 一键版（luci-app-adguardhome-lite）配置文件
+# 普通用户请通过 LuCI 界面“服务 -> AdGuard Home 一键版”修改，不建议手动编辑。
+
+config adguardhome_lite 'main'
+	# 是否启用：1=开机自启并立即运行；0=停止服务并恢复系统原始 DNS 设置
+	option enabled '0'
+
+	# DNS 接管方式：
+	#   takeover = 接管 53 端口（默认，DNSMasq 移到 1745，与默认配置的 53 端口一致）
+	#   upstream = DNSMasq 上游（AdGuard Home 监听 5333，零端口冲突）
+	#   none     = 仅面板模式（不改变系统 DNS）
+	option dns_mode 'takeover'
+
+	# 管理面板端口，默认 13800；被占用时可改为 13801 等
+	option webport '13800'
+
+	# 内核安装位置；/tmp 为内存临时位置，重启后会丢失，需要重新安装
+	option binpath '/usr/bin/AdGuardHome/AdGuardHome'
+
+	# AdGuard Home 主配置文件
+	option config '/etc/AdGuardHome.yaml'
+
+	# 工作目录：保存过滤器缓存、查询日志和统计数据
+	option workdir '/etc/AdGuardHome'
+
+	# 内核更新通道：stable=稳定版（推荐），beta=测试版
+	option channel 'stable'
+
+	# GitHub 反代（国内加速）：
+	#   none          = 关闭，官方 CDN 优先
+	#   gh-proxy.org  = 通过 gh-proxy.org 下载 GitHub 内核（推荐国内用户）
+	#   ghproxy.cc    = 备用反代
+	#   ghproxy.com   = 备用反代
+	#   ghfast.top    = 备用反代
+	# 反代不可用时会自动回退到官方 CDN 和 GitHub 直连。
+	option github_proxy 'gh-proxy.org'
+
+	# 初始管理员账号和密码；默认 admin / admin123，建议首次登录后修改
+	option adminuser 'admin'
+	option adminpass 'admin123'
+
+	# 以下为插件内部状态，请勿手动修改
+	option mode_applied 'none'
+	option core_version ''

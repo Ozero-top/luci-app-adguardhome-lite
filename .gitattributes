@@ -1,0 +1,10 @@
+# 统一使用 LF，避免 Shell 脚本在路由器/OpenWrt SDK 中出现换行符问题
+* text=auto eol=lf
+
+# 二进制文件
+*.ipk binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary

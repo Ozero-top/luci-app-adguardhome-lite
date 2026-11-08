@@ -1,0 +1,82 @@
+<%+header%>
+<div class="agh-frame-wrap">
+	<iframe id="agh-frame" src="<%=url([[admin]], [[services]], [[adguardhome_lite]], [[frame]])%>" title="AdGuard Home 一键版" scrolling="no" loading="eager"></iframe>
+</div>
+<style>
+	.agh-frame-wrap {
+		width: 100%;
+		margin: 0;
+		padding: 0;
+	}
+	#agh-frame {
+		display: block;
+		width: 100%;
+		height: 600px;
+		min-height: 0;
+		border: 0;
+		border-radius: 8px;
+		background: #f3eddf;
+		overflow: hidden;
+	}
+	@media (max-width: 800px) {
+		#agh-frame {
+			height: 480px;
+		}
+	}
+</style>
+<script>
+	(function () {
+		var frame = document.getElementById('agh-frame');
+		var lastHeight = 0;
+
+		function fitFrame() {
+			if (!frame) return;
+			try {
+				var doc = frame.contentDocument || frame.contentWindow.document;
+				if (!doc || !doc.documentElement) return;
+
+				// 隐藏 iframe 内部页面滚动条，滚动交给外层 LuCI 主题
+				doc.documentElement.style.overflow = 'hidden';
+				if (doc.body) doc.body.style.overflow = 'hidden';
+
+				var height = Math.max(
+					doc.documentElement.scrollHeight || 0,
+					doc.body ? (doc.body.scrollHeight || 0) : 0,
+					320
+				);
+				if (Math.abs(height - lastHeight) > 1) {
+					lastHeight = height;
+					frame.style.height = height + 'px';
+				}
+			} catch (e) {}
+		}
+
+		function bindFrame() {
+			fitFrame();
+			try {
+				var doc = frame.contentDocument || frame.contentWindow.document;
+				if (window.ResizeObserver && doc && doc.documentElement) {
+					var ro = new ResizeObserver(fitFrame);
+					ro.observe(doc.documentElement);
+					if (doc.body) ro.observe(doc.body);
+				}
+				if (window.MutationObserver && doc && doc.body) {
+					new MutationObserver(fitFrame).observe(doc.body, {
+						subtree: true,
+						childList: true,
+						attributes: true,
+						characterData: true
+					});
+				}
+			} catch (e) {}
+		}
+
+		if (frame) {
+			frame.addEventListener('load', bindFrame);
+		}
+		window.addEventListener('resize', fitFrame);
+		setInterval(fitFrame, 1500);
+		fitFrame();
+	})();
+</script>
+<%+footer%>

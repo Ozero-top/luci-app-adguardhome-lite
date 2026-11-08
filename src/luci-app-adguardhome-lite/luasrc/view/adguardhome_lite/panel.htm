@@ -1,0 +1,389 @@
+<% local _token = token
+   if not _token then
+       local _d = require "luci.dispatcher"
+       _token = _d.context and _d.context.authtoken or ""
+   end %><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>AdGuard Home 一键版</title>
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261108c">
+	<script>
+		window.AGH = {
+			token: "<%=_token%>",
+			urls: {
+				status:       "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[status]])%>",
+				coreInstall:  "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[core_install]])%>",
+				coreProgress: "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[core_progress]])%>",
+				service:      "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[service]])%>",
+				password:     "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[password]])%>",
+				logs:         "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[logs_raw]])%>",
+				settingsGet:  "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[settings_get]])%>",
+				settingsSave: "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[settings_save]])%>",
+				yamlGet:      "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[yaml_get]])%>",
+				yamlSave:     "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[yaml_save]])%>",
+				luci:         "<%=url([[admin]])%>"
+			}
+		};
+	</script>
+</head>
+<body>
+<div class="agh-app">
+	<header class="agh-topbar">
+		<div class="agh-brand">
+			<div class="agh-logo">AG</div>
+			<div class="agh-brand-text">
+				<h1>AdGuard Home 一键版</h1>
+				<p>独立插件页面 · 草绿 / 米黄</p>
+			</div>
+		</div>
+		<div class="agh-top-actions">
+			<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
+			<span class="agh-badge">独立页面</span>
+		</div>
+	</header>
+
+	<nav class="agh-tabs" id="agh-tabs">
+		<button type="button" class="agh-tab is-active" data-tab="overview">概览</button>
+		<button type="button" class="agh-tab" data-tab="settings">基础设置</button>
+		<button type="button" class="agh-tab" data-tab="advanced">高级配置</button>
+		<button type="button" class="agh-tab" data-tab="logs">运行日志</button>
+		<button type="button" class="agh-tab" data-tab="guide">使用引导</button>
+	</nav>
+
+	<main class="agh-main">
+		<section class="agh-tab-panel is-active" id="agh-tab-overview">
+			<div class="agh-hero">
+				<div>
+					<h2>AdGuard Home 一键版</h2>
+					<p>一个页面完成内核安装、DNS 接管和面板访问。过滤规则、家长控制、查询统计等请在 AdGuard Home 面板中设置。</p>
+				</div>
+				<div class="agh-hero-badge">v0.107.80+</div>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>运行状态</h3>
+					<button type="button" id="agh-refresh-status" class="agh-ghost-btn agh-small-btn">刷新</button>
+				</div>
+				<div id="agh-status-grid" class="agh-status-grid">
+					<div class="agh-empty">正在读取状态...</div>
+				</div>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>三步完成配置</h3>
+				</div>
+				<div class="agh-steps">
+					<div class="agh-step">
+						<div class="agh-step-no">1</div>
+						<div class="agh-step-body">
+							<div class="agh-step-title">安装 AdGuard Home 内核</div>
+							<p>自动识别设备架构，从官方源或 GitHub 反代下载最新内核。内核约 10-40MB，请确保路由器空间充足。</p>
+							<div class="agh-inline">
+								<button type="button" id="agh-install-btn" class="agh-btn agh-btn-primary">安装/更新内核</button>
+								<span id="agh-core-hint" class="agh-hint"></span>
+							</div>
+						</div>
+					</div>
+					<div class="agh-step">
+						<div class="agh-step-no">2</div>
+						<div class="agh-step-body">
+							<div class="agh-step-title">一键启用并接管 DNS</div>
+							<p>首次启用从内置模板生成配置，默认账号 admin、密码 admin123，并采用“接管 53 端口”方式接管 DNS。</p>
+							<div class="agh-inline">
+								<button type="button" id="agh-enable-btn" class="agh-btn agh-btn-primary">一键启用</button>
+								<span id="agh-enable-hint" class="agh-hint"></span>
+							</div>
+						</div>
+					</div>
+					<div class="agh-step">
+						<div class="agh-step-no">3</div>
+						<div class="agh-step-body">
+							<div class="agh-step-title">打开 AdGuard Home 面板</div>
+							<p>首次登录可使用状态卡片中的默认密码。登录后可添加过滤规则、查看拦截统计。</p>
+							<div class="agh-inline">
+								<a href="#" id="agh-panel-link" class="agh-btn agh-btn-secondary" target="_blank" rel="noopener">打开控制台</a>
+								<span id="agh-console-hint" class="agh-hint"></span>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div id="agh-progress-wrap" class="agh-progress-wrap" hidden>
+					<div class="agh-progress-head">
+						<span>安装进度</span>
+						<span id="agh-progress-state" class="agh-hint"></span>
+					</div>
+					<pre id="agh-progress-log" class="agh-log"></pre>
+				</div>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>快捷操作</h3>
+				</div>
+				<div class="agh-actions">
+					<button type="button" id="agh-start-btn" class="agh-btn agh-btn-secondary">启动服务</button>
+					<button type="button" id="agh-stop-btn" class="agh-btn agh-btn-danger">停止并关闭自启</button>
+					<button type="button" id="agh-restart-btn" class="agh-btn agh-btn-secondary">重启服务</button>
+					<button type="button" class="agh-btn agh-btn-ghost" data-goto="settings">基础设置</button>
+					<button type="button" class="agh-btn agh-btn-ghost" data-goto="advanced">高级配置</button>
+					<button type="button" class="agh-btn agh-btn-ghost" data-goto="logs">运行日志</button>
+					<button type="button" class="agh-btn agh-btn-ghost" data-goto="guide">使用引导</button>
+				</div>
+				<p class="agh-hint agh-mt-8">“停止并关闭自启”会结束 AdGuard Home 进程并恢复 DNSMasq 原始设置，面板也会同时关闭；需要面板时请重新启动服务。</p>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>新手提示</h3>
+				</div>
+				<ul class="agh-tips">
+					<li><b>只要普通过滤：</b>安装内核 → 一键启用 → 打开控制台，之后在 AdGuard Home 面板添加过滤器。</li>
+					<li><b>停止后上网异常：</b>点击“停止并关闭自启”，插件会自动恢复 DNSMasq 原始设置。</li>
+					<li><b>忘记面板密码：</b>到“基础设置”页底部的“修改面板密码”重新设置。</li>
+					<li><b>磁盘空间不足：</b>到“基础设置”把内核安装位置改为“内存临时”，或清理路由器空间。</li>
+				</ul>
+			</div>
+		</section>
+
+		<section class="agh-tab-panel" id="agh-tab-settings">
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>服务与 DNS</h3>
+				</div>
+				<p class="agh-hint">默认配置：接管 53 端口，管理面板端口 13800，默认账号 admin / 密码 admin123。保存后会自动应用，约 5-10 秒恢复。</p>
+				<form id="agh-settings-form" class="agh-form" autocomplete="off">
+					<div class="agh-field agh-field-switch">
+						<div>
+							<label for="agh-set-enabled">启用 AdGuard Home</label>
+							<p class="agh-hint">开启后启动服务；关闭后停止服务并恢复 DNSMasq 原始设置。</p>
+						</div>
+						<label class="agh-switch">
+							<input type="checkbox" id="agh-set-enabled">
+							<span></span>
+						</label>
+					</div>
+
+					<div class="agh-form-grid">
+						<div class="agh-field">
+							<label for="agh-set-dns-mode">DNS 接管方式</label>
+							<select id="agh-set-dns-mode">
+								<option value="takeover">接管 53 端口（默认，DNSMasq 移到 1745）</option>
+								<option value="upstream">DNSMasq 上游（AdGuard Home 监听 5333）</option>
+								<option value="openclash">OpenClash 串联（保留 DNS 劫持，DNSMasq 转发给 AGH）</option>
+								<option value="none">仅面板模式（不接管 DNS）</option>
+							</select>
+							<p class="agh-hint">同时运行 OpenClash 且必须保留 DNS 劫持时，请选择“OpenClash 串联”。切换方式时会自动调整插件内置的上游 DNS，自定义上游保持不变。</p>
+						</div>
+
+						<div class="agh-field">
+							<label for="agh-set-webport">管理面板端口</label>
+							<input type="number" id="agh-set-webport" min="1" max="65535" placeholder="13800">
+							<p class="agh-hint">默认 13800；不能使用 53、1745、5333。</p>
+						</div>
+
+						<div class="agh-field">
+							<label for="agh-set-binpath">内核安装位置</label>
+							<select id="agh-set-binpath">
+								<option value="/usr/bin/AdGuardHome/AdGuardHome">内置存储（推荐，重启保留）</option>
+								<option value="/tmp/AdGuardHome/AdGuardHome">内存临时（重启后需重新安装）</option>
+							</select>
+						</div>
+
+						<div class="agh-field">
+							<label for="agh-set-workdir">数据工作目录</label>
+							<select id="agh-set-workdir">
+								<option value="/etc/AdGuardHome">内置存储（推荐，数据保留）</option>
+								<option value="/tmp/AdGuardHome">内存临时（减少闪存写入）</option>
+							</select>
+						</div>
+
+						<div class="agh-field">
+							<label for="agh-set-channel">内核更新通道</label>
+							<select id="agh-set-channel">
+								<option value="stable">稳定版（推荐）</option>
+								<option value="beta">测试版（谨慎使用）</option>
+							</select>
+						</div>
+
+						<div class="agh-field">
+							<label for="agh-set-github-proxy">GitHub 反代</label>
+							<select id="agh-set-github-proxy">
+								<option value="none">关闭（不使用）</option>
+								<option value="gh-proxy.org">gh-proxy.org</option>
+								<option value="ghproxy.cc">ghproxy.cc</option>
+								<option value="ghproxy.com">ghproxy.com</option>
+								<option value="ghfast.top">ghfast.top</option>
+							</select>
+							<p class="agh-hint">官方 CDN 失败时通过反代下载 GitHub 内核；反代不可用时回退直连。</p>
+						</div>
+					</div>
+
+					<div class="agh-form-actions">
+						<button type="submit" id="agh-save-settings-btn" class="agh-btn agh-btn-primary">保存并应用</button>
+						<span id="agh-settings-msg" class="agh-hint"></span>
+					</div>
+				</form>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>修改面板密码</h3>
+				</div>
+				<p class="agh-hint">浏览器本地计算 bcrypt 哈希，保存后自动重启 AdGuard Home。忘记当前密码也可直接用这里重置。</p>
+				<form id="agh-password-form" class="agh-form" autocomplete="off">
+					<div class="agh-form-grid">
+						<div class="agh-field">
+							<label for="agh-newpass">新密码（至少 8 个字符）</label>
+							<input type="password" id="agh-newpass" autocomplete="new-password">
+						</div>
+						<div class="agh-field">
+							<label for="agh-newpass2">再次输入新密码</label>
+							<input type="password" id="agh-newpass2" autocomplete="new-password">
+						</div>
+					</div>
+					<div class="agh-form-actions">
+						<button type="submit" id="agh-savepass-btn" class="agh-btn agh-btn-primary">保存新密码</button>
+						<span id="agh-pass-msg" class="agh-hint"></span>
+					</div>
+				</form>
+			</div>
+		</section>
+
+		<section class="agh-tab-panel" id="agh-tab-advanced">
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>高级配置</h3>
+					<div class="agh-inline">
+						<button type="button" id="agh-yaml-load" class="agh-ghost-btn agh-small-btn">重新加载</button>
+						<button type="button" id="agh-yaml-save" class="agh-btn agh-btn-primary agh-small-btn">校验并保存</button>
+					</div>
+				</div>
+				<p class="agh-hint">
+					直接编辑 AdGuard Home 官方配置文件 <code id="agh-yaml-path">/etc/AdGuardHome.yaml</code>。
+					保存前会调用官方 <code>--check-config</code> 校验，失败不会覆盖原文件；每次保存保留 <code>.bak</code> 备份。
+				</p>
+				<p class="agh-hint">过滤器、上游 DNS、家长控制等大部分功能可以直接在 AdGuard Home 面板中设置，通常不需要修改本页。</p>
+				<textarea id="agh-yaml-editor" class="agh-code" spellcheck="false" placeholder="正在加载配置..."></textarea>
+				<div class="agh-form-actions">
+					<span id="agh-yaml-msg" class="agh-hint"></span>
+					<span id="agh-yaml-count" class="agh-hint agh-ml-auto"></span>
+				</div>
+			</div>
+		</section>
+
+		<section class="agh-tab-panel" id="agh-tab-logs">
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>运行日志</h3>
+					<div class="agh-inline">
+						<button type="button" id="agh-log-refresh" class="agh-ghost-btn agh-small-btn">刷新</button>
+						<label class="agh-inline agh-check-label">
+							<input type="checkbox" id="agh-log-auto">
+							每 5 秒自动刷新
+						</label>
+						<button type="button" id="agh-log-download" class="agh-btn agh-btn-secondary agh-small-btn">下载日志</button>
+					</div>
+				</div>
+				<p class="agh-hint">显示系统日志中与 AdGuard 相关的记录、内核安装日志和最近一次服务操作日志。</p>
+				<pre id="agh-log-box" class="agh-log agh-log-tall">正在读取日志...</pre>
+			</div>
+		</section>
+
+		<section class="agh-tab-panel" id="agh-tab-guide">
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>一、三步完成配置</h3>
+				</div>
+				<ol class="agh-guide-list">
+					<li><b>安装内核：</b>在“概览”页点击“安装/更新内核”，自动识别架构并下载官方最新稳定版。</li>
+					<li><b>一键启用：</b>首次启用从内置模板生成配置，默认密码 admin123，并接管 53 端口。</li>
+					<li><b>打开控制台：</b>用概览页显示的地址、账号和默认密码登录 AdGuard Home。</li>
+				</ol>
+				<p class="agh-hint">国内网络如果下载失败，可在“基础设置”选择 GitHub 反代（推荐 gh-proxy.org）；反代不可用时自动回退。</p>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>二、三种 DNS 接管方式</h3>
+				</div>
+				<div class="agh-table-wrap">
+					<table class="agh-table">
+						<thead>
+							<tr><th>方式</th><th>原理</th><th>适用场景</th></tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><b>接管 53 端口（默认）</b></td>
+								<td>AdGuard Home 直接监听 53，DNSMasq 自动移到 1745，上游指向 DNSMasq。</td>
+								<td>与内置配置一致，客户端直接查询路由器 53。</td>
+							</tr>
+							<tr>
+								<td><b>DNSMasq 上游</b></td>
+								<td>AdGuard Home 监听 5333，DNSMasq 继续占用 53 并转发请求。</td>
+								<td>不想替换系统 DNS 时使用。</td>
+							</tr>
+							<tr>
+								<td><b>仅面板模式</b></td>
+								<td>AdGuard Home 监听 5333，不修改 DNSMasq。</td>
+								<td>只体验面板，或准备手动配置其他接管方式。</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<p class="agh-hint">以上方式只对“使用路由器作为 DNS”的设备生效；手动设置外部 DNS 的设备需要另行配置防火墙重定向。</p>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>三、AdGuard Home 面板常用功能</h3>
+				</div>
+				<ul class="agh-tips">
+					<li><b>拦截广告：</b>“过滤器 → DNS 黑名单”，启用默认规则或添加订阅。</li>
+					<li><b>安全搜索 / 家长控制：</b>“设置 → 常规设置”。</li>
+					<li><b>上游 DNS：</b>“设置 → DNS 设置”。</li>
+					<li><b>查询统计：</b>“仪表盘”和“查询日志”。</li>
+					<li><b>设备命名：</b>“设置 → 客户端设置”。</li>
+				</ul>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>四、常见问题</h3>
+				</div>
+				<ul class="agh-tips">
+					<li><b>面板打不开：</b>确认服务处于“运行中”；停止服务时面板也会关闭。</li>
+					<li><b>启用后不能上网：</b>点击“停止并关闭自启”，插件会恢复 DNSMasq 原始设置。</li>
+					<li><b>13800 打不开：</b>等待 5-10 秒；确认 UCI 端口和配置一致；旧安装需手动改成 13800。</li>
+					<li><b>忘记密码：</b>基础设置页底部“修改面板密码”。</li>
+					<li><b>升级固件后：</b>配置会保留，内核需重新安装。</li>
+				</ul>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>五、安全提示</h3>
+				</div>
+				<ul class="agh-tips">
+					<li>AdGuard Home 面板默认对局域网开放，请勿把 13800 映射到公网。</li>
+					<li>默认密码 admin123，建议首次登录后修改。</li>
+					<li>接管 53 端口会调整 DNSMasq，请确认没有其他 DNS 服务冲突。</li>
+				</ul>
+			</div>
+		</section>
+		</main>
+
+		<footer class="agh-footer">
+			<span>AdGuard Home 一键版 · 独立插件页面</span>
+			<span>布局与样式不受 LuCI 主题影响</span>
+		</footer>
+</div>
+
+<script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261108c"></script>
+</body>
+</html>

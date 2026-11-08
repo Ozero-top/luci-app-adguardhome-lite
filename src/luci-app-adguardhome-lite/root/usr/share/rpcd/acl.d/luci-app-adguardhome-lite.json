@@ -1,0 +1,25 @@
+{
+	"luci-app-adguardhome-lite": {
+		"description": "AdGuard Home 一键版（DNS 过滤与服务管理）",
+		"read": {
+			"uci": [ "adguardhome_lite" ],
+			"file": {
+				"/etc/AdGuardHome.yaml": [ "read" ],
+				"/etc/config/adguardhome_lite": [ "read" ],
+				"/var/run/adguardhome_lite_update.log": [ "read" ],
+				"/var/run/adguardhome_lite_action.log": [ "read" ],
+				"/var/run/adguardhome_lite_bootstrap.log": [ "read" ]
+			}
+		},
+		"write": {
+			"uci": [ "adguardhome_lite" ],
+			"file": {
+				"/etc/AdGuardHome.yaml": [ "write" ],
+				"/etc/config/adguardhome_lite": [ "write" ],
+				"/var/run/adguardhome_lite_update.log": [ "write" ],
+				"/var/run/adguardhome_lite_action.log": [ "write" ],
+				"/var/run/adguardhome_lite_bootstrap.log": [ "write" ]
+			}
+		}
+	}
+}
