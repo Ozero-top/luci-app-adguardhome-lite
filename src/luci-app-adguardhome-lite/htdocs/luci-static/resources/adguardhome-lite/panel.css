@@ -83,72 +83,6 @@ code {
 	padding: 16px 18px 28px;
 }
 
-/* 顶部栏（插件自带，不是 LuCI 顶栏） */
-.agh-topbar {
-	position: sticky;
-	top: 0;
-	z-index: 20;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 16px;
-	padding: 12px 16px;
-	margin-bottom: 12px;
-	background: rgba(255, 253, 247, 0.94);
-	border: 1px solid var(--agh-border);
-	border-radius: var(--agh-radius);
-	box-shadow: var(--agh-shadow);
-	backdrop-filter: blur(12px);
-}
-
-.agh-brand {
-	display: flex;
-	align-items: center;
-	gap: 11px;
-	min-width: 0;
-}
-
-.agh-logo {
-	width: 42px;
-	height: 42px;
-	flex: 0 0 42px;
-	display: grid;
-	place-items: center;
-	border-radius: 12px;
-	background: var(--agh-primary);
-	color: #fffdf6;
-	font-weight: 800;
-	font-size: 15px;
-	letter-spacing: 0.4px;
-	box-shadow: 0 8px 18px rgba(79, 125, 58, 0.22);
-}
-
-.agh-brand-text {
-	min-width: 0;
-}
-
-.agh-brand-text h1 {
-	margin: 0;
-	font-size: 18px;
-	line-height: 1.25;
-	color: #324a2c;
-	letter-spacing: 0.2px;
-}
-
-.agh-brand-text p {
-	margin: 2px 0 0;
-	font-size: 11px;
-	color: var(--agh-muted);
-}
-
-.agh-top-actions {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	flex-wrap: wrap;
-	justify-content: flex-end;
-}
-
 .agh-pill {
 	display: inline-flex;
 	align-items: center;
@@ -286,6 +220,14 @@ code {
 	margin: 0;
 	color: var(--agh-muted);
 	max-width: 860px;
+}
+
+.agh-hero-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	flex-wrap: wrap;
 }
 
 .agh-hero-badge {
@@ -789,13 +731,8 @@ code {
 /* 响应式 */
 @media (max-width: 800px) {
 	.agh-app { padding: 12px; }
-	.agh-topbar {
-		position: static;
-		flex-direction: column;
-		align-items: stretch;
-	}
-	.agh-top-actions { justify-content: flex-start; }
 	.agh-hero { flex-direction: column; padding: 15px; }
+	.agh-hero-actions { justify-content: flex-start; }
 	.agh-step { gap: 10px; padding: 11px; }
 	.agh-step-no { width: 30px; height: 30px; flex-basis: 30px; font-size: 12px; }
 	.agh-card { padding: 14px; }
@@ -804,8 +741,6 @@ code {
 }
 
 @media (max-width: 460px) {
-	.agh-brand-text h1 { font-size: 16px; }
-	.agh-brand-text p { font-size: 10px; }
 	.agh-hero h2 { font-size: 18px; }
 	.agh-status-grid { grid-template-columns: 1fr; }
 }
