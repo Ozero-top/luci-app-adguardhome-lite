@@ -8,7 +8,7 @@
 
 ## 项目初衷
 
-很多人第一次用 AdGuard Home，会卡在两件事：不知道怎么接管 DNS，以及下载内核总是失败。
+第一次用 AdGuard Home，会卡在两件事：不知道怎么接管 DNS，以及下载内核总是失败。
 
 本插件的目标就是把这些门槛降到最低：
 
@@ -198,6 +198,26 @@ make package/luci-app-adguardhome-lite/compile V=s
 - **重启后内核消失**：内核安装在 `/tmp` 内存位置，重新安装或改为内置存储。
 
 更多内容见 [安装与使用说明](docs/安装与使用说明.md)。
+
+---
+
+## 更新记录
+
+### v1.0.0（2026-11-08）
+
+- 首次发布：三步完成内核安装、DNS 接管与服务启停
+- 支持官方内核自动下载、GitHub 反代与 fake-IP 环境
+- 四种 DNS 接管方式，新增「OpenClash 串联」共存模式
+- 提供 `.ipk` 与离线 `.run` 两种安装包
+- 内置 8 个过滤规则 + 1 个白名单，日志与统计保留 30 天
+
+---
+
+## 反馈与贡献
+
+- 问题反馈：[GitHub Issues](https://github.com/Ozero-top/luci-app-adguardhome-lite/issues)
+- 欢迎提交 Pull Request 改进插件或文档
+- 如果这个项目帮到了你，欢迎点一个 Star
 
 ---
 
