@@ -759,6 +759,16 @@ code {
 	border-top: 1px solid var(--agh-border);
 }
 
+.agh-footer-link a {
+	color: var(--agh-primary);
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.agh-footer-link a:hover {
+	text-decoration: underline;
+}
+
 /* 响应式 */
 @media (max-width: 800px) {
 	.agh-app { padding: 12px; }
