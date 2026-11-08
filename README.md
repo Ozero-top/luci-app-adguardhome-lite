@@ -201,6 +201,7 @@ make package/luci-app-adguardhome-lite/compile V=s
 - **停止后面板打不开**：正常现象，面板随服务停止；重新「启动服务」即可。
 - **改了面板端口打不开**：等待 5-10 秒，并确认服务运行中、UCI 端口与 YAML `address` 一致。
 - **OpenClash 下不去广告**：DNS 接管方式选择「OpenClash 串联」。
+- **去广告测试不是 100 分 / YouTube 广告去不掉**：DNS 过滤只能拦截域名，无法隐藏页面元素，也无法处理与视频同域的 YouTube 广告；需要浏览器端扩展（uBlock Origin 等）配合。
 - **重启后内核消失**：内核安装在 `/tmp` 内存位置，重新安装或改为内置存储。
 
 更多内容见 [安装与使用说明](docs/安装与使用说明.md)。
