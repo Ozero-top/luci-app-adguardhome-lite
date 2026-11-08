@@ -136,6 +136,22 @@ nslookup www.google.com 路由器IP   # 代理站点返回 198.18.x.x fake-IP
 tail -6 /etc/dnsmasq.conf          # 应包含 BEGIN adguardhome-lite-openclash
 ```
 
+### 与 OpenClash 的启动顺序
+
+系统开机时按初始化顺序启动：**DNSMasq（START=19）→ AdGuard Home（START=95）→ OpenClash（START=99）**。
+
+| DNS 接管方式 | 顺序要求 | 说明 |
+|---|---|---|
+| **OpenClash 串联** | 无要求 | 先启 AdGuard Home 或先启 OpenClash 均实测正常：`pos.baidu.com` 返回 `0.0.0.0`，百度 / Google 可访问 |
+| 接管 53 端口 | **不要与 OpenClash 的 DNS 劫持同用** | OpenClash 会把 53 劫持到 DNSMasq 端口（如 1745），查询绕过监听 53 的 AdGuard Home，去广告失效；OpenClash 重启后会更明显 |
+| DNSMasq 上游 / 仅面板 | 无要求 | 不涉及 53 端口劫持 |
+
+建议：
+
+- 同时需要 OpenClash 本地 DNS 劫持和去广告时，固定使用 **「OpenClash 串联」**，不依赖启动顺序；
+- 手动排查时先启 OpenClash 或先启 AdGuard Home 都可以，串联模式会自动对齐 DNSMasq 端口；
+- OpenClash 重启期间 DNS 会短暂中断 1~2 秒，属正常现象。
+
 ---
 
 ## 项目结构
@@ -200,8 +216,7 @@ make package/luci-app-adguardhome-lite/compile V=s
 - **启用后不能上网**：概览页点「停止并关闭自启」，插件会恢复 DNSMasq；仍异常可执行 `/etc/init.d/adguardhome_lite stop && /etc/init.d/dnsmasq restart`。
 - **停止后面板打不开**：正常现象，面板随服务停止；重新「启动服务」即可。
 - **改了面板端口打不开**：等待 5-10 秒，并确认服务运行中、UCI 端口与 YAML `address` 一致。
-- **OpenClash 下不去广告**：DNS 接管方式选择「OpenClash 串联」。
-- **去广告测试不是 100 分 / YouTube 广告去不掉**：DNS 过滤只能拦截域名，无法隐藏页面元素，也无法处理与视频同域的 YouTube 广告；需要浏览器端扩展（uBlock Origin 等）配合。
+- **OpenClash 下不去广告**：DNS 接管方式选择「OpenClash 串联」，不要使用「接管 53」与 OpenClash 的 DNS 劫持搭配。
 - **重启后内核消失**：内核安装在 `/tmp` 内存位置，重新安装或改为内置存储。
 
 更多内容见 [安装与使用说明](docs/安装与使用说明.md)。
