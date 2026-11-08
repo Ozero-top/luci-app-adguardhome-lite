@@ -4,10 +4,6 @@
 
 > 插件负责安装内核、接管 DNS 与服务管理；过滤规则、查询统计、家长控制等请直接在 AdGuard Home 面板中操作。
 
-<div align=center>
-<img src="https://ozero.top/media/2026/11/6af0738b04e0b3.88465351.png" width="600" height="566"> 
-</div>
-
 ---
 
 ## 项目初衷
@@ -22,6 +18,12 @@
 - **不绑定设备**：同时兼容新版 LuCI 与旧版 Lua LuCI，覆盖 OpenWrt、ImmortalWrt、iStoreOS 及衍生固件。
 
 需要更细的控制时，仍可在 AdGuard Home 面板或插件「高级配置」中修改。
+
+---
+
+<div align=center>
+<img src="https://ozero.top/media/2026/11/6af0738b04e0b3.88465351.png" width="600" height="566"> 
+</div>
 
 ---
 
