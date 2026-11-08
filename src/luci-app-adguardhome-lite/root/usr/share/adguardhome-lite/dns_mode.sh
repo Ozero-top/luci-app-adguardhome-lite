@@ -20,6 +20,9 @@ save_original() {
     old_has_port="0"
     old_port="$(get_uci dhcp.@dnsmasq[0].port)"
     [ -n "$old_port" ] && old_has_port="1"
+    # 1745 是本插件接管时使用的端口，不能当作系统原始值保存，
+    # 否则停止插件后 DNSMasq 不会回到 53，客户端会失去 DNS。
+    [ "$old_port" = "1745" ] && old_port="53"
 
     old_has_noresolv="0"
     old_noresolv="$(get_uci dhcp.@dnsmasq[0].noresolv)"
@@ -62,7 +65,10 @@ restore_original() {
     [ "$(get_uci "$CONF.main.old_captured")" = "1" ] || return 0
 
     if [ "$(get_uci "$CONF.main.old_has_port")" = "1" ]; then
-        uci -q set "dhcp.@dnsmasq[0].port=$(get_uci "$CONF.main.old_port")"
+        _restore_port="$(get_uci "$CONF.main.old_port")"
+        # 兼容旧版本错误保存的 1745：恢复时必须回到 53，否则停止插件后没有 DNS 监听
+        [ "$_restore_port" = "1745" ] && _restore_port="53"
+        uci -q set "dhcp.@dnsmasq[0].port=$_restore_port"
     else
         uci -q delete dhcp.@dnsmasq[0].port
     fi
@@ -84,6 +90,15 @@ restore_original() {
         for _s in $(get_uci "$CONF.main.old_server"); do
             uci -q add_list "dhcp.@dnsmasq[0].server=$_s"
         done
+    else
+        # 原始状态没有上游且已禁用 resolv.conf 时，恢复后会导致无法解析，
+        # 这里补上公共 DNS，保证停止插件后仍然能上网。
+        if [ "$(get_uci "$CONF.main.old_has_noresolv")" = "1" ] && \
+           [ "$(get_uci "$CONF.main.old_noresolv")" = "1" ]; then
+            uci -q add_list 'dhcp.@dnsmasq[0].server=223.5.5.5'
+            uci -q add_list 'dhcp.@dnsmasq[0].server=119.29.29.29'
+            uci -q delete dhcp.@dnsmasq[0].resolvfile
+        fi
     fi
 
     uci -q commit dhcp 2>/dev/null
@@ -212,6 +227,38 @@ apply_mode() {
             _port="$(get_uci dhcp.@dnsmasq[0].port)"
             if [ -z "$_port" ] || [ "$_port" = "53" ]; then
                 uci -q set dhcp.@dnsmasq[0].port='1745'
+            fi
+
+            # 确保 DNSMasq 有可用上游：空上游或失效的 Clash DNS 会让 AGH 无法解析。
+            _upstream_ok="0"
+            _servers="$(get_uci dhcp.@dnsmasq[0].server)"
+            if [ -n "$_servers" ]; then
+                _upstream_ok="1"
+                for _s in $_servers; do
+                    case "$_s" in
+                        127.0.0.1#7874|127.0.0.1:7874)
+                            netstat -ln 2>/dev/null | grep -q ':7874 ' || _upstream_ok="0"
+                            ;;
+                    esac
+                done
+            fi
+            if [ "$_upstream_ok" = "0" ]; then
+                log_msg "DNSMasq 没有可用上游，已设置为公共 DNS（223.5.5.5 / 119.29.29.29）。"
+                uci -q delete dhcp.@dnsmasq[0].server
+                uci -q add_list 'dhcp.@dnsmasq[0].server=223.5.5.5'
+                uci -q add_list 'dhcp.@dnsmasq[0].server=119.29.29.29'
+                uci -q set dhcp.@dnsmasq[0].noresolv='1'
+                uci -q delete dhcp.@dnsmasq[0].resolvfile
+                # 同步备份值，停止插件后依然保留可用的公共 DNS
+                if [ "$(get_uci "$CONF.main.old_captured")" = "1" ]; then
+                    uci -q set "$CONF.main.old_has_server=1"
+                    uci -q delete "$CONF.main.old_server"
+                    uci -q add_list "$CONF.main.old_server=223.5.5.5"
+                    uci -q add_list "$CONF.main.old_server=119.29.29.29"
+                    uci -q set "$CONF.main.old_has_noresolv=1"
+                    uci -q set "$CONF.main.old_noresolv=1"
+                    uci -q delete "$CONF.main.old_has_resolvfile"
+                fi
             fi
             ;;
         openclash)
