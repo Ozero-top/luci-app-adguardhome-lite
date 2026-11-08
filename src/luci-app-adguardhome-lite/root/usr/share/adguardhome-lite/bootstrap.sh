@@ -52,9 +52,10 @@ case "$dns_mode" in
         upstream_note="Clash DNS（$clash_dns_port）"
         ;;
     upstream)
-        # DNSMasq 在 53 且转发给 AdGuard Home，本机 53 会形成回环，改用公共 DNS
-        upstream="223.5.5.5 119.29.29.29"
-        upstream_note="公共 DNS（避免本机回环）"
+        # DNSMasq 在 53 且转发给 AdGuard Home，本机 53 会形成回环，
+        # 改用实际的 Clash DNS 或 WAN 下发的 DNS，避免写死公共 DNS。
+        upstream="$(detect_upstream_dns)"
+        upstream_note="系统上游 DNS（$upstream）"
         ;;
     *)
         # 仅面板模式：DNSMasq 保持 53，可直接作为本地上游
@@ -63,6 +64,9 @@ case "$dns_mode" in
         ;;
 esac
 yaml_set_list "$configpath" "upstream_dns" "$upstream"
+
+# 记录自动写入的上游，后续切换模式时只改动插件自己写入的值
+uci -q set "$CONF.main.auto_upstream=$upstream"
 
 if ! check_agh_config; then
     _err=$(tail -n 5 /var/run/adguardhome_lite_check.log 2>/dev/null | tr '\n' ' ')

@@ -20,9 +20,6 @@ save_original() {
     old_has_port="0"
     old_port="$(get_uci dhcp.@dnsmasq[0].port)"
     [ -n "$old_port" ] && old_has_port="1"
-    # 1745 是本插件接管时使用的端口，不能当作系统原始值保存，
-    # 否则停止插件后 DNSMasq 不会回到 53，客户端会失去 DNS。
-    [ "$old_port" = "1745" ] && old_port="53"
 
     old_has_noresolv="0"
     old_noresolv="$(get_uci dhcp.@dnsmasq[0].noresolv)"
@@ -65,10 +62,7 @@ restore_original() {
     [ "$(get_uci "$CONF.main.old_captured")" = "1" ] || return 0
 
     if [ "$(get_uci "$CONF.main.old_has_port")" = "1" ]; then
-        _restore_port="$(get_uci "$CONF.main.old_port")"
-        # 兼容旧版本错误保存的 1745：恢复时必须回到 53，否则停止插件后没有 DNS 监听
-        [ "$_restore_port" = "1745" ] && _restore_port="53"
-        uci -q set "dhcp.@dnsmasq[0].port=$_restore_port"
+        uci -q set "dhcp.@dnsmasq[0].port=$(get_uci "$CONF.main.old_port")"
     else
         uci -q delete dhcp.@dnsmasq[0].port
     fi
@@ -90,15 +84,6 @@ restore_original() {
         for _s in $(get_uci "$CONF.main.old_server"); do
             uci -q add_list "dhcp.@dnsmasq[0].server=$_s"
         done
-    else
-        # 原始状态没有上游且已禁用 resolv.conf 时，恢复后会导致无法解析，
-        # 这里补上公共 DNS，保证停止插件后仍然能上网。
-        if [ "$(get_uci "$CONF.main.old_has_noresolv")" = "1" ] && \
-           [ "$(get_uci "$CONF.main.old_noresolv")" = "1" ]; then
-            uci -q add_list 'dhcp.@dnsmasq[0].server=223.5.5.5'
-            uci -q add_list 'dhcp.@dnsmasq[0].server=119.29.29.29'
-            uci -q delete dhcp.@dnsmasq[0].resolvfile
-        fi
     fi
 
     uci -q commit dhcp 2>/dev/null
@@ -228,38 +213,6 @@ apply_mode() {
             if [ -z "$_port" ] || [ "$_port" = "53" ]; then
                 uci -q set dhcp.@dnsmasq[0].port='1745'
             fi
-
-            # 确保 DNSMasq 有可用上游：空上游或失效的 Clash DNS 会让 AGH 无法解析。
-            _upstream_ok="0"
-            _servers="$(get_uci dhcp.@dnsmasq[0].server)"
-            if [ -n "$_servers" ]; then
-                _upstream_ok="1"
-                for _s in $_servers; do
-                    case "$_s" in
-                        127.0.0.1#7874|127.0.0.1:7874)
-                            netstat -ln 2>/dev/null | grep -q ':7874 ' || _upstream_ok="0"
-                            ;;
-                    esac
-                done
-            fi
-            if [ "$_upstream_ok" = "0" ]; then
-                log_msg "DNSMasq 没有可用上游，已设置为公共 DNS（223.5.5.5 / 119.29.29.29）。"
-                uci -q delete dhcp.@dnsmasq[0].server
-                uci -q add_list 'dhcp.@dnsmasq[0].server=223.5.5.5'
-                uci -q add_list 'dhcp.@dnsmasq[0].server=119.29.29.29'
-                uci -q set dhcp.@dnsmasq[0].noresolv='1'
-                uci -q delete dhcp.@dnsmasq[0].resolvfile
-                # 同步备份值，停止插件后依然保留可用的公共 DNS
-                if [ "$(get_uci "$CONF.main.old_captured")" = "1" ]; then
-                    uci -q set "$CONF.main.old_has_server=1"
-                    uci -q delete "$CONF.main.old_server"
-                    uci -q add_list "$CONF.main.old_server=223.5.5.5"
-                    uci -q add_list "$CONF.main.old_server=119.29.29.29"
-                    uci -q set "$CONF.main.old_has_noresolv=1"
-                    uci -q set "$CONF.main.old_noresolv=1"
-                    uci -q delete "$CONF.main.old_has_resolvfile"
-                fi
-            fi
             ;;
         openclash)
             # 保留 OpenClash 的 53 劫持：DNSMasq 端口与劫持目标保持一致，
@@ -289,6 +242,66 @@ apply_mode() {
     return 0
 }
 
+# 让 DNSMasq 监听 OpenClash 劫持的目标端口，并保持上游指向 Clash DNS。
+# 仅用于 OpenClash 仍在运行且劫持规则存在的场景。
+align_with_openclash() {
+    _ap="$1"
+
+    [ "$(get_uci dhcp.@dnsmasq[0].port)" = "$_ap" ] || uci -q set "dhcp.@dnsmasq[0].port=$_ap"
+
+    if port_listening "$clash_dns_port"; then
+        uci -q set dhcp.@dnsmasq[0].noresolv='1'
+        uci -q delete dhcp.@dnsmasq[0].resolvfile
+        uci -q delete dhcp.@dnsmasq[0].server
+        uci -q add_list "dhcp.@dnsmasq[0].server=127.0.0.1#$clash_dns_port"
+    fi
+
+    uci -q commit dhcp 2>/dev/null
+    log_msg "OpenClash 仍在运行，DNSMasq 已对齐劫持端口 $_ap。"
+}
+
+# 恢复后检查上游是否可用：指向已停止的本地端口时自动回退，避免 DNSMasq 无法解析。
+repair_dnsmasq_upstream() {
+    [ "$(get_uci dhcp.@dnsmasq[0].noresolv)" = "1" ] || return 0
+
+    _servers="$(get_uci dhcp.@dnsmasq[0].server)"
+    [ -n "$_servers" ] || return 0
+
+    _alive=0
+    for _s in $_servers; do
+        case "$_s" in
+            127.0.0.1#*|::1#*|localhost#*)
+                _p="${_s##*#}"
+                port_listening "$_p" && _alive=1
+                ;;
+            *)
+                _alive=1
+                ;;
+        esac
+        [ "$_alive" = "1" ] && break
+    done
+    [ "$_alive" = "1" ] && return 0
+
+    if port_listening "$clash_dns_port"; then
+        log_msg "DNSMasq 上游不可用（$_servers），已切换为 Clash DNS。"
+        uci -q delete dhcp.@dnsmasq[0].server
+        uci -q add_list "dhcp.@dnsmasq[0].server=127.0.0.1#$clash_dns_port"
+    else
+        log_msg "DNSMasq 上游不可用（$_servers），已回退到 WAN DNS。"
+        uci -q delete dhcp.@dnsmasq[0].server
+        uci -q set dhcp.@dnsmasq[0].noresolv='0'
+        if [ -s /tmp/resolv.conf.d/resolv.conf.auto ]; then
+            uci -q set dhcp.@dnsmasq[0].resolvfile='/tmp/resolv.conf.d/resolv.conf.auto'
+        else
+            uci -q delete dhcp.@dnsmasq[0].resolvfile
+        fi
+    fi
+
+    uci -q commit dhcp 2>/dev/null
+    restart_dnsmasq
+    sleep 1
+}
+
 revert_mode() {
     _had="$(get_uci "$CONF.main.old_captured")"
     _applied="$(get_uci "$CONF.main.mode_applied")"
@@ -308,8 +321,21 @@ revert_mode() {
     uci -q set "$CONF.main.mode_applied=none"
     uci -q commit "$CONF" 2>/dev/null
 
-    if [ "$_had" = "1" ] || [ "$_oc" = "1" ]; then
+    # OpenClash 仍在劫持 53 时，DNSMasq 必须监听劫持目标端口，
+    # 否则恢复出的端口与劫持目标不一致，会直接导致 DNSMasq 无法解析。
+    _hijack="$(openclash_hijack_port)"
+    if [ -n "$_hijack" ]; then
+        align_with_openclash "$_hijack"
+    fi
+
+    if [ "$_had" = "1" ] || [ "$_oc" = "1" ] || [ -n "$_hijack" ]; then
         restart_dnsmasq
+        sleep 1
+        # 恢复后如果上游指向已停止的本地端口，自动回退到 WAN DNS，避免断网
+        repair_dnsmasq_upstream
+        if ! nslookup www.baidu.com 127.0.0.1 >/dev/null 2>&1; then
+            log_msg "提示：DNSMasq 解析仍失败，请检查 OpenClash 运行状态或 WAN DNS。"
+        fi
         log_msg "已恢复 DNSMasq 原始设置"
     fi
 }
