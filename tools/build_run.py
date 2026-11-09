@@ -20,9 +20,9 @@ import tarfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "dist")
-MODERN = "luci-app-adguardhome-lite_1.1.1-1_all.ipk"
-LEGACY = "luci-app-adguardhome-lite_1.1.1-1-legacy_all.ipk"
-OUTPUT = "luci-app-adguardhome-lite_1.1.1-1.run"
+MODERN = "luci-app-adguardhome-lite_1.1.2-1_all.ipk"
+LEGACY = "luci-app-adguardhome-lite_1.1.2-1-legacy_all.ipk"
+OUTPUT = "luci-app-adguardhome-lite_1.1.2-1.run"
 
 INSTALL_SH = """#!/bin/sh
 # AdGuard Home 一键版 - 离线安装脚本
