@@ -44,6 +44,7 @@ if [ -s "$configpath" ]; then
     case "$dns_mode" in
         takeover) _target_up="127.0.0.1:1745" ;;
         openclash) _target_up="127.0.0.1:$clash_dns_port" ;;
+        clashfirst) _target_up="$(detect_real_upstream_dns)" ;;
         upstream) _target_up="$(detect_upstream_dns)" ;;
         *) _target_up="127.0.0.1" ;;
     esac
@@ -52,7 +53,7 @@ if [ -s "$configpath" ]; then
     _is_auto=0
     [ -n "$_auto_up" ] && [ "$_cur_up" = "$_auto_up" ] && _is_auto=1
     case "$_cur_up" in
-        "127.0.0.1"|"127.0.0.1:1745"|"127.0.0.1:$clash_dns_port"|"223.5.5.5 119.29.29.29"|"$_self_ip")
+        "127.0.0.1"|"127.0.0.1:1745"|"127.0.0.1:$clash_dns_port"|"127.0.0.1:5335"|"223.5.5.5 119.29.29.29"|"$_self_ip")
             _is_auto=1
             ;;
     esac
@@ -62,6 +63,23 @@ if [ -s "$configpath" ]; then
         uci -q set "$CONF.main.auto_upstream=$_target_up"
         log_msg "已根据 DNS 接管方式调整上游 DNS：$_target_up"
     fi
+
+    # 本地 PTR 解析：只有接管 53 模式才可以指向 DNSMasq（1745），
+    # 其它模式下 DNSMasq 又转发回 AdGuard Home，会造成反向查询环。
+    _ptr_up="127.0.0.1:53"
+    [ "$dns_mode" = "takeover" ] && _ptr_up="127.0.0.1:1745"
+    _cur_ptr=$(yaml_get_list "$configpath" "local_ptr_upstreams")
+    case "$_cur_ptr" in
+        ""|"127.0.0.1"|"127.0.0.1:53"|"127.0.0.1:1745")
+            if [ "$dns_mode" = "takeover" ]; then
+                yaml_set_scalar "$configpath" "use_private_ptr_resolvers" "true"
+                yaml_set_list "$configpath" "local_ptr_upstreams" "$_ptr_up"
+            else
+                yaml_set_scalar "$configpath" "use_private_ptr_resolvers" "false"
+                yaml_set_list "$configpath" "local_ptr_upstreams" ""
+            fi
+            ;;
+    esac
 
     if ! check_agh_config; then
         _err=$(tail -n 3 /var/run/adguardhome_lite_check.log 2>/dev/null | tr '\n' ' ')
@@ -77,6 +95,12 @@ if [ "$enabled" = "1" ]; then
     _rc=$?
     if [ "$_rc" -ne 0 ]; then
         log_msg "启动命令返回错误码 $_rc，请到“运行日志”查看原因。"
+    fi
+
+    # 前置模式下 AdGuard Home 先启动，再让 OpenClash 重载上游，
+    # 避免重启 OpenClash 时 5335 还没有监听导致 DNS 中断。
+    if [ "$dns_mode" = "clashfirst" ]; then
+        clashfirst_openclash_refresh
     fi
 else
     /etc/init.d/adguardhome_lite disable >/dev/null 2>&1

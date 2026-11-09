@@ -37,6 +37,20 @@ start_service() {
         return 1
     fi
 
+    # 串联模式的 AdGuard Home 上游是 Clash DNS；Clash 已在运行但端口未就绪时，
+    # 先等待其监听，避免 AdGuard Home 启动即解析失败。
+    if [ "$dns_mode" = "openclash" ] && pidof clash >/dev/null 2>&1; then
+        _wi=0
+        while [ "$_wi" -lt 10 ]; do
+            port_listening "$clash_dns_port" && break
+            sleep 1
+            _wi=$(( _wi + 1 ))
+        done
+        if ! port_listening "$clash_dns_port"; then
+            log_msg "等待 Clash DNS（$clash_dns_port）超时，OpenClash 可能尚未就绪。"
+        fi
+    fi
+
     # 应用 DNS 接管方式；失败不阻止内核启动，但会记录原因
     if ! /usr/share/adguardhome-lite/dns_mode.sh apply; then
         log_msg "DNS 接管设置失败，将继续启动 AdGuard Home。"

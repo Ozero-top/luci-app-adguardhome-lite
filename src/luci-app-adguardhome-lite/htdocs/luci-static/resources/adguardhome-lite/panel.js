@@ -146,9 +146,19 @@
 
 	function modeLabel(mode) {
 		if (mode === 'takeover') return '接管 53 端口';
-		if (mode === 'openclash') return 'OpenClash 串联（保留 DNS 劫持）';
+		if (mode === 'openclash') return 'OpenClash 串联（DNSMasq → AGH → Clash）';
+		if (mode === 'clashfirst') return 'OpenClash 前置（Clash → AGH → 真实 DNS）';
 		if (mode === 'none') return '仅面板（不接管 DNS）';
 		return 'DNSMasq 上游';
+	}
+
+	function modeChain(d) {
+		var cdp = d.clash_dns_port || '7874';
+		if (d.dns_mode === 'takeover') return '客户端 → 53 AdGuard Home → 1745 DNSMasq → 上游 DNS';
+		if (d.dns_mode === 'openclash') return '客户端 → 53 DNSMasq → 5333 AdGuard Home → ' + cdp + ' Clash DNS';
+		if (d.dns_mode === 'clashfirst') return '客户端 → OpenClash 劫持 → ' + cdp + ' Clash DNS → 5335 AdGuard Home → 真实 DNS';
+		if (d.dns_mode === 'none') return '不接管 DNS，仅保留管理面板';
+		return '客户端 → 53 DNSMasq → 5333 AdGuard Home → 自动选择上游';
 	}
 
 	function channelLabel(channel) {
@@ -229,6 +239,7 @@
 			['服务状态', d.running ? '<span class="agh-ok">运行中</span>' : '<span class="agh-bad">已停止</span>'],
 			['内核版本', d.core ? '<span class="agh-ok">' + esc(d.version || '已安装') + '</span>' : '<span class="agh-bad">未安装</span>'],
 			['DNS 接管', esc(modeLabel(d.dns_mode)) + ((d.mode_applied && d.mode_applied !== d.dns_mode) ? ' <span class="agh-warn">（待应用）</span>' : '')],
+			['当前链路', '<span class="agh-path">' + esc(modeChain(d)) + '</span>'],
 			['更新通道', esc(channelLabel(d.channel))],
 			['GitHub 反代', d.channel === 'beta' ? '<span class="agh-hint">测试版不使用</span>' : esc(proxyLabel(d.github_proxy))],
 			['面板地址', '<a href="' + esc(panel) + '" target="_blank" rel="noopener">' + esc(panel.replace(/^http:\/\//, '')) + '</a>'],
@@ -239,7 +250,24 @@
 		];
 
 		if (d.openclash_hijack && d.dns_mode === 'takeover') {
-			rows.push(['配置建议', '<span class="agh-warn">检测到 OpenClash DNS 劫持，当前「接管 53」会被劫持绕过，建议改用「OpenClash 串联」。</span>']);
+			rows.push(['配置建议', '<span class="agh-warn">检测到 OpenClash DNS 劫持，当前「接管 53」会被绕过：请关闭 OpenClash 的 DNS 劫持，或改用「OpenClash 前置」。</span>']);
+		}
+		if (d.dns_mode === 'openclash' && d.openclash_hijack_port &&
+			d.openclash_hijack_port !== '53' && d.openclash_hijack_port !== String(d.dns_port)) {
+			rows.push(['配置建议', '<span class="agh-warn">OpenClash 把 53 直接劫持到 ' + esc(d.openclash_hijack_port) +
+				'，查询不经过 DNSMasq，AdGuard Home 被绕过。请改用「OpenClash 前置」。</span>']);
+		}
+		if (d.dns_mode === 'openclash' && !d.openclash_running) {
+			rows.push(['配置建议', '<span class="agh-warn">Clash 内核未运行，AdGuard Home 的上游 ' + esc(d.clash_dns_port || '7874') + ' 不可用，DNS 会解析失败。</span>']);
+		}
+		if (d.dns_mode === 'clashfirst') {
+			if (!d.openclash_running) {
+				rows.push(['配置建议', '<span class="agh-warn">Clash 内核未运行，前置链路无法生效。</span>']);
+			} else if (!d.openclash_redirect || d.openclash_redirect === '0') {
+				rows.push(['配置建议', '<span class="agh-warn">OpenClash 的 DNS 劫持未开启，客户端查询会绕过 AdGuard Home。</span>']);
+			} else if (!d.openclash_upstream_agh) {
+				rows.push(['配置建议', '<span class="agh-warn">未检测到指向 127.0.0.1:' + String(d.dns_port) + ' 的 OpenClash 上游，可保存一次设置或重启 OpenClash 使其生效。</span>']);
+			}
 		}
 
 		var html = '';
@@ -523,8 +551,8 @@
 			setMsg(msgEl, '管理面板端口必须是 1-65535 之间的整数。', 'bad');
 			return;
 		}
-		if (n === 53 || n === 1745 || n === 5333) {
-			setMsg(msgEl, '管理面板端口不能使用 53、1745 或 5333。', 'bad');
+		if (n === 53 || n === 1745 || n === 5333 || n === 5335) {
+			setMsg(msgEl, '管理面板端口不能使用 53、1745、5333 或 5335。', 'bad');
 			return;
 		}
 

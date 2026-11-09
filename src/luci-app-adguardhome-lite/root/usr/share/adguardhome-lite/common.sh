@@ -45,6 +45,7 @@ load_conf() {
 
     case "$dns_mode" in
         takeover) dnsport="53" ;;
+        clashfirst) dnsport="5335" ;;
         *) dnsport="5333" ;;
     esac
 }
@@ -251,43 +252,87 @@ detect_upstream_dns() {
     echo "223.5.5.5 119.29.29.29"
 }
 
-# OpenClash 是否仍在劫持 53 端口（返回重定向目标端口）
-openclash_hijack_port() {
-    have_cmd nft || return 0
-    nft list chain inet fw4 dstnat 2>/dev/null \
-        | grep 'OpenClash DNS Hijack' \
-        | sed -n 's/.*redirect to :\([0-9][0-9]*\).*/\1/p' \
-        | head -n 1
+# “OpenClash 前置”模式使用的真实上游：AdGuard Home 位于 Clash 之后，
+# 上游必须是真实 DNS，绝不能是 Clash（7874）或本机 53，否则会形成查询环。
+detect_real_upstream_dns() {
+    _wan_dns="$(wan_dns_servers)"
+    if [ -n "$_wan_dns" ]; then
+        echo "$_wan_dns"
+        return
+    fi
+
+    echo "223.5.5.5 119.29.29.29"
 }
 
-# 让 OpenClash 重新生成防火墙劫持规则（不重启 Clash 内核）
-# 仅在 Clash 正在运行时执行，避免 OpenClash 未启动时无谓等待。
-openclash_reload_rules() {
-    [ -x /etc/init.d/openclash ] || return 1
-    pidof clash >/dev/null 2>&1 || return 1
+# OpenClash 是否仍在劫持 53 端口（返回重定向目标端口）
+# 兼容两种规则写法：redirect to :7874 和 dnat [ip] to 127.0.0.1:7874
+openclash_hijack_port() {
+    have_cmd nft || return 0
 
-    /etc/init.d/openclash reload manual >/dev/null 2>&1
+    _oc_line=$(nft list chain inet fw4 dstnat 2>/dev/null | grep 'OpenClash DNS Hijack' | head -n 1)
+    [ -n "$_oc_line" ] || return 0
 
-    _ri=0
-    while [ "$_ri" -lt 10 ]; do
-        sleep 1
-        [ -n "$(openclash_hijack_port)" ] && return 0
-        _ri=$(( _ri + 1 ))
+    _oc_port=$(echo "$_oc_line" | sed -n 's/.*redirect to :\([0-9][0-9]*\).*/\1/p')
+    if [ -z "$_oc_port" ]; then
+        _oc_port=$(echo "$_oc_line" | sed -n 's/.*dnat.*:\([0-9][0-9]*\).*/\1/p')
+    fi
+    echo "$_oc_port"
+}
+
+# DNSMasq 实际读取的 conf-dir：优先从 OpenWrt 生成的临时配置解析，
+# 回退到 /tmp/dnsmasq.d（与 OpenClash 使用的位置一致）。
+dnsmasq_confdir() {
+    _dcd=""
+    for _dcf in /tmp/etc/dnsmasq.conf.*; do
+        [ -f "$_dcf" ] || continue
+        _dcv=$(sed -n 's/^conf-dir=\([^,]*\).*/\1/p' "$_dcf" 2>/dev/null | head -n 1)
+        if [ -n "$_dcv" ]; then
+            _dcd="$_dcv"
+            break
+        fi
     done
+    [ -n "$_dcd" ] || _dcd="/tmp/dnsmasq.d"
+    echo "$_dcd"
+}
+
+# dnsmasq 2.86 起支持 server=/#/，旧版本只能用 server=/./ 表示所有域名
+dnsmasq_hash_rule_supported() {
+    _dvv=$(dnsmasq --version 2>/dev/null | sed -n 's/.*version \([0-9][0-9.]*\).*/\1/p' | head -n 1)
+    [ -n "$_dvv" ] || return 0
+
+    _dvmaj=${_dvv%%.*}
+    _dvrest=${_dvv#*.}
+    _dvmin=${_dvrest%%.*}
+    [ "$_dvmaj" -ge 3 ] 2>/dev/null && return 0
+    if [ "$_dvmaj" -eq 2 ] 2>/dev/null && [ "$_dvmin" -ge 86 ] 2>/dev/null; then
+        return 0
+    fi
     return 1
 }
 
-# OpenClash 串联模式：在 /etc/dnsmasq.conf 写入默认转发规则，
-# 让 DNSMasq 把所有域名查询交给 AdGuard Home，同时保留 OpenClash 的 DNS 劫持。
+# OpenClash 串联模式：在 DNSMasq 的 conf-dir 写入带标记的默认转发规则，
+# 让 DNSMasq 把域名查询交给 AdGuard Home。
+# 不再写 /etc/dnsmasq.conf：OpenWrt 上该文件不会被 DNSMasq 读取。
 OC_CONF="/etc/dnsmasq.conf"
+OC_FILE="adguardhome-lite.conf"
 OC_BEGIN="# BEGIN adguardhome-lite-openclash"
 OC_END="# END adguardhome-lite-openclash"
 
+oc_conf_path() {
+    echo "$(dnsmasq_confdir)/$OC_FILE"
+}
+
 openclash_forward_present() {
-    [ -f "$OC_CONF" ] && grep -qF "$OC_BEGIN" "$OC_CONF"
+    _ocp="$(oc_conf_path)"
+    [ -f "$_ocp" ] && grep -qF "$OC_BEGIN" "$_ocp" && return 0
+    [ -f "$OC_CONF" ] && grep -qF "$OC_BEGIN" "$OC_CONF" && return 0
+    return 1
 }
 
 openclash_forward_del() {
+    _ocp="$(oc_conf_path)"
+    [ -f "$_ocp" ] && rm -f "$_ocp"
+
     [ -f "$OC_CONF" ] || return 0
     grep -qF "$OC_BEGIN" "$OC_CONF" || return 0
 
@@ -299,16 +344,23 @@ openclash_forward_del() {
 }
 
 openclash_forward_add() {
-    [ -f "$OC_CONF" ] || return 1
+    _ocdir="$(dnsmasq_confdir)"
+    mkdir -p "$_ocdir" 2>/dev/null || return 1
+
     openclash_forward_del
 
     {
-        printf '\n%s\n' "$OC_BEGIN"
-        # strict-order 保证优先查询 AdGuard Home；不可用时才回退到原 DNSMasq 上游
+        printf '%s\n' "$OC_BEGIN"
+        # strict-order：DNSMasq 有多个上游时按顺序优先查询 AdGuard Home，
+        # 避免轮询到 WAN DNS 造成过滤被绕过；AdGuard Home 不可用时仍可回退。
         printf 'strict-order\n'
-        printf 'server=/#/127.0.0.1#%s\n' "$dnsport"
+        if dnsmasq_hash_rule_supported; then
+            printf 'server=/#/127.0.0.1#%s\n' "$dnsport"
+        else
+            printf 'server=/./127.0.0.1#%s\n' "$dnsport"
+        fi
         printf '%s\n' "$OC_END"
-    } >> "$OC_CONF"
+    } > "$_ocdir/$OC_FILE"
 }
 
 # 读取 YAML 中某个两空格缩进的列表，返回空格分隔的一行
@@ -347,6 +399,11 @@ yaml_set_list() {
     awk -v k="$_key" -v vals="$_values" '
         BEGIN { n = split(vals, a, " ") }
         $0 ~ "^  " k ":" {
+            if (n == 0 || vals == "") {
+                print "  " k ": []"
+                skip = 1
+                next
+            }
             print "  " k ":"
             for (i = 1; i <= n; i++) print "    - " a[i]
             skip = 1
@@ -355,4 +412,106 @@ yaml_set_list() {
         skip == 1 && /^    - / { next }
         { skip = 0; print }
     ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
+}
+
+###
+# OpenClash 前置（clashfirst）模式：让 Clash 的 DNS 上游只指向 AdGuard Home
+###
+
+clashfirst_disable_upstream() {
+    _nds_sid="$1"
+    config_get _nds_grp "$_nds_sid" group ""
+    # nameserver 和 fallback 都会给 Clash 提供绕过 AdGuard Home 的解析路径
+    case "$_nds_grp" in
+        nameserver|fallback) ;;
+        *) return 0 ;;
+    esac
+    config_get_bool _nds_en "$_nds_sid" enabled 1
+    [ "$_nds_en" = "0" ] && return 0
+
+    uci -q set "openclash.$_nds_sid.enabled=0"
+    _oc_disabled="$_oc_disabled $_nds_sid"
+}
+
+# 关闭 OpenClash 原有 nameserver 组，仅保留指向 AdGuard Home 的上游。
+# 返回值：0 成功；2 未安装 OpenClash；3 OpenClash 版本不支持自定义 DNS。
+clashfirst_openclash_apply() {
+    uci -q get openclash.config >/dev/null 2>&1 || return 2
+    uci -q get openclash.config.enable_custom_dns >/dev/null 2>&1 || return 3
+
+    # 清理上一次可能残留的设置（不重启 OpenClash）
+    clashfirst_openclash_restore >/dev/null 2>&1
+
+    _old_cd=$(uci -q get openclash.config.enable_custom_dns)
+    [ -n "$_old_cd" ] || _old_cd="0"
+    _old_wan=$(uci -q get openclash.config.append_wan_dns)
+    [ -n "$_old_wan" ] || _old_wan="0"
+
+    _oc_disabled=""
+    config_load openclash 2>/dev/null
+    config_foreach clashfirst_disable_upstream dns_servers
+
+    _sid=$(uci add openclash dns_servers) || return 1
+    # 注意不要写成 foo='bar'，否则引号会进入 UCI 值，OpenClash 读不到合法值
+    uci -q set "openclash.$_sid.group=nameserver"
+    uci -q set "openclash.$_sid.ip=127.0.0.1"
+    uci -q set "openclash.$_sid.port=$dnsport"
+    uci -q set "openclash.$_sid.type=udp"
+    uci -q set "openclash.$_sid.enabled=1"
+    uci -q set openclash.config.enable_custom_dns=1
+    # 不再追加 WAN DNS，否则 Clash 会同时查询运营商 DNS，部分查询绕过过滤
+    uci -q set openclash.config.append_wan_dns=0
+
+    uci -q set "$CONF.main.oc_agh_sid=$_sid"
+    uci -q set "$CONF.main.oc_old_custom_dns=$_old_cd"
+    uci -q set "$CONF.main.oc_old_append_wan_dns=$_old_wan"
+    uci -q set "$CONF.main.oc_disabled_sids=$_oc_disabled"
+
+    uci -q commit openclash 2>/dev/null
+    uci -q commit "$CONF" 2>/dev/null
+    return 0
+}
+
+# 恢复 OpenClash 的原有 DNS 上游设置
+clashfirst_openclash_restore() {
+    _r_sid=$(uci -q get "$CONF.main.oc_agh_sid")
+    _r_sids=$(uci -q get "$CONF.main.oc_disabled_sids")
+    _r_old=$(uci -q get "$CONF.main.oc_old_custom_dns")
+    _r_wan=$(uci -q get "$CONF.main.oc_old_append_wan_dns")
+
+    [ -n "$_r_sid" ] || [ -n "$_r_sids" ] || [ -n "$_r_old" ] || [ -n "$_r_wan" ] || return 0
+
+    [ -n "$_r_sid" ] && uci -q delete "openclash.$_r_sid"
+    for _r_s in $_r_sids; do
+        uci -q set "openclash.$_r_s.enabled=1"
+    done
+    if [ -n "$_r_old" ]; then
+        uci -q set "openclash.config.enable_custom_dns=$_r_old"
+    fi
+    if [ -n "$_r_wan" ]; then
+        uci -q set "openclash.config.append_wan_dns=$_r_wan"
+    fi
+
+    uci -q delete "$CONF.main.oc_agh_sid"
+    uci -q delete "$CONF.main.oc_disabled_sids"
+    uci -q delete "$CONF.main.oc_old_custom_dns"
+    uci -q delete "$CONF.main.oc_old_append_wan_dns"
+
+    uci -q commit openclash 2>/dev/null
+    uci -q commit "$CONF" 2>/dev/null
+    return 0
+}
+
+# 让 OpenClash 重新生成 DNS 配置使自定义上游生效；仅在 Clash 已运行时重启。
+clashfirst_openclash_refresh() {
+    # OpenClash 的“快速启动”会在配置未变时跳过 yml_change.sh，
+    # 导致自定义上游不生效；无论 Clash 是否在运行，都要先让缓存失效。
+    rm -f /tmp/openclash.change /tmp/openclash_tpl_cache
+
+    pidof clash >/dev/null 2>&1 || return 0
+    [ -x /etc/init.d/openclash ] || return 0
+
+    log_msg "正在重启 OpenClash 以应用自定义上游 DNS..."
+    /etc/init.d/openclash restart >/dev/null 2>&1
+    return 0
 }

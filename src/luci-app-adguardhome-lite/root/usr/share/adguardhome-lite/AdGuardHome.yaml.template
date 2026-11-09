@@ -18,7 +18,7 @@ auth_attempts: 5
 block_auth_min: 15
 http_proxy: ""
 language: zh-cn
-theme: auto
+theme: light
 dns:
   edns_client_subnet:
     custom_ip: ""
@@ -28,7 +28,7 @@ dns:
     enabled: true
   ipset_file: ""
   upstream_dns_file: ""
-  upstream_mode: fastest_addr
+  upstream_mode: parallel
   bind_hosts:
     - 0.0.0.0
   ratelimit_whitelist: []
@@ -47,10 +47,10 @@ dns:
     - 223.5.5.5
     - 119.29.29.29
   disallowed_clients: []
-  fallback_dns:
-    - 223.5.5.5
+  fallback_dns: []
   ipset: []
-  local_ptr_upstreams: []
+  local_ptr_upstreams:
+    - 127.0.0.1:1745
   upstream_dns:
     - 127.0.0.1:1745
   cache_optimistic_answer_ttl: 30s
@@ -63,14 +63,14 @@ dns:
   cache_ttl_max: 0
   cache_ttl_min: 0
   cache_size: 8388608
-  ratelimit: 0
+  ratelimit: 20
   port: 53
   aaaa_disabled: false
   anonymize_client_ip: false
   bootstrap_prefer_ipv6: false
-  cache_enabled: true
+  cache_enabled: false
   cache_optimistic: false
-  enable_dnssec: true
+  enable_dnssec: false
   handle_ddr: true
   hostsfile_enabled: true
   refuse_any: true
@@ -78,7 +78,7 @@ dns:
   serve_plain_dns: true
   use_dns64: false
   use_http3_upstreams: false
-  use_private_ptr_resolvers: false
+  use_private_ptr_resolvers: true
 tls:
   enabled: false
   server_name: ""
@@ -99,7 +99,7 @@ querylog:
   interval: 30d
   size_memory: 1000
   enabled: true
-  file_enabled: true
+  file_enabled: false
   ignored_enabled: false
 statistics:
   dir_path: ""
@@ -140,12 +140,43 @@ filters:
     url: https://raw.githubusercontent.com/8680/GOODBYEADS/master/data/rules/ad-domain.txt
     name: GOODBYEADS域名规则
     id: 1794130387
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_3.txt
+    name: AdGuard Tracking Protection
+    id: 1794200744
+  - enabled: true
+    url: https://big.oisd.nl/
+    name: OISD Big
+    id: 1794200745
+  - enabled: true
+    url: https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt
+    name: HaGeZi Multi Pro
+    id: 1794200746
 whitelist_filters:
   - enabled: true
     url: https://raw.githubusercontent.com/8680/GOODBYEADS/master/data/rules/allow.txt
     name: GOODBYEADS
     id: 1794130386
-user_rules: []
+# 拦截常见 DoH/DoT 服务商域名，防止应用绕过 AdGuard Home 直接加密解析
+user_rules:
+  - dns.google
+  - cloudflare-dns.com
+  - dns.quad9.net
+  - doh.opendns.com
+  - dns.mozilla.org
+  - doh.cleanbrowsing.org
+  - dns.nextdns.io
+  - doh.pub
+  - doh.360.cn
+  - "||dns.google^"
+  - "||cloudflare-dns.com^"
+  - "||dns.quad9.net^"
+  - "||doh.opendns.com^"
+  - "||dns.mozilla.org^"
+  - "||doh.cleanbrowsing.org^"
+  - "||dns.nextdns.io^"
+  - "||doh.pub^"
+  - "||doh.360.cn^"
 dhcp:
   dhcpv4:
     gateway_ip: ""
