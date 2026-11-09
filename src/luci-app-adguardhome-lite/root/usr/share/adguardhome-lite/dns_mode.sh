@@ -123,6 +123,40 @@ patch_agh_port() {
     return 0
 }
 
+# 接管 53 端口模式：OpenClash 的 DNS 劫持会把设备的 53 查询直接拽到 DNSMasq（1745），
+# 从而绕过 AdGuard Home。这里在它的 dstnat 规则之前（priority -101）再加一条
+# 重定向，把局域网设备的 DNS 查询统一收回路由器 53 端口，交给 AdGuard Home 过滤。
+AGH_NFT_FILE="/etc/nftables.d/30-adguardhome-lite-dns.nft"
+
+agh_nft_reload() {
+    have_cmd fw4 || return 0
+    fw4 reload >/dev/null 2>&1
+}
+
+agh_nft_ensure() {
+    [ -d /etc/nftables.d ] || return 0
+    have_cmd nft || return 0
+
+    _want="# AdGuard Home 一键版：接管 53 端口时启用，避免被 OpenClash 的 DNS 劫持绕过。
+chain agh_dns_redirect {
+    type nat hook prerouting priority -101; policy accept;
+    meta nfproto ipv4 ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect\"
+}"
+
+    if [ -f "$AGH_NFT_FILE" ] && [ "$(cat "$AGH_NFT_FILE")" = "$_want" ]; then
+        return 0
+    fi
+
+    printf '%s\n' "$_want" > "$AGH_NFT_FILE"
+    agh_nft_reload
+}
+
+agh_nft_clear() {
+    [ -f "$AGH_NFT_FILE" ] || return 0
+    rm -f "$AGH_NFT_FILE"
+    agh_nft_reload
+}
+
 # 判断当前 DNSMasq 是否已经是目标模式
 mode_is_applied() {
     [ "$mode_applied" = "$dns_mode" ] || return 1
@@ -179,6 +213,12 @@ apply_mode() {
         uci -q set "$CONF.main.mode_applied=$dns_mode"
         uci -q commit "$CONF" 2>/dev/null
         return 0
+    fi
+
+    if [ "$dns_mode" = "takeover" ]; then
+        agh_nft_ensure
+    else
+        agh_nft_clear
     fi
 
     if mode_is_applied; then
@@ -365,6 +405,9 @@ revert_mode() {
     _oc="0"
     openclash_forward_present && _oc="1"
     _old_port="$(get_uci dhcp.@dnsmasq[0].port)"
+
+    # 停止服务或切换模式后不再接管 53，移除自建的重定向规则
+    agh_nft_clear
 
     if [ "$_applied" = "clashfirst" ]; then
         clashfirst_openclash_restore
