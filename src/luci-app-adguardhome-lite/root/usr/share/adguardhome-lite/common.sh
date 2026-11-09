@@ -260,6 +260,23 @@ openclash_hijack_port() {
         | head -n 1
 }
 
+# 让 OpenClash 重新生成防火墙劫持规则（不重启 Clash 内核）
+# 仅在 Clash 正在运行时执行，避免 OpenClash 未启动时无谓等待。
+openclash_reload_rules() {
+    [ -x /etc/init.d/openclash ] || return 1
+    pidof clash >/dev/null 2>&1 || return 1
+
+    /etc/init.d/openclash reload manual >/dev/null 2>&1
+
+    _ri=0
+    while [ "$_ri" -lt 10 ]; do
+        sleep 1
+        [ -n "$(openclash_hijack_port)" ] && return 0
+        _ri=$(( _ri + 1 ))
+    done
+    return 1
+}
+
 # OpenClash 串联模式：在 /etc/dnsmasq.conf 写入默认转发规则，
 # 让 DNSMasq 把所有域名查询交给 AdGuard Home，同时保留 OpenClash 的 DNS 劫持。
 OC_CONF="/etc/dnsmasq.conf"

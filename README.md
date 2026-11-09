@@ -123,7 +123,9 @@ OpenClash 的 DNS 劫持会把所有 53 端口查询重定向到它自己的 DNS
 - AdGuard Home 监听 `5333`，避开 53 劫持；
 - 在 `/etc/dnsmasq.conf` 写入带标记的 `strict-order` + `server=/#/127.0.0.1#5333`；
 - AdGuard Home 上游指向 `openclash.config.dns_port`（默认 `7874`）；
-- DNSMasq 端口与 OpenClash 劫持目标保持一致。
+- **DNSMasq 始终监听 53**，并让 OpenClash 把劫持规则同步为 53→53。
+
+这样即使 OpenClash 重启、更新或停止，53 端口仍有 DNSMasq 提供解析，不会出现“局域网全部设备断网”。
 
 停止插件或切换模式时自动移除转发规则，DNS 恢复直连 Clash，不会断网。
 

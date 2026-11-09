@@ -140,8 +140,11 @@ mode_is_applied() {
             openclash_forward_present || return 1
             grep -q "^  port: $dnsport$" "$configpath" || return 1
             _hp="$(openclash_hijack_port)"
+            _port="$(get_uci dhcp.@dnsmasq[0].port)"
             if [ -n "$_hp" ]; then
-                [ "$(get_uci dhcp.@dnsmasq[0].port)" = "$_hp" ] || return 1
+                [ "$_port" = "53" ] && [ "$_hp" = "53" ] || return 1
+            else
+                [ "$_port" = "53" ] || return 1
             fi
             ;;
         none)
@@ -215,12 +218,8 @@ apply_mode() {
             fi
             ;;
         openclash)
-            # 保留 OpenClash 的 53 劫持：DNSMasq 端口与劫持目标保持一致，
-            # 再用 /#/ 规则把默认查询转发给 AdGuard Home（监听 5333）。
-            _hijack_port="$(openclash_hijack_port)"
-            if [ -n "$_hijack_port" ]; then
-                uci -q set "dhcp.@dnsmasq[0].port=$_hijack_port"
-            fi
+            # 保留 OpenClash 的 53 劫持，但 DNSMasq 必须留在 53：
+            # 这样即使 OpenClash 重启/更新导致劫持规则消失，客户端仍有 DNS。
             if ! openclash_forward_add; then
                 log_msg "无法写入 DNSMasq 转发规则，已取消 OpenClash 串联模式。"
                 restore_original
@@ -228,6 +227,7 @@ apply_mode() {
                 uci -q commit "$CONF" 2>/dev/null
                 return 1
             fi
+            ensure_safe_dnsmasq_layout
             ;;
         none)
             ;;
@@ -242,22 +242,49 @@ apply_mode() {
     return 0
 }
 
-# 让 DNSMasq 监听 OpenClash 劫持的目标端口，并保持上游指向 Clash DNS。
-# 仅用于 OpenClash 仍在运行且劫持规则存在的场景。
-align_with_openclash() {
-    _ap="$1"
+# 保证 DNSMasq 始终监听 53（或与 OpenClash 劫持目标一致）。
+# 说明：如果 DNSMasq 被移到 1745，53 端口就只剩 OpenClash 的劫持规则；
+# 一旦 OpenClash 重启/更新导致规则消失，局域网会完全没有 DNS。
+ensure_safe_dnsmasq_layout() {
+    _hj="$(openclash_hijack_port)"
+    _cur="$(get_uci dhcp.@dnsmasq[0].port)"
 
-    [ "$(get_uci dhcp.@dnsmasq[0].port)" = "$_ap" ] || uci -q set "dhcp.@dnsmasq[0].port=$_ap"
-
-    if port_listening "$clash_dns_port"; then
-        uci -q set dhcp.@dnsmasq[0].noresolv='1'
-        uci -q delete dhcp.@dnsmasq[0].resolvfile
-        uci -q delete dhcp.@dnsmasq[0].server
-        uci -q add_list "dhcp.@dnsmasq[0].server=127.0.0.1#$clash_dns_port"
+    if [ -z "$_hj" ]; then
+        # 没有劫持规则时，DNSMasq 必须在 53，否则客户端无 DNS 可用
+        if [ "$_cur" != "53" ]; then
+            uci -q set dhcp.@dnsmasq[0].port='53'
+            uci -q commit dhcp 2>/dev/null
+            restart_dnsmasq
+            sleep 1
+            log_msg "未检测到 OpenClash 劫持，DNSMasq 已恢复监听 53。"
+        fi
+        return 0
     fi
 
+    # 有劫持规则：优先让 DNSMasq 回到 53，并让 OpenClash 重新生成 53→53 的规则
+    if [ "$_cur" = "53" ] && [ "$_hj" = "53" ]; then
+        return 0
+    fi
+
+    uci -q set dhcp.@dnsmasq[0].port='53'
     uci -q commit dhcp 2>/dev/null
-    log_msg "OpenClash 仍在运行，DNSMasq 已对齐劫持端口 $_ap。"
+    restart_dnsmasq
+    sleep 1
+
+    if openclash_reload_rules; then
+        _hj2="$(openclash_hijack_port)"
+        if [ "$_hj2" = "53" ]; then
+            log_msg "DNSMasq 已回到 53，OpenClash 劫持规则已同步。"
+            return 0
+        fi
+    fi
+
+    # 重载失败时退回“跟随劫持端口”，至少保证当前网络可用
+    uci -q set "dhcp.@dnsmasq[0].port=$_hj"
+    uci -q commit dhcp 2>/dev/null
+    restart_dnsmasq
+    sleep 1
+    log_msg "OpenClash 规则未能同步，DNSMasq 暂时跟随劫持端口 $_hj。"
 }
 
 # 恢复后检查上游是否可用：指向已停止的本地端口时自动回退，避免 DNSMasq 无法解析。
@@ -307,10 +334,10 @@ revert_mode() {
     _applied="$(get_uci "$CONF.main.mode_applied")"
     _oc="0"
     openclash_forward_present && _oc="1"
+    _old_port="$(get_uci dhcp.@dnsmasq[0].port)"
 
     if [ "$_applied" = "openclash" ]; then
-        # 串联模式未接管 DNSMasq：保留当前端口（与 OpenClash 劫持目标一致），
-        # 只移除转发规则并清理可能遗留的备份记录。
+        # 串联模式未接管 DNSMasq：只移除转发规则并清理可能遗留的备份记录。
         openclash_forward_del
         clear_original
     else
@@ -321,14 +348,13 @@ revert_mode() {
     uci -q set "$CONF.main.mode_applied=none"
     uci -q commit "$CONF" 2>/dev/null
 
-    # OpenClash 仍在劫持 53 时，DNSMasq 必须监听劫持目标端口，
-    # 否则恢复出的端口与劫持目标不一致，会直接导致 DNSMasq 无法解析。
-    _hijack="$(openclash_hijack_port)"
-    if [ -n "$_hijack" ]; then
-        align_with_openclash "$_hijack"
-    fi
+    # 保证 53 端口始终有 DNS 服务：
+    # - OpenClash 仍在劫持时，让 DNSMasq 回到 53 并同步劫持规则；
+    # - OpenClash 劫持已消失时，DNSMasq 必须留在 53，避免客户端无 DNS。
+    ensure_safe_dnsmasq_layout
 
-    if [ "$_had" = "1" ] || [ "$_oc" = "1" ] || [ -n "$_hijack" ]; then
+    _new_port="$(get_uci dhcp.@dnsmasq[0].port)"
+    if [ "$_had" = "1" ] || [ "$_oc" = "1" ] || [ "$_old_port" != "$_new_port" ]; then
         restart_dnsmasq
         sleep 1
         # 恢复后如果上游指向已停止的本地端口，自动回退到 WAN DNS，避免断网
