@@ -53,13 +53,35 @@ local function service_running(binpath)
     return sys.call(string.format("ps w 2>/dev/null | grep -v grep | grep -F %q >/dev/null 2>&1", binpath)) == 0
 end
 
--- 检测 OpenClash 是否仍在劫持 53 端口（用于界面提示接管方式是否匹配）
-local function openclash_hijacking()
-    return sys.call("nft list chain inet fw4 dstnat 2>/dev/null | grep -q 'OpenClash DNS Hijack'") == 0
+-- 检测 OpenClash 的 53 劫持目标端口（兼容 redirect to :PORT 与 dnat ... :PORT）
+local function openclash_hijack_port()
+    local out = sys.exec("nft list chain inet fw4 dstnat 2>/dev/null | grep 'OpenClash DNS Hijack' | head -n 1")
+    if not out or out == "" then
+        return ""
+    end
+
+    local p = out:match("redirect to :(%d+)") or out:match("dnat.*:(%d+)")
+    return p or ""
 end
 
 local function openclash_running()
     return sys.call("pidof clash >/dev/null 2>&1") == 0
+end
+
+-- OpenClash 是否启用了自定义上游 DNS，且其中包含指向 AdGuard Home 的条目
+local function openclash_upstream_agh(port)
+    local found = false
+    pcall(function()
+        uci:foreach("openclash", "dns_servers", function(s)
+            local enabled = tostring(s.enabled or "1")
+            local sport = tostring(s.port or "")
+            if enabled ~= "0" and s.group == "nameserver"
+                and s.ip == "127.0.0.1" and sport == tostring(port) then
+                found = true
+            end
+        end)
+    end)
+    return found
 end
 
 local function read_number(path)
@@ -187,9 +209,15 @@ function action_status()
     local configpath = cfg("config", "/etc/AdGuardHome.yaml")
     local workdir = cfg("workdir", "/etc/AdGuardHome")
     local dns_mode = cfg("dns_mode", "takeover")
-    local dnsport = (dns_mode == "takeover") and 53 or 5333
+    local dnsport = 5333
+    if dns_mode == "takeover" then
+        dnsport = 53
+    elseif dns_mode == "clashfirst" then
+        dnsport = 5335
+    end
     local webport = tonumber(cfg("webport", "13800")) or 13800
     local password = cfg("adminpass", "admin123")
+    local hijack_port = openclash_hijack_port()
 
     local data = {
         core = fs.access(binpath, "x") and true or false,
@@ -207,8 +235,15 @@ function action_status()
         channel = cfg("channel", "stable"),
         github_proxy = cfg("github_proxy", "gh-proxy.org"),
         mode_applied = cfg("mode_applied", "none"),
-        openclash_hijack = openclash_hijacking(),
+        openclash_hijack = hijack_port ~= "",
+        openclash_hijack_port = hijack_port,
         openclash_running = openclash_running(),
+        openclash_redirect = uci:get("openclash", "config", "enable_redirect_dns") or "",
+        openclash_custom_dns = uci:get("openclash", "config", "enable_custom_dns") or "",
+        openclash_upstream_agh = openclash_upstream_agh(dnsport),
+        clash_dns_port = uci:get("openclash", "config", "dns_port") or "",
+        dnsmasq_port = uci:get("dhcp", "@dnsmasq[0]", "port") or "53",
+        agh_bypassed = cfg("agh_bypassed", "0"),
         update_running = update_running(),
         action_running = action_running(),
         action_code = read_number(RUN .. "_action.code")
@@ -371,7 +406,10 @@ function action_settings_save()
         return
     end
 
-    local allowed_modes = { takeover = true, upstream = true, none = true, openclash = true }
+    local allowed_modes = {
+        takeover = true, upstream = true, none = true,
+        openclash = true, clashfirst = true
+    }
     local allowed_bins = {
         ["/usr/bin/AdGuardHome/AdGuardHome"] = true,
         ["/tmp/AdGuardHome/AdGuardHome"] = true
@@ -412,8 +450,8 @@ function action_settings_save()
         json_error("管理面板端口必须是 1-65535 之间的整数。")
         return
     end
-    if port == 53 or port == 1745 or port == 5333 then
-        json_error("管理面板端口不能使用 53、1745 或 5333。")
+    if port == 53 or port == 1745 or port == 5333 or port == 5335 then
+        json_error("管理面板端口不能使用 53、1745、5333 或 5335。")
         return
     end
 
