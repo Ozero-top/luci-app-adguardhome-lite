@@ -116,6 +116,17 @@ Release 页面同时提供 `SHA256SUMS`，下载后可校验文件完整性。
 | **OpenClash 串联** | 保留 OpenClash DNS 劫持；DNSMasq 通过 `strict-order` + `server=/#/127.0.0.1#5333` 转发给 AdGuard Home，再由其转发到 Clash DNS（7874） | 同时运行 OpenClash 且必须开启 DNS 劫持 |
 | 仅面板模式 | AdGuard Home 监听 5333，不修改 DNSMasq | 先体验面板或手动接管 |
 
+### 推荐架构怎么选
+
+| 目标 | 推荐方式 |
+|---|---|
+| 逐设备统计、所有域名都先经过过滤 | 关闭 OpenClash 的 DNS 劫持，使用「接管 53」（AdGuard 前置） |
+| 保留 OpenClash 的 DNS 劫持、fake-IP 与分流规则 | 使用「OpenClash 串联」（DNSMasq 始终监听 53） |
+
+不要同时让一方的上游指向另一方，也不要把「接管 53」和 OpenClash DNS 劫持混用，否则会形成绕过或查询环。
+
+> 插件没有内置“OpenClash 前置（Clash → AdGuard Home）”模式：该方式下 AdGuard 只能看到路由器发起的查询，部分 fake-IP 域名也会跳过过滤，不符合本插件“去广告优先”的目标。需要 fake-IP 优先时可手动按此拓扑配置。
+
 ### OpenClash 串联说明
 
 OpenClash 的 DNS 劫持会把所有 53 端口查询重定向到它自己的 DNS，导致 AdGuard Home 收不到查询、去广告不生效。选择「OpenClash 串联」后插件会自动：
