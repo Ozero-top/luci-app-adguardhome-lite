@@ -191,6 +191,13 @@ apply_mode() {
         return 0
     fi
 
+    # 从「OpenClash 前置」切到其它模式时，必须先把 Clash 上游还原，
+    # 否则 Clash 仍指向 AdGuard Home，而 AdGuard Home 又转给 Clash，形成查询环。
+    if [ "$mode_applied" = "clashfirst" ] && [ "$dns_mode" != "clashfirst" ]; then
+        clashfirst_openclash_restore
+        clashfirst_openclash_refresh &
+    fi
+
     # 先恢复原始状态，再基于原始状态应用新模式，保证来回切换不叠加。
     # OpenClash 串联模式不长期接管 DNSMasq 设置，因此不保存/恢复原始值。
     if [ "$dns_mode" = "openclash" ]; then
