@@ -238,6 +238,10 @@
 			['工作目录', '<span class="agh-path">' + esc(d.workdir || '') + '</span>']
 		];
 
+		if (d.openclash_hijack && d.dns_mode === 'takeover') {
+			rows.push(['配置建议', '<span class="agh-warn">检测到 OpenClash DNS 劫持，当前「接管 53」会被劫持绕过，建议改用「OpenClash 串联」。</span>']);
+		}
+
 		var html = '';
 		for (var i = 0; i < rows.length; i++) {
 			html += '<div class="agh-status-item"><span class="agh-k">' + esc(rows[i][0]) + '</span><span class="agh-v">' + rows[i][1] + '</span></div>';

@@ -53,6 +53,15 @@ local function service_running(binpath)
     return sys.call(string.format("ps w 2>/dev/null | grep -v grep | grep -F %q >/dev/null 2>&1", binpath)) == 0
 end
 
+-- 检测 OpenClash 是否仍在劫持 53 端口（用于界面提示接管方式是否匹配）
+local function openclash_hijacking()
+    return sys.call("nft list chain inet fw4 dstnat 2>/dev/null | grep -q 'OpenClash DNS Hijack'") == 0
+end
+
+local function openclash_running()
+    return sys.call("pidof clash >/dev/null 2>&1") == 0
+end
+
 local function read_number(path)
     local v = fs.readfile(path)
     if not v then
@@ -198,6 +207,8 @@ function action_status()
         channel = cfg("channel", "stable"),
         github_proxy = cfg("github_proxy", "gh-proxy.org"),
         mode_applied = cfg("mode_applied", "none"),
+        openclash_hijack = openclash_hijacking(),
+        openclash_running = openclash_running(),
         update_running = update_running(),
         action_running = action_running(),
         action_code = read_number(RUN .. "_action.code")
