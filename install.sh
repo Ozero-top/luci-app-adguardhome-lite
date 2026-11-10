@@ -10,7 +10,7 @@
 #
 # 常用参数：
 #   -v VERSION   指定版本（默认 1.1.6），可写 latest 取最新 Release
-#   -m URL       指定 GitHub 反代（可重复），默认依次尝试 gh-proxy.org / ghfast.top / ghproxy.cc
+#   -m URL       指定 GitHub 反代（可重复），默认依次尝试 gh-proxy.org / ghfast.top / gh-proxy.com
 #   --no-deps    不自动安装依赖
 #   --src DIR    从本地源码目录安装（开发调试用）
 #   --uninstall  卸载插件（保留配置与内核）
@@ -147,14 +147,14 @@ fetch() {
 resolve_version() {
 	[ "$VERSION" = "latest" ] || return 0
 	api="https://api.github.com/repos/$REPO/releases/latest"
-	tmp="$1/api.json"
+	_api_file="$1/api.json"
 	for prefix in $MIRRORS "https://gh-proxy.org" "https://ghfast.top" ""; do
 		if [ -n "$prefix" ]; then
-			fetch "$prefix/$api" "$tmp" || continue
+			fetch "$prefix/$api" "$_api_file" || continue
 		else
-			fetch "$api" "$tmp" || continue
+			fetch "$api" "$_api_file" || continue
 		fi
-		v=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' "$tmp" | head -n 1)
+		v=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' "$_api_file" | head -n 1)
 		[ -n "$v" ] && { VERSION="$v"; return 0; }
 	done
 	warn "无法获取最新版本，改用默认 $VERSION"
@@ -173,7 +173,7 @@ download_source() {
 	archive="$dest/src.tar.gz"
 	OK=0
 	for ref in "refs/tags/v$VERSION" "refs/heads/main"; do
-		for prefix in $MIRRORS "https://gh-proxy.org" "https://ghfast.top" "https://ghproxy.cc" ""; do
+		for prefix in $MIRRORS "https://gh-proxy.org" "https://ghfast.top" "https://gh-proxy.com" ""; do
 			base="https://github.com/$REPO/archive/$ref.tar.gz"
 			if [ -n "$prefix" ]; then
 				url="$prefix/$base"
