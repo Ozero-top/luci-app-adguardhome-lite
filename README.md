@@ -1,4 +1,4 @@
-# luci-app-adguardhome-lite
+# AdGuard Home 一键版
 
 面向 OpenWrt / ImmortalWrt / iStoreOS 的 **AdGuard Home 一键版 LuCI 插件**，三步完成「装内核 → 接 DNS → 看状态」。
 
