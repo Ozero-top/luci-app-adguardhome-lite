@@ -358,11 +358,62 @@
 		if (restartBtn) restartBtn.disabled = busy || !d.core;
 	}
 
+	function fmtCount(value) {
+		if (value === null || value === undefined || value === '' || isNaN(Number(value))) return '-';
+		return Number(value).toLocaleString('zh-CN');
+	}
+
+	// 统计随 /status 一起返回，这里只负责渲染，避免额外请求
+	function renderStats(d) {
+		var hint = $('agh-stats-hint');
+		var keys = {
+			queries: 'agh-stat-queries',
+			blocked: 'agh-stat-blocked',
+			malware: 'agh-stat-malware',
+			adult: 'agh-stat-adult'
+		};
+		if (!d || d.ok === false) {
+			Object.keys(keys).forEach(function (k) {
+				var el = $(keys[k]);
+				if (el) el.textContent = '-';
+			});
+			if (hint) hint.textContent = (d && d.error) ? d.error : '统计读取失败。';
+			return;
+		}
+		Object.keys(keys).forEach(function (k) {
+			if (k === 'adult') return;
+			var el = $(keys[k]);
+			if (el) el.textContent = fmtCount(d[k]);
+		});
+		var adultEl = $('agh-stat-adult');
+		if (adultEl) {
+			adultEl.textContent = (d.adult_filter && !Number(d.adult)) ? '已启用' : fmtCount(d.adult);
+		}
+		var updated = $('agh-stats-updated');
+		if (updated) {
+			updated.textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+		}
+		if (hint) {
+			var tips = [];
+			if (d.protection === false) tips.push('防护已关闭');
+			if (d.safebrowsing === false) tips.push('未开启安全浏览，「恶意/钓鱼」会一直是 0（它依赖境外在线服务，开启后若解析变慢请关闭）');
+			if (d.adult_filter) {
+				tips.push('成人规则已启用，命中数计入「已拦截」');
+			} else if (d.parental === false) {
+				tips.push('未开启成人内容拦截，「成人内容」会一直是 0');
+			}
+			hint.textContent = tips.length
+				? tips.join('；') + '，可到 AdGuard Home 面板开启。'
+				: '数据来自 AdGuard Home 统计接口，每 10 秒随状态自动刷新。';
+		}
+	}
+
 	async function refreshStatus(silent) {
 		try {
 			var d = await apiGet(U.status);
 			state.status = d;
 			renderStatus();
+			if (d && d.stats) renderStats(d.stats);
 			if (d.action_running && !state.busy) {
 				state.busy = true;
 				pollAction(null);
@@ -531,6 +582,8 @@
 			setSelectValue('agh-set-workdir', d.workdir);
 			setSelectValue('agh-set-channel', d.channel);
 			setSelectValue('agh-set-github-proxy', d.github_proxy);
+			var adult = $('agh-set-adult');
+			if (adult) adult.checked = !!d.adult_block;
 			var path = $('agh-yaml-path');
 			if (path && d.config_path) path.textContent = d.config_path;
 			setMsg(msgEl, '', '');
@@ -563,7 +616,8 @@
 			binpath: $('agh-set-binpath').value,
 			workdir: $('agh-set-workdir').value,
 			channel: $('agh-set-channel').value,
-			github_proxy: $('agh-set-github-proxy').value
+			github_proxy: $('agh-set-github-proxy').value,
+			adult_block: ($('agh-set-adult') && $('agh-set-adult').checked) ? '1' : '0'
 		};
 
 		if (btn) btn.disabled = true;

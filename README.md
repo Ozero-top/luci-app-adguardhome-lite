@@ -36,6 +36,10 @@
 - **fake-IP 兼容下载**：路由器使用 OpenClash 等 fake-IP DNS 时，自动通过公共 DNS 解析真实 IP 并用 `curl --resolve` 下载。
 - **四种 DNS 接管方式**：接管 53、DNSMasq 上游、OpenClash 前置、仅面板（「OpenClash 串联」已下线，旧配置会自动迁移）。
 - **OpenClash 共存**：推荐「接管 53 + OpenClash DNS 劫持/转发」，在保留 fake-IP 与分流的同时，让 AdGuard Home 直接看到每台设备；插件会自建 `agh_dns_redirect` 链把设备的 53 查询收回，因此 OpenClash 劫持指向 `53`、`1745` 还是 `7874` 都不会绕过过滤；也支持「Clash → AdGuard Home → 真实 DNS」的前置链路。
+- **概览直接看统计**：插件页内即可看到 DNS 查询、过滤器拦截、恶意/钓鱼、成人内容（家长控制）四项数据，随状态每 10 秒刷新，不必打开 AdGuard Home 控制台
+- **可选成人内容拦截**：基础设置里一个开关，自动追加/移除 HaGeZi NSFW 规则，关闭即还原，不需要手动编辑过滤列表
+- **规则下载走代理**：自动检测 OpenClash 的 HTTP 代理并写入 AdGuard Home 的 `http_proxy`，避免国内直连 GitHub 更新失败
+- **参数自动配置**：保存接管方式时自动关闭缓存与 DNSSEC、改用并行上游，并按模式写入上游与 PTR，不需要逐项手动设置
 - **安全可控**：默认密码 `admin123`，可在插件内重置；停止服务或卸载时自动恢复 DNSMasq 设置。
 - **配置可维护**：内置 YAML 模板（11 个过滤规则 + 1 个白名单，日志/统计保留 30 天）；高级配置保存前自动 `--check-config` 并保留备份。
 
@@ -191,6 +195,7 @@ nft list chain inet fw4 dstnat | grep 'OpenClash DNS Hijack'
 
 建议：
 
+- 顺序固定为 **DNSMasq（19）→ AdGuard Home（95）→ OpenClash（99）**：OpenClash 的 DNS 上游写着 `127.0.0.1:5335`，必须等 AdGuard Home 先监听；接管 53 时 AdGuard Home 又要依赖先启动的 DNSMasq（1745）。插件已自动注册好 `START=95`，无需手动调整。
 - 想逐设备统计：用 **「接管 53」**，OpenClash 的 DNS 劫持/转发可以保持开启；
 - 不想让 AdGuard Home 占 53：用 **「OpenClash 前置」**（没有逐设备统计）；
 - OpenClash 重启期间 DNS 会短暂中断 1~2 秒，属正常现象。
@@ -270,6 +275,17 @@ make package/luci-app-adguardhome-lite/compile V=s
 ## 更新记录
 
 > 更名说明：插件显示名由「AdGuard Home 一键版」改为「AdGuard Home 助手」。包名 `luci-app-adguardhome-lite`、配置 `/etc/config/adguardhome_lite` 与安装方式均未变化，已安装用户可直接覆盖升级。
+
+### v1.1.5（2026-11-10）
+
+- 概览新增「过滤统计」卡片：DNS 查询、已拦截、恶意/钓鱼、成人内容四项数据直接读取 AdGuard Home 统计接口，随状态每 10 秒刷新，不需要打开控制台
+- 一键化：保存接管方式时自动关闭缓存与 DNSSEC、改用并行上游，省去进面板逐项设置
+- 模板默认不开启安全浏览：它依赖 AdGuard 在线服务，国内网络不可达时会拖慢甚至阻塞解析；需要时可在面板手动开启
+- 基础设置新增「成人内容拦截」开关：开启自动追加 HaGeZi NSFW 规则，关闭自动移除，命中计入「已拦截」
+- 自动检测 OpenClash 的 HTTP 代理并写入 AdGuard Home 的 `http_proxy`，修复国内直连 GitHub 导致规则更新失败
+- 概览「快捷操作」更名为「服务控制」，只保留启动/停止/重启三个按钮
+- 性能优化：统计合并进状态接口（页面由两次请求变一次），内核版本与统计数据加本地缓存，状态接口稳定在约 170ms
+- 文档补充开机启动顺序（DNSMasq 19 → AdGuard Home 95 → OpenClash 99）与原因，面板使用引导同步更新
 
 ### v1.1.4（2026-11-10）
 

@@ -43,6 +43,9 @@ config adguardhome_lite 'main'
 	option adminuser 'admin'
 	option adminpass 'admin123'
 
+	# 成人内容拦截：1=启用（自动追加 HaGeZi NSFW 规则）；0=关闭
+	option adult_block '0'
+
 	# 以下为插件内部状态，请勿手动修改
 	option mode_applied 'none'
 	option core_version ''

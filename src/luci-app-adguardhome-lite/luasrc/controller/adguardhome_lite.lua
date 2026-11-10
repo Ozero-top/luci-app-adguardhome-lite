@@ -10,6 +10,27 @@ local uci = require "luci.model.uci".cursor()
 local CONF = "adguardhome_lite"
 local SHARE = "/usr/share/adguardhome-lite"
 local RUN = "/var/run/adguardhome_lite"
+local STATS_CACHE = RUN .. "_stats.json"
+local VERSION_CACHE = RUN .. "_core_version"
+
+-- 前置声明：action_status 会内联统计结果，定义在下方
+local collect_stats
+
+-- 读取带 TTL 的临时缓存，避免每次请求都重新执行外部命令
+local function read_cache(path, ttl)
+    local mtime = fs.stat(path, "mtime")
+    if not mtime then
+        return nil
+    end
+    if ttl and (os.time() - mtime) > ttl then
+        return nil
+    end
+    local data = fs.readfile(path)
+    if not data or data == "" then
+        return nil
+    end
+    return data
+end
 
 local function cfg(opt, default)
     local v = uci:get(CONF, "main", opt)
@@ -32,13 +53,27 @@ local function core_version(binpath)
         return ""
     end
 
+    -- 优先使用缓存：只要内核文件没变，就直接复用上次结果，
+    -- 避免每次刷新页面都启动一次 30MB 的内核查版本。
+    local bin_mtime = fs.stat(binpath, "mtime")
+    local cache_mtime = fs.stat(VERSION_CACHE, "mtime")
+    if bin_mtime and cache_mtime and cache_mtime >= bin_mtime then
+        local cached = fs.readfile(VERSION_CACHE)
+        if cached and cached ~= "" then
+            return (cached:gsub("%s+$", ""))
+        end
+    end
+
     local out = sys.exec(string.format("%q --version 2>/dev/null | head -n 1", binpath))
     if not out or out == "" then
         return ""
     end
 
-    local ver = out:match("[vV][%d%.]+")
-    return ver or ""
+    local ver = out:match("[vV][%d%.]+") or ""
+    if ver ~= "" then
+        fs.writefile(VERSION_CACHE, ver)
+    end
+    return ver
 end
 
 local function service_running(binpath)
@@ -193,6 +228,7 @@ function index()
 
     -- 独立管理页面的 JSON 接口（不出现在菜单中）
     entry({ "admin", "services", "adguardhome_lite", "status" }, call("action_status")).leaf = true
+    entry({ "admin", "services", "adguardhome_lite", "stats" }, call("action_stats")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "core_install" }, call("action_core_install")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "core_progress" }, call("action_core_progress")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "service" }, call("action_service")).leaf = true
@@ -247,17 +283,99 @@ function action_status()
         openclash_upstream_agh = openclash_upstream_agh(dnsport),
         clash_dns_port = uci:get("openclash", "config", "dns_port") or "",
         dnsmasq_port = uci:get("dhcp", "@dnsmasq[0]", "port") or "53",
-        -- 接管 53 时是否有实际生效的收回规则（被 OpenClash 劫持时靠它兜底）
-        dns_redirect = (sys.call("nft list chain inet fw4 agh_dns_redirect 2>/dev/null | grep -q 'redirect to :53'") == 0),
+        -- 只有「接管 53」才需要检查收回规则，其它模式跳过 nft 调用
+        dns_redirect = (dns_mode == "takeover")
+            and (sys.call("nft list chain inet fw4 agh_dns_redirect 2>/dev/null | grep -q 'redirect to :53'") == 0)
+            or false,
         agh_bypassed = cfg("agh_bypassed", "0"),
         update_running = update_running(),
         action_running = action_running(),
         action_code = read_number(RUN .. "_action.code")
     }
 
+    -- 统计跟着状态一起返回，前端一次请求即可刷新两块内容
+    data.stats = collect_stats()
+
     http.header("Cache-Control", "no-store")
     http.prepare_content("application/json")
     http.write_json(data)
+end
+
+-- 从 AdGuard Home 本地接口读取过滤统计，插件页面无需打开控制台。
+-- 结果缓存 8 秒：页面 10 秒轮询时每次都能拿到新数据，又不会重复请求。
+collect_stats = function()
+    local cached = read_cache(STATS_CACHE, 8)
+    if cached then
+        local ok, jsonc = pcall(require, "luci.jsonc")
+        if ok then
+            local parsed = jsonc.parse(cached)
+            if type(parsed) == "table" then
+                return parsed
+            end
+        end
+    end
+
+    local webport = tonumber(cfg("webport", "13800")) or 13800
+    local auth = string.format("%s:%s", cfg("adminuser", "admin"), cfg("adminpass", "admin123"))
+    local url = string.format("http://127.0.0.1:%d/control/stats", webport)
+    local raw = sys.exec(string.format("curl -s -m 3 -u %q %s 2>/dev/null", auth, url))
+
+    if not raw or raw == "" then
+        return { ok = false, error = "AdGuard Home 未运行或统计接口不可用。" }
+    end
+
+    local ok_req, jsonc = pcall(require, "luci.jsonc")
+    if not ok_req then
+        return { ok = false, error = "缺少 luci-lib-jsonc，无法解析统计结果。" }
+    end
+
+    local stats = jsonc.parse(raw)
+    if type(stats) ~= "table" then
+        return { ok = false, error = "统计接口返回格式异常。" }
+    end
+
+    -- 防护/安全浏览/家长控制等开关直接读 YAML，省掉一次 HTTP 请求
+    local yaml_text = fs.readfile(cfg("config", "/etc/AdGuardHome.yaml")) or ""
+
+    local data = {
+        ok = true,
+        queries = stats.num_dns_queries or 0,
+        blocked = stats.num_blocked_filtering or 0,
+        malware = stats.num_replaced_safebrowsing or 0,
+        adult = stats.num_replaced_parental or 0,
+        safesearch = stats.num_replaced_safesearch or 0,
+        avg = stats.avg_processing_time or 0,
+        protection = yaml_text:match("\n  protection_enabled:%s*true") ~= nil,
+        safebrowsing = yaml_text:match("\n  safebrowsing_enabled:%s*true") ~= nil,
+        parental = yaml_text:match("\n  parental_enabled:%s*true") ~= nil,
+        adult_filter = yaml_text:find("nsfw.txt", 1, true) ~= nil,
+        top_blocked = {}
+    }
+
+    local top = stats.top_blocked_domains
+    if type(top) == "table" then
+        for i = 1, math.min(#top, 5) do
+            local item = top[i]
+            if type(item) == "table" then
+                for domain, count in pairs(item) do
+                    data.top_blocked[#data.top_blocked + 1] = { domain = domain, count = count }
+                end
+            end
+        end
+    end
+
+    local encoded = jsonc.stringify(data)
+    if encoded and encoded ~= "" then
+        fs.writefile(STATS_CACHE, encoded)
+    end
+
+    return data
+end
+
+function action_stats()
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+    http.write_json(collect_stats())
 end
 
 function action_core_install()
@@ -385,6 +503,7 @@ function action_settings_get()
         workdir = cfg("workdir", "/etc/AdGuardHome"),
         channel = cfg("channel", "stable"),
         github_proxy = cfg("github_proxy", "gh-proxy.org"),
+        adult_block = cfg("adult_block", "0") == "1",
         admin_user = cfg("adminuser", "admin"),
         admin_pass = cfg("adminpass", "admin123"),
         config_path = configpath,
@@ -410,6 +529,12 @@ function action_settings_save()
     local workdir = http.formvalue("workdir") or "/etc/AdGuardHome"
     local channel = http.formvalue("channel") or "stable"
     local proxy = http.formvalue("github_proxy") or "gh-proxy.org"
+    local adult = http.formvalue("adult_block") or "0"
+
+    if adult ~= "0" and adult ~= "1" then
+        json_error("成人内容拦截参数不正确。")
+        return
+    end
 
     if enabled ~= "0" and enabled ~= "1" then
         json_error("启用状态参数不正确。")
@@ -476,6 +601,7 @@ function action_settings_save()
     uci:set(CONF, "main", "workdir", workdir)
     uci:set(CONF, "main", "channel", channel)
     uci:set(CONF, "main", "github_proxy", proxy)
+    uci:set(CONF, "main", "adult_block", adult)
     uci:commit(CONF)
 
     start_action("sh " .. SHARE .. "/apply_settings.sh")
