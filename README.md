@@ -4,16 +4,6 @@
 
 > 插件负责安装内核、接管 DNS 与服务管理；过滤规则、查询统计、家长控制等请直接在 AdGuard Home 面板中操作。
 
-> **搭配浏览器扩展效果更佳**
->
-> 路由器上的 AdGuard Home 只能按域名拦截，页面内的广告位、同域名广告和追踪脚本需要浏览器端过滤。建议在常用浏览器再装一个 AdGuard 浏览器扩展（或 uBlock Origin），两者叠加后，adblock-tester.com、adblock.turtlecute.org 这类测试通常可以达到 95% 以上。
->
-> - 官方下载页（自动识别浏览器）：<https://adguard.com/zh_cn/adguard-browser-extension/overview.html>
-> - Chrome 应用商店：<https://chromewebstore.google.com/detail/adguard-adblocker/bgnkhhnnamicmpeenaelnjfhikgbkllg>
-> - Edge：在扩展商店搜索「AdGuard AdBlocker」即可；Firefox：在 addons.mozilla.org 搜索「AdGuard」
->
-> 只装扩展不装路由器端也可以，但手机、电视等无法装扩展的设备就过滤不到；只装路由器端则页面内广告会剩下一些，推荐两者一起用。
-
 ---
 
 ## 项目初衷
@@ -36,6 +26,16 @@
 </div>
 
 ---
+
+> **搭配浏览器扩展效果更佳**
+>
+> 路由器上的 AdGuard Home 只能按域名拦截，页面内的广告位、同域名广告和追踪脚本需要浏览器端过滤。建议在常用浏览器再装一个 AdGuard 浏览器扩展（或 uBlock Origin），两者叠加后，adblock-tester.com、adblock.turtlecute.org 这类测试通常可以达到 95% 以上。
+>
+> - 官方下载页（自动识别浏览器）：<https://adguard.com/zh_cn/adguard-browser-extension/overview.html>
+> - Chrome 应用商店：<https://chromewebstore.google.com/detail/adguard-adblocker/bgnkhhnnamicmpeenaelnjfhikgbkllg>
+> - Edge：在扩展商店搜索「AdGuard AdBlocker」即可；Firefox：在 addons.mozilla.org 搜索「AdGuard」
+>
+> 只装扩展不装路由器端也可以，但手机、电视等无法装扩展的设备就过滤不到；只装路由器端则页面内广告会剩下一些，推荐两者一起用。
 
 ## 功能特性
 
