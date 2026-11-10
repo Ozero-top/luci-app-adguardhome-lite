@@ -1,6 +1,6 @@
 {
 	"luci-app-adguardhome-lite": {
-		"description": "AdGuard Home 一键版（DNS 过滤与服务管理）",
+		"description": "AdGuard Home 助手（DNS 过滤与服务管理）",
 		"read": {
 			"uci": [ "adguardhome_lite" ],
 			"file": {

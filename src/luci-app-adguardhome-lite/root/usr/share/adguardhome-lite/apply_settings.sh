@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 一键版 - 应用 LuCI 设置
+# AdGuard Home 助手 - 应用 LuCI 设置
 # 功能：停止服务、更新端口、重新应用 DNS 接管模式并启动服务。
 
 . /usr/share/adguardhome-lite/common.sh

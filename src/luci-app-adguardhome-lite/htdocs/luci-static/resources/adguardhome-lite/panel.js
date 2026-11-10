@@ -1,5 +1,5 @@
 /*
- * AdGuard Home 一键版 - 独立管理页面
+ * AdGuard Home 助手 - 独立管理页面
  * 不依赖 LuCI 主题、luci.js 或 XHR，全部使用原生 fetch。
  */
 (function () {

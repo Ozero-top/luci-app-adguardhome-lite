@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 一键版 - 首次配置生成脚本
+# AdGuard Home 助手 - 首次配置生成脚本
 # 功能：从内置默认配置模板生成 /etc/AdGuardHome.yaml，并同步面板端口、DNS 端口和上游 DNS。
 # 说明：仅在配置文件不存在时由 init 脚本自动调用，一般无需手动执行。
 

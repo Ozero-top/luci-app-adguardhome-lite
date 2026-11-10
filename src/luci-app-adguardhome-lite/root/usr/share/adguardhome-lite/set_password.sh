@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 一键版 - 修改面板密码
+# AdGuard Home 助手 - 修改面板密码
 # 说明：密码哈希由浏览器端 bcrypt 计算，脚本只负责写入 YAML 并重启服务。
 
 . /usr/share/adguardhome-lite/common.sh
