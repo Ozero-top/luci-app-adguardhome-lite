@@ -415,6 +415,26 @@ yaml_set_list() {
     ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
 }
 
+# 修正 ratelimit_whitelist 格式：AdGuard Home 只接受单个 IP，不接受 CIDR。
+# 旧版本曾写入 127.0.0.0/8、::1/128，会导致 --check-config 失败、服务无法启动。
+yaml_fix_ratelimit_whitelist() {
+    _file="$1"
+    [ -f "$_file" ] || return 1
+    grep -q 'ratelimit_whitelist' "$_file" 2>/dev/null || return 0
+
+    awk '
+        /^  ratelimit_whitelist:/ { inblk = 1; print; next }
+        inblk && /^    - / {
+            gsub(/127\.0\.0\.0\/8/, "127.0.0.1")
+            gsub(/::1\/128/, "::1")
+            print
+            next
+        }
+        inblk { inblk = 0 }
+        { print }
+    ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
+}
+
 # 修改 YAML 中顶格（0 缩进）的标量，例如 http_proxy
 yaml_set_root_scalar() {
     _file="$1"

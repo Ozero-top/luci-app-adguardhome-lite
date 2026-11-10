@@ -32,8 +32,8 @@ dns:
   bind_hosts:
     - 0.0.0.0
   ratelimit_whitelist:
-    - 127.0.0.0/8
-    - ::1/128
+    - 127.0.0.1
+    - ::1
   dns64_prefixes: []
   private_networks: []
   trusted_proxies:
