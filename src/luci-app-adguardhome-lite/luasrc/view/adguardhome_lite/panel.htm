@@ -8,12 +8,13 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>AdGuard Home 助手</title>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261109b">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261110d">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
 			urls: {
 				status:       "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[status]])%>",
+				stats:        "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[stats]])%>",
 				coreInstall:  "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[core_install]])%>",
 				coreProgress: "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[core_progress]])%>",
 				service:      "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[service]])%>",
@@ -33,7 +34,7 @@
 	<div class="agh-hero">
 		<div>
 			<h2>AdGuard Home 助手</h2>
-			<p>一个页面完成内核安装、DNS 接管和面板访问。过滤规则、家长控制、查询统计等请在 AdGuard Home 面板中设置。</p>
+			<p>一个页面完成内核安装、DNS 接管和过滤统计查看。缓存、DNSSEC、上游模式等常用参数会随接管方式自动配置，不需要再进 AdGuard Home 面板逐项设置。</p>
 		</div>
 		<div class="agh-hero-actions">
 			<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
@@ -60,6 +61,32 @@
 				<div id="agh-status-grid" class="agh-status-grid">
 					<div class="agh-empty">正在读取状态...</div>
 				</div>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>过滤统计</h3>
+					<span id="agh-stats-updated" class="agh-hint">读取中...</span>
+				</div>
+				<div class="agh-metrics">
+					<div class="agh-metric">
+						<div class="agh-metric-num" id="agh-stat-queries">-</div>
+						<div class="agh-metric-label">DNS 查询</div>
+					</div>
+					<div class="agh-metric">
+						<div class="agh-metric-num" id="agh-stat-blocked">-</div>
+						<div class="agh-metric-label">已拦截（广告/跟踪）</div>
+					</div>
+					<div class="agh-metric">
+						<div class="agh-metric-num" id="agh-stat-malware">-</div>
+						<div class="agh-metric-label">恶意/钓鱼</div>
+					</div>
+					<div class="agh-metric">
+						<div class="agh-metric-num" id="agh-stat-adult">-</div>
+						<div class="agh-metric-label">成人内容（家长控制）</div>
+					</div>
+				</div>
+				<p id="agh-stats-hint" class="agh-hint">数据直接取自 AdGuard Home 统计接口，无需打开控制台；服务未运行时无法读取。</p>
 			</div>
 
 			<div class="agh-card">
@@ -113,16 +140,12 @@
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>快捷操作</h3>
+					<h3>服务控制</h3>
 				</div>
 				<div class="agh-actions">
 					<button type="button" id="agh-start-btn" class="agh-btn agh-btn-secondary">启动服务</button>
 					<button type="button" id="agh-stop-btn" class="agh-btn agh-btn-danger">停止并关闭自启</button>
 					<button type="button" id="agh-restart-btn" class="agh-btn agh-btn-secondary">重启服务</button>
-					<button type="button" class="agh-btn agh-btn-ghost" data-goto="settings">基础设置</button>
-					<button type="button" class="agh-btn agh-btn-ghost" data-goto="advanced">高级配置</button>
-					<button type="button" class="agh-btn agh-btn-ghost" data-goto="logs">运行日志</button>
-					<button type="button" class="agh-btn agh-btn-ghost" data-goto="guide">使用引导</button>
 				</div>
 				<p class="agh-hint agh-mt-8">“停止并关闭自启”会结束 AdGuard Home 进程并恢复 DNSMasq 原始设置，面板也会同时关闭；需要面板时请重新启动服务。</p>
 			</div>
@@ -211,6 +234,17 @@
 							</select>
 							<p class="agh-hint">官方 CDN 失败时通过反代下载 GitHub 内核；反代不可用时回退直连。</p>
 						</div>
+					</div>
+
+					<div class="agh-field agh-field-switch">
+						<div>
+							<label for="agh-set-adult">成人内容拦截</label>
+							<p class="agh-hint">开启后自动追加 HaGeZi NSFW 规则（AdGuard 兼容格式），拦截结果计入「已拦截」；关闭时移除该规则。默认关闭，保存后约 5-10 秒生效。</p>
+						</div>
+						<label class="agh-switch">
+							<input type="checkbox" id="agh-set-adult">
+							<span></span>
+						</label>
 					</div>
 
 					<div class="agh-form-actions">
@@ -382,13 +416,25 @@
 					<li><b>13800 打不开：</b>等待 5-10 秒；确认 UCI 端口和配置一致；旧安装需手动改成 13800。</li>
 					<li><b>忘记密码：</b>基础设置页底部“修改面板密码”。</li>
 					<li><b>升级固件后：</b>配置会保留，内核需重新安装。</li>
+					<li><b>「恶意/钓鱼」「成人内容」一直是 0：</b>这两项分别依赖「安全浏览」和「家长控制」，插件默认不开启。安全浏览依赖境外在线服务，开启后如果解析明显变慢，请把它关掉。</li>
 					<li><b>广告拦不住：</b>先确认 DNS 接管方式对不对（推荐「接管 53 端口」，并确认面板没有提示劫持绕过）；能过滤的是广告域名，抖音、微信、爱奇艺这类“同一个 App 自己域名里的广告”DNS 拦不了，需要客户端级方案。</li>
 				</ul>
 			</div>
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>六、安全提示</h3>
+					<h3>六、开机启动顺序（不用手动干预）</h3>
+				</div>
+				<ul class="agh-tips">
+					<li><b>顺序：</b>DNSMasq（START=19）→ AdGuard Home（START=95）→ OpenClash（START=99）。</li>
+					<li><b>为什么这样排：</b>先让 DNSMasq 起来（接管 53 时它在 1745 提供本地解析），再让 AdGuard Home 占好 53/5335，最后才启动 OpenClash 去劫持 53 并把上游交给 AdGuard Home。这样开机过程中每个环节的端口都已就绪，不会出现「Clash 先起来、AdGuard Home 还没监听」导致解析失败。</li>
+					<li><b>你不需要做什么：</b>安装或启用插件时，`/etc/init.d/adguardhome_lite` 已注册为 START=95、STOP=01，开机自动按上述顺序执行。</li>
+				</ul>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>七、安全提示</h3>
 				</div>
 				<ul class="agh-tips">
 					<li>AdGuard Home 面板默认对局域网开放，请勿把 13800 映射到公网。</li>
@@ -406,6 +452,6 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261109b"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261110d"></script>
 </body>
 </html>

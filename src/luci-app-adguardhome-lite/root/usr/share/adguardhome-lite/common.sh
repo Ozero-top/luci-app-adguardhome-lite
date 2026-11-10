@@ -35,6 +35,7 @@ load_conf() {
     config_get github_proxy "main" github_proxy "gh-proxy.org"
     config_get adminuser "main" adminuser "admin"
     config_get adminpass "main" adminpass "admin123"
+    config_get adult_block "main" adult_block "0"
     config_get mode_applied "main" mode_applied "none"
 
     # OpenClash 的 DNS 端口（默认 7874），用于串联模式的上游
@@ -411,6 +412,116 @@ yaml_set_list() {
         }
         skip == 1 && /^    - / { next }
         { skip = 0; print }
+    ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
+}
+
+# 修改 YAML 中顶格（0 缩进）的标量，例如 http_proxy
+yaml_set_root_scalar() {
+    _file="$1"
+    _key="$2"
+    _value="$3"
+    [ -f "$_file" ] || return 1
+
+    awk -v k="$_key" -v v="$_value" '
+        $0 ~ "^" k ":" { print k ": \"" v "\""; next }
+        { print }
+    ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
+}
+
+###
+# filters 列表的增删（用于可选的成人内容拦截规则）
+###
+
+ADULT_FILTER_URL="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/nsfw.txt"
+ADULT_FILTER_NAME="HaGeZi NSFW（成人内容）"
+ADULT_FILTER_ID="1794300001"
+
+# 过滤列表下载走 Clash 的 HTTP 代理：国内直连 GitHub 常被重置，
+# 交给 Clash 代理后 AGH 才能正常更新规则。
+detect_http_proxy() {
+    _hp="$(uci -q get openclash.config.http_port 2>/dev/null)"
+    case "$_hp" in
+        ''|*[!0-9]*) _hp="" ;;
+    esac
+    if [ -n "$_hp" ] && port_listening "$_hp"; then
+        echo "http://127.0.0.1:$_hp"
+        return
+    fi
+    echo ""
+}
+
+# 判断 filters 中是否已存在指定 URL
+yaml_filter_present() {
+    _file="$1"
+    _url="$2"
+    [ -f "$_file" ] || return 1
+    grep -qF "url: $_url" "$_file"
+}
+
+# 在 filters: 列表末尾追加一条规则（已存在则跳过）
+yaml_filter_add() {
+    _file="$1"
+    _url="$2"
+    _name="$3"
+    _id="$4"
+    [ -f "$_file" ] || return 1
+    yaml_filter_present "$_file" "$_url" && return 0
+
+    awk -v url="$_url" -v name="$_name" -v id="$_id" '
+        { line[NR] = $0 }
+        END {
+            start = 0
+            for (i = 1; i <= NR; i++) {
+                if (line[i] ~ /^filters:/) { start = i; break }
+            }
+            if (start == 0) exit 1
+
+            # 找到 filters 段最后一个列表项的最后一行
+            last = start
+            for (i = start + 1; i <= NR; i++) {
+                if (line[i] ~ /^[^ ]/ && line[i] != "") break
+                if (line[i] ~ /^  - / || line[i] ~ /^    [a-z_]+:/) last = i
+            }
+
+            for (i = 1; i <= NR; i++) {
+                print line[i]
+                if (i == last) {
+                    print "  - enabled: true"
+                    print "    url: " url
+                    print "    name: " name
+                    print "    id: " id
+                }
+            }
+        }
+    ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
+}
+
+# 从 filters: 列表中删除指定 URL 的规则（不存在则跳过）
+yaml_filter_remove() {
+    _file="$1"
+    _url="$2"
+    [ -f "$_file" ] || return 0
+    yaml_filter_present "$_file" "$_url" || return 0
+
+    awk -v url="$_url" '
+        { line[NR] = $0 }
+        END {
+            for (i = 1; i <= NR; i++) {
+                if (line[i] ~ /^  - /) {
+                    end = i
+                    for (j = i + 1; j <= NR; j++) {
+                        if (line[j] ~ /^    /) end = j
+                        else break
+                    }
+                    hit = 0
+                    for (j = i; j <= end; j++) {
+                        if (index(line[j], "url: " url) > 0) hit = 1
+                    }
+                    if (hit) { i = end; continue }
+                }
+                print line[i]
+            }
+        }
     ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
 }
 

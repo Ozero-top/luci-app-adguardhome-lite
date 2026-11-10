@@ -92,6 +92,37 @@ if [ -s "$configpath" ]; then
             ;;
     esac
 
+    # 一键化：自动写入适合 Clash fake-IP 的 DNS 参数，
+    # 省得用户再进 AdGuard Home 面板逐项关闭缓存、DNSSEC 等。
+    # 注意不要自动开启安全浏览（safebrowsing）：它依赖 AdGuard 的在线服务，
+    # 国内网络不可达时会拖慢甚至阻塞解析，需要时请用户在面板手动开启。
+    yaml_set_scalar "$configpath" "cache_enabled" "false"
+    yaml_set_scalar "$configpath" "cache_optimistic" "false"
+    yaml_set_scalar "$configpath" "enable_dnssec" "false"
+    yaml_set_scalar "$configpath" "upstream_mode" "parallel"
+    log_msg "已自动应用推荐 DNS 参数：关闭缓存/DNSSEC，并行上游。"
+
+    # 过滤列表下载走 Clash 的 HTTP 代理（检测不到就清空），
+    # 否则国内直连 GitHub 会被重置，成人规则等列表无法更新。
+    _proxy="$(detect_http_proxy)"
+    yaml_set_root_scalar "$configpath" "http_proxy" "$_proxy"
+    if [ -n "$_proxy" ]; then
+        log_msg "过滤列表下载已走 Clash 代理：$_proxy"
+    else
+        log_msg "未检测到可用的 Clash HTTP 代理，过滤列表将直连下载。"
+    fi
+
+    # 成人内容拦截（可选）：追加或移除 HaGeZi NSFW 规则
+    _had_adult="0"
+    yaml_filter_present "$configpath" "$ADULT_FILTER_URL" && _had_adult="1"
+    if [ "$adult_block" = "1" ]; then
+        yaml_filter_add "$configpath" "$ADULT_FILTER_URL" "$ADULT_FILTER_NAME" "$ADULT_FILTER_ID"
+        [ "$_had_adult" = "1" ] || log_msg "已启用成人内容拦截（追加 HaGeZi NSFW 规则）。"
+    else
+        yaml_filter_remove "$configpath" "$ADULT_FILTER_URL"
+        [ "$_had_adult" = "0" ] || log_msg "已关闭成人内容拦截（移除 NSFW 规则）。"
+    fi
+
     # 前置模式下来源全是 127.0.0.1，回环地址必须跳出限速，
     # 否则一个客户端超过 20 qps 就会被 AdGuard Home 拒绝。
     if [ "$dns_mode" = "clashfirst" ]; then

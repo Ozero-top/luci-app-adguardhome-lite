@@ -28,7 +28,7 @@ import tempfile
 SOURCE_DATE_EPOCH = 1794096000  # 2026-11-08 00:00:00 UTC，保证构建结果可复现
 
 PKG_NAME = "luci-app-adguardhome-lite"
-PKG_VERSION = "1.1.4"
+PKG_VERSION = "1.1.5"
 PKG_RELEASE = "1"
 PKG_MAINTAINER = "Ozero-top"
 
@@ -196,9 +196,9 @@ def write_text(path: str, text: str, mode: int = 0o644):
 
 def build_control(staging_control: str, variant: str, installed_kb: int):
     version = "%s-%s" % (PKG_VERSION, PKG_RELEASE)
-    deps = "libc, luci-base, curl, wget-ssl, ca-bundle"
+    deps = "libc, luci-base, luci-lib-jsonc, curl, wget-ssl, ca-bundle"
     if variant == "modern":
-        deps = "libc, luci-base, luci-compat, curl, wget-ssl, ca-bundle"
+        deps = "libc, luci-base, luci-compat, luci-lib-jsonc, curl, wget-ssl, ca-bundle"
     else:
         version += "-legacy"
 
