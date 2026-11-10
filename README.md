@@ -60,9 +60,10 @@
 | 项目 | 说明 |
 |---|---|
 | 固件 | OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS，以及基于新版 LuCI 的衍生固件 |
+| 25.12 及 apk 系统 | iStoreOS 25.12、OpenWrt 25.12 使用 `apk` 包管理，不能安装 `.ipk`，请用 [脚本安装](#脚本安装2512--apk-系统推荐) |
 | 旧固件 | OpenWrt 22.03 及更早的原生 Lua LuCI 使用 `legacy` 版本（不依赖 `luci-compat`） |
 | 架构 | x86_64 / 386、ARM64、ARM v5/v6/v7/v8、MIPS / MIPSel / MIPS64 / MIPS64el、RISC-V 64、PPC64LE（暂不支持 LoongArch） |
-| 实测环境 | Kwrt aarch64、iStoreOS x86_64；内核 AdGuard Home v0.107.80 |
+| 实测环境 | Kwrt aarch64、iStoreOS 24.10 / 25.12 x86_64；内核 AdGuard Home v0.107.80 |
 
 > 与旧版 `luci-app-adguardhome` 冲突，安装前请先卸载旧插件及中文语言包。
 
@@ -101,6 +102,48 @@ sh /tmp/luci-app-adguardhome-lite_<版本>.run
 脚本会自解压到临时目录，优先安装新版 LuCI 包，失败时自动回退 legacy 包，安装完成后自动清理临时文件。
 
 Release 页面同时提供 `SHA256SUMS`，下载后可校验文件完整性。
+
+### 脚本安装（25.12 / apk 系统，推荐）
+
+OpenWrt / iStoreOS **25.12 起默认使用 `apk` 包管理**，`.ipk` 无法安装。这类系统直接用 `install.sh`，脚本会自动下载源码、补齐依赖、安装文件并清理 LuCI 缓存，**不需要打安装包**。
+
+```sh
+# curl（推荐）
+curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh
+
+# 只有 wget 时
+wget -qO- https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh
+```
+
+国内网络如果访问 raw.githubusercontent.com 失败，脚本本身也走反代：
+
+```sh
+curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
+```
+
+脚本会依次尝试 `gh-proxy.org`、`ghfast.top`、`ghproxy.cc` 和 GitHub 直连，哪一个能用就用哪一个；`curl` 与 `wget` 都支持。
+
+常用参数：
+
+| 参数 | 作用 |
+|---|---|
+| `-v 1.1.6` | 指定版本；`-v latest` 取最新 Release |
+| `-m https://gh-proxy.org` | 指定反代，可重复 |
+| `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
+| `--uninstall` | 卸载插件，恢复 DNSMasq 原始设置，保留配置与内核 |
+| `--purge` | 卸载并删除 `/etc/config/adguardhome_lite`、内核与统计数据 |
+
+示例：
+
+```sh
+# 卸载（保留配置）
+sh install.sh --uninstall
+
+# 安装指定版本并指定反代
+sh install.sh -v 1.1.6 -m https://gh-proxy.org
+```
+
+> 脚本安装不会在 `apk` 的已安装列表里留下记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
 
 ---
 
@@ -222,6 +265,7 @@ nft list chain inet fw4 dstnat | grep 'OpenClash DNS Hijack'
 │   ├── root/usr/share/adguardhome-lite/ # 安装、接管、更新等核心脚本
 │   ├── root/etc/init.d/                 # procd 服务脚本
 │   └── Makefile                         # OpenWrt SDK 构建入口
+├── install.sh                          # 脚本安装入口（25.12 / apk 系统，无需安装包）
 ├── tools/build_ipk.py                   # 免 SDK 直接构建 ipk
 ├── tools/build_run.py                   # 构建离线自解压 .run 安装包
 ├── docs/安装与使用说明.md                # 安装、验证与排障文档
@@ -285,6 +329,13 @@ make package/luci-app-adguardhome-lite/compile V=s
 ## 更新记录
 
 > 更名说明：插件显示名由「AdGuard Home 一键版」改为「AdGuard Home 助手」。包名 `luci-app-adguardhome-lite`、配置 `/etc/config/adguardhome_lite` 与安装方式均未变化，已安装用户可直接覆盖升级。
+
+### v1.1.6（2026-11-10）
+
+- 新增 `install.sh` 脚本安装：支持 curl / wget，自动选择 GitHub 反代、检查依赖、安装文件并清理 LuCI 缓存；带 `--uninstall` / `--purge`
+- 适配 OpenWrt / iStoreOS 25.12（`apk` 包管理）：这类系统无法安装 `.ipk`，直接用 `install.sh` 即可
+- 修复配置模板把 `ratelimit_whitelist` 写成 CIDR（`127.0.0.0/8`、`::1/128`）导致 `--check-config` 失败、服务无法启动的问题；改为单个 IP，旧配置在应用时自动修正
+- 文档补充 25.12 兼容说明与脚本安装、卸载命令
 
 ### v1.1.5（2026-11-10）
 

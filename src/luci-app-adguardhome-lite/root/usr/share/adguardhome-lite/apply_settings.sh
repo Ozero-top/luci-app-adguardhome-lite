@@ -125,13 +125,21 @@ if [ -s "$configpath" ]; then
 
     # 前置模式下来源全是 127.0.0.1，回环地址必须跳出限速，
     # 否则一个客户端超过 20 qps 就会被 AdGuard Home 拒绝。
+    # 注意：ratelimit_whitelist 只接受单个 IP，写 CIDR 会导致配置校验失败。
     if [ "$dns_mode" = "clashfirst" ]; then
         _rl=$(awk '$0 ~ "^  ratelimit:" {print $2; exit}' "$configpath" 2>/dev/null)
         _wl=$(yaml_get_list "$configpath" "ratelimit_whitelist")
         if [ -n "$_rl" ] && [ "$_rl" != "0" ] && [ -z "$_wl" ]; then
-            yaml_set_list "$configpath" "ratelimit_whitelist" "127.0.0.0/8 ::1/128"
+            yaml_set_list "$configpath" "ratelimit_whitelist" "127.0.0.1 ::1"
             log_msg "已把回环地址加入限速白名单（前置模式查询来源都是 127.0.0.1）。"
         fi
+    fi
+
+    # 兼容 1.1.4/1.1.5 生成的配置：把白名单里的 CIDR 改回单个 IP
+    _wl_cidr=$(awk '/^  ratelimit_whitelist:/{f=1;next} f&&/^    - /{print;next} f{f=0}' "$configpath" 2>/dev/null | grep -cE '127\.0\.0\.0/8|::1/128')
+    if [ "${_wl_cidr:-0}" != "0" ]; then
+        yaml_fix_ratelimit_whitelist "$configpath"
+        log_msg "已修正限速白名单格式（CIDR 改为单个 IP）。"
     fi
 
     if ! check_agh_config; then
