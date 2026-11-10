@@ -22,7 +22,7 @@
 ---
 
 <div align=center>
-<img src="https://ozero.top/media/2026/11/6af0738b04e0b3.88465351.png" width="600" height="794"> 
+<img src="https://ozero.top/media/2026/11/6af2d7b3091938.16423231.png" width="600" height="794"> 
 </div>
 
 ---
