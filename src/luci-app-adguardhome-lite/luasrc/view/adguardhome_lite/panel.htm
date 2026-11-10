@@ -164,11 +164,10 @@
 							<select id="agh-set-dns-mode">
 								<option value="takeover">接管 53 端口（默认，DNSMasq 移到 1745）</option>
 								<option value="upstream">DNSMasq 上游（AdGuard Home 监听 5333）</option>
-								<option value="openclash">OpenClash 串联（DNSMasq 53 → AGH 5333 → Clash 7874）</option>
 								<option value="clashfirst">OpenClash 前置（Clash 7874 → AGH 5335 → 真实 DNS）</option>
 								<option value="none">仅面板模式（不接管 DNS）</option>
 							</select>
-							<p class="agh-hint">大白话选择：<b>装了 OpenClash 且开着 DNS 劫持（新版默认就开着）→ 选「OpenClash 前置」</b>；<b>没装 OpenClash，或已经关掉它的 DNS 劫持 → 选「接管 53 端口」</b>。其余三种只在特殊情况下用，详见「使用引导」。切换时会自动恢复原来的 DNS 设置，不会叠加。</p>
+							<p class="agh-hint">大白话选择：<b>想统计每台设备、让所有域名都先过滤 → 选「接管 53 端口」</b>；装了 OpenClash、开着 DNS 劫持也能用，插件会把设备的 53 查询收回 53，不会再被 Clash 抢走。<b>不想让 AdGuard Home 占 53，或不在乎逐设备统计 → 选「OpenClash 前置」</b>（这种模式下面板里来源全是 127.0.0.1）。切换时会自动恢复原来的 DNS 设置，不会叠加。</p>
 						</div>
 
 						<div class="agh-field">
@@ -300,9 +299,9 @@
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>二、五种 DNS 接管方式，到底选哪个？</h3>
+					<h3>二、四种 DNS 接管方式，到底选哪个？</h3>
 				</div>
-				<p class="agh-hint">记住一句话：<b>装了 OpenClash 就用「OpenClash 前置」，没装 OpenClash 就用「接管 53 端口」。</b>剩下三种是特殊情况才用。选错了不会坏，但广告可能拦不住，或者干脆上不了网。</p>
+				<p class="agh-hint">记住一句话：<b>想看到每台设备、让所有域名都先过滤 → 「接管 53 端口」</b>（装了 OpenClash、开着 DNS 劫持也照样能用）；<b>不想让 AdGuard Home 占 53 端口 → 「OpenClash 前置」</b>。剩下两种只在特殊情况用。</p>
 				<div class="agh-table-wrap">
 					<table class="agh-table">
 						<thead>
@@ -310,24 +309,24 @@
 						</thead>
 						<tbody>
 							<tr>
-								<td>装了 OpenClash，并且开着「DNS 劫持」（新版默认就开着）</td>
-								<td><b>OpenClash 前置</b></td>
-								<td>53 已经被 Clash 抢走了，只能让 Clash 把查询转给 AdGuard Home 过滤，否则 AdGuard Home 根本收不到查询。</td>
+								<td>装了 OpenClash（DNS 劫持/转发开着），还想看到每台设备</td>
+								<td><b>接管 53 端口</b></td>
+								<td>插件会在 OpenClash 的劫持之前把设备的 53 查询收回 53，先交给 AdGuard Home 过滤，再经 DNSMasq（1745）→ Clash（7874）分流。</td>
 							</tr>
 							<tr>
-								<td>没装 OpenClash，或者已经关掉它的 DNS 劫持</td>
+								<td>没装 OpenClash</td>
 								<td><b>接管 53 端口</b>（默认）</td>
-								<td>最直接：把 53 端口交给 AdGuard Home，所有设备默认都走它，过滤和统计都最完整。</td>
+								<td>最直接：把 53 交给 AdGuard Home，所有设备默认都走它，过滤和统计都最完整。</td>
 							</tr>
 							<tr>
-								<td>不想让 AdGuard Home 占 53，但也没人抢 53</td>
+								<td>不想让 AdGuard Home 占 53，也不在乎逐设备统计</td>
+								<td><b>OpenClash 前置</b></td>
+								<td>Clash 先劫持，再把查询交给 AdGuard Home（5335）过滤；面板里来源全是 127.0.0.1，属于正常现象。</td>
+							</tr>
+							<tr>
+								<td>没有程序抢 53，但想让 DNSMasq 继续当入口</td>
 								<td><b>DNSMasq 上游</b></td>
-								<td>让 DNSMasq 继续待在 53，收到查询后再转给 AdGuard Home（5333）过滤。</td>
-							</tr>
-							<tr>
-								<td>关掉了 OpenClash 的 DNS 劫持，但仍想让 Clash 决定域名怎么解析</td>
-								<td><b>OpenClash 串联</b></td>
-								<td>先由 AdGuard Home 过滤，过滤完再交给 Clash 的 DNS（7874）去做分流解析。</td>
+								<td>DNSMasq 留在 53，收到查询后转给 AdGuard Home（5333）过滤。</td>
 							</tr>
 							<tr>
 								<td>只想看看面板，或 DNS 已经由别的程序管了</td>
@@ -337,6 +336,7 @@
 						</tbody>
 					</table>
 				</div>
+				<p class="agh-hint">原来的「OpenClash 串联」已下线：DNSMasq 会优先用 OpenClash 写入的上游，查询被 Clash 抢先应答，AdGuard Home 实际收不到，旧配置会自动迁移到「接管 53 端口」。</p>
 			</div>
 
 			<div class="agh-card">
@@ -345,16 +345,13 @@
 				</div>
 				<ul class="agh-tips">
 					<li><b>接管 53 端口（默认）：</b>相当于把「问路的前台」直接换成 AdGuard Home。设备一上来就问它，它先把广告域名拦掉，剩下的再转交给系统原来的 DNSMasq（被挪到 1745 端口）。<br>
-					<b>什么时候用：</b>没装 OpenClash，或者确定 OpenClash 的 DNS 劫持已经关掉。<br>
-					<b>要注意：</b>如果 OpenClash 还开着 DNS 劫持，它会把 53 抢走，AdGuard Home 就被绕过了，广告看起来「没效果」。</li>
+					<b>什么时候用：</b>想看到每台设备、让所有域名都先过滤；装了 OpenClash 也推荐这个。<br>
+					<b>要注意：</b>插件会自建一条 nft 规则，把设备的 53 查询在 OpenClash 劫持之前收回 53；如果这条规则没生效（面板会提示），查询仍可能被 Clash 抢走。</li>
 					<li><b>DNSMasq 上游：</b>前台还是 DNSMasq，但它不再自己查，而是把所有查询转给 AdGuard Home（5333）过滤。<br>
 					<b>什么时候用：</b>你不想让 AdGuard Home 占用 53 端口，同时又没有程序抢 53。<br>
-					<b>要注意：</b>和「接管 53」一样，OpenClash 开着 DNS 劫持时不要用。</li>
-					<li><b>OpenClash 串联：</b>查询先到 DNSMasq，再给 AdGuard Home 过滤，最后交给 Clash 的 DNS 去做分流。<br>
-					<b>什么时候用：</b>你已经关掉了 OpenClash 的 DNS 劫持，但还想让 Clash 决定哪些域名走代理。<br>
-					<b>要注意：</b>Clash 必须正在运行；Clash 停了，DNS 就会解析失败。</li>
-					<li><b>OpenClash 前置（装了 OpenClash 就选它）：</b>设备先被 OpenClash 的劫持规则拉进 Clash 的 DNS（7874），Clash 再把域名丢给 AdGuard Home（5335）过滤，AdGuard Home 最后去问运营商/公共 DNS。<br>
-					<b>什么时候用：</b>OpenClash 开着 DNS 劫持（新版默认），这是绝大多数装了 OpenClash 的用户该选的。<br>
+					<b>要注意：</b>OpenClash 开着 DNS 劫持时不要用。</li>
+					<li><b>OpenClash 前置：</b>设备先被 OpenClash 的劫持规则拉进 Clash 的 DNS（7874），Clash 再把域名丢给 AdGuard Home（5335）过滤，AdGuard Home 最后去问运营商/公共 DNS。<br>
+					<b>什么时候用：</b>不想让 AdGuard Home 占 53 端口，或者只关心过滤、不在乎每台设备各自的统计。<br>
 					<b>要注意：</b>Clash 内核必须运行；插件会自动把 Clash 的上游改成 127.0.0.1:5335，OpenClash 重启或「一键设置」后如果失效，回来重新保存一次即可。这个模式下面板里看到的来源都是 Clash（127.0.0.1），看不到每台设备的名字，属于正常现象。</li>
 					<li><b>仅面板模式：</b>什么 DNS 都不改，只把 13800 控制台开起来。<br>
 					<b>什么时候用：</b>只想先看看界面，或者你已经有别的 DNS 方案（比如另一台软路由）。</li>
@@ -385,7 +382,7 @@
 					<li><b>13800 打不开：</b>等待 5-10 秒；确认 UCI 端口和配置一致；旧安装需手动改成 13800。</li>
 					<li><b>忘记密码：</b>基础设置页底部“修改面板密码”。</li>
 					<li><b>升级固件后：</b>配置会保留，内核需重新安装。</li>
-					<li><b>广告拦不住：</b>先确认 DNS 接管方式对不对（装了 OpenClash 要选“OpenClash 前置”）；能过滤的是广告域名，抖音、微信、爱奇艺这类“同一个 App 自己域名里的广告”DNS 拦不了，需要客户端级方案。</li>
+					<li><b>广告拦不住：</b>先确认 DNS 接管方式对不对（推荐「接管 53 端口」，并确认面板没有提示劫持绕过）；能过滤的是广告域名，抖音、微信、爱奇艺这类“同一个 App 自己域名里的广告”DNS 拦不了，需要客户端级方案。</li>
 				</ul>
 			</div>
 

@@ -34,7 +34,7 @@
 - **官方内核**：自动识别 CPU 架构，从 AdGuard 官方源下载最新稳定版内核。
 - **GitHub 反代**：可选 `gh-proxy.org`、`ghproxy.cc`、`ghproxy.com`、`ghfast.top`，加速国内下载；失败自动回退官方 CDN 与 GitHub 直连。
 - **fake-IP 兼容下载**：路由器使用 OpenClash 等 fake-IP DNS 时，自动通过公共 DNS 解析真实 IP 并用 `curl --resolve` 下载。
-- **五种 DNS 接管方式**：接管 53、DNSMasq 上游、OpenClash 串联、OpenClash 前置、仅面板。
+- **四种 DNS 接管方式**：接管 53、DNSMasq 上游、OpenClash 前置、仅面板（「OpenClash 串联」已下线，旧配置会自动迁移）。
 - **OpenClash 共存**：推荐「接管 53 + OpenClash DNS 劫持/转发」，在保留 fake-IP 与分流的同时，让 AdGuard Home 直接看到每台设备；插件会自建 `agh_dns_redirect` 链把设备的 53 查询收回，因此 OpenClash 劫持指向 `53`、`1745` 还是 `7874` 都不会绕过过滤；也支持「Clash → AdGuard Home → 真实 DNS」的前置链路。
 - **安全可控**：默认密码 `admin123`，可在插件内重置；停止服务或卸载时自动恢复 DNSMasq 设置。
 - **配置可维护**：内置 YAML 模板（11 个过滤规则 + 1 个白名单，日志/统计保留 30 天）；高级配置保存前自动 `--check-config` 并保留备份。
@@ -113,10 +113,11 @@ Release 页面同时提供 `SHA256SUMS`，下载后可校验文件完整性。
 | 方式 | 完整链路 | 适用场景 |
 |---|---|---|
 | 接管 53 端口（默认） | 客户端 → 53 AdGuard Home → 1745 DNSMasq → 7874 Clash DNS / 上游 DNS | 想逐设备统计；装了 OpenClash、开着 DNS 劫持/转发也能用（插件自动收回 53） |
-| DNSMasq 上游 | 客户端 → 53 DNSMasq → 5333 AdGuard Home → 自动上游 | 不想让 AdGuard Home 占用 53 |
-| OpenClash 串联 | 客户端 → 53 DNSMasq → 5333 AdGuard Home → 7874 Clash DNS | 想让 Clash 决定域名怎么解析 |
+| DNSMasq 上游 | 客户端 → 53 DNSMasq → 5333 AdGuard Home → 自动上游 | 不想让 AdGuard Home 占用 53，且无程序抢 53 |
 | **OpenClash 前置** | 客户端 → OpenClash 劫持 → 7874 Clash DNS → 5335 AdGuard Home → 真实 DNS | 不想让 AdGuard Home 占 53、不需要逐设备统计；劫持直接指向 7874 时的备选 |
 | 仅面板模式 | 不接管 DNS，仅提供管理面板 | 先体验面板或手动接管 |
+
+> 「OpenClash 串联」已下线：OpenClash 写入 DNSMasq 的默认上游（`server=127.0.0.1#7874`）排在 `conf-dir` 之前，`strict-order` 下查询会被 Clash 抢先应答，AdGuard Home 实际收不到查询。旧配置在保存或启动时会自动迁移为「接管 53 端口」。
 
 ### 推荐架构怎么选
 
@@ -125,9 +126,8 @@ Release 页面同时提供 `SHA256SUMS`，下载后可校验文件完整性。
 | 逐设备统计、所有域名先过滤，同时保留 fake-IP 与分流 | 「接管 53」+ OpenClash DNS 劫持/转发（插件会自动把查询收回 53） |
 | 不使用 OpenClash | 「接管 53」 |
 | 不想让 AdGuard Home 占 53，也不在乎逐设备统计 | 「OpenClash 前置」（Clash → AdGuard Home → 真实 DNS） |
-| 关闭了 OpenClash DNS 劫持，但仍希望交给 Clash 解析 | 「接管 53」或「OpenClash 串联」 |
 
-不要同时让一方的上游指向另一方：前置模式的上游必须是真实 DNS，串联模式的上游必须是 Clash DNS，否则会形成查询环。「接管 53」可以和 OpenClash 的 DNS 劫持/转发一起用：插件会写入独立的 `agh_dns_redirect` 链（`priority -101`），在 OpenClash 规则之前把局域网设备的 53 查询收回路由器 53 端口，所以劫持目标写 `:53`、`:1745` 或 `:7874` 都不会跳过 AdGuard Home。
+不要同时让一方的上游指向另一方：前置模式的上游必须是真实 DNS，否则会形成查询环。「接管 53」可以和 OpenClash 的 DNS 劫持/转发一起用：插件会写入独立的 `agh_dns_redirect` 链（`priority -101`），在 OpenClash 规则之前把局域网设备的 53 查询（IPv4 + IPv6）收回路由器 53 端口，所以劫持目标写 `:53`、`:1745` 或 `:7874` 都不会跳过 AdGuard Home；写入后会实际校验规则是否存在，缺失时自动重载防火墙。
 
 ### 接管 53 + OpenClash（推荐组合）
 
@@ -167,29 +167,17 @@ nft list chain inet fw4 dstnat | grep 'OpenClash DNS Hijack'
 - 原值全部记录在插件 UCI 中，停止/切换模式时恢复，并重启 OpenClash 使配置生效；
 - 要求 Clash 内核正在运行且 OpenClash DNS 劫持已开启，否则面板会提示“被绕过”。
 
-该模式下 AdGuard Home 看到的来源都是 Clash（`127.0.0.1`），没有逐设备统计；需要逐设备统计请用「接管 53」。
+该模式下 AdGuard Home 看到的来源都是 Clash（`127.0.0.1`），没有逐设备统计；需要逐设备统计请用「接管 53」。另外 Clash 的 fake-IP 会对所有 A 记录返回 `198.18.x.x`，被拦截的域名在 DNS 层也不会显示成 `0.0.0.0`，实际拦截发生在连接阶段。
 
-### OpenClash 串联说明
+### 「OpenClash 串联」为什么下线
 
-适用于关闭 OpenClash DNS 劫持、或劫持规则为 `redirect to :53` 的环境。选择「OpenClash 串联」后插件会自动：
+该模式曾把 `server=/#/127.0.0.1#5333` 写进 DNSMasq 的 `conf-dir`，让查询先经过 AdGuard Home 再交给 Clash。但在真实环境中：
 
-- AdGuard Home 监听 `5333`；
-- 向 DNSMasq 实际读取的 `conf-dir`（通常 `/tmp/dnsmasq.d/adguardhome-lite.conf`）写入带标记的 `strict-order` + `server=/#/127.0.0.1#5333`（dnsmasq < 2.86 使用 `server=/./`）；
-- AdGuard Home 上游指向 `openclash.config.dns_port`（默认 `7874`）；
-- **DNSMasq 不跟随任何劫持端口**（避免与 Clash 抢 7874 导致 DNSMasq 起不来）。
+- OpenClash 自己会把 `server=127.0.0.1#7874` 写进 `dhcp.@dnsmasq[0].server`，生成配置里它排在 `conf-dir` 之前；
+- 加了 `strict-order` 后 DNSMasq 按顺序先问 Clash，Clash 有应答就不会再问 AdGuard Home；
+- OpenClash 每次启动还会重写这条上游，转发文件随时失效。
 
-这样即使 OpenClash 重启、更新或停止，53 端口仍有 DNSMasq 提供解析，不会出现“局域网全部设备断网”。
-
-停止插件或切换模式时自动移除转发文件，DNS 恢复直连 Clash，不会断网。
-
-验证：
-
-```sh
-nslookup pos.baidu.com 路由器IP    # 应返回 0.0.0.0
-nslookup www.baidu.com 路由器IP    # 应正常解析
-nslookup www.google.com 路由器IP   # 代理站点返回 198.18.x.x fake-IP
-cat /tmp/dnsmasq.d/adguardhome-lite.conf 2>/dev/null   # 串联模式应存在
-```
+结果是「显示已接管、实际没过滤」。因此插件已移除该选项，旧配置会在保存或启动时自动迁移为「接管 53 端口」（该模式既能逐设备统计，也能保留 Clash 的 fake-IP 与分流）。
 
 ### 与 OpenClash 的启动顺序
 
@@ -198,7 +186,6 @@ cat /tmp/dnsmasq.d/adguardhome-lite.conf 2>/dev/null   # 串联模式应存在
 | DNS 接管方式 | 顺序要求 | 说明 |
 |---|---|---|
 | **OpenClash 前置** | 无要求 | AdGuard Home 上游是真实 DNS，不依赖 Clash；OpenClash 启动后接管 53 并转发到 AdGuard Home |
-| **OpenClash 串联** | Clash 已在运行时才会等待其 DNS 端口 | 启动时最多等待 10 秒；Clash 未运行则直接启动，面板会提示上游不可用 |
 | 接管 53 端口 | 可与 OpenClash 劫持同用 | 插件自建 `agh_dns_redirect` 链先把查询收回 AdGuard Home（53），再经 DNSMasq（1745）交给 Clash（7874），不受 OpenClash 劫持目标影响 |
 | DNSMasq 上游 / 仅面板 | 无要求 | 不涉及 53 端口劫持 |
 
@@ -283,6 +270,13 @@ make package/luci-app-adguardhome-lite/compile V=s
 ## 更新记录
 
 > 更名说明：插件显示名由「AdGuard Home 一键版」改为「AdGuard Home 助手」。包名 `luci-app-adguardhome-lite`、配置 `/etc/config/adguardhome_lite` 与安装方式均未变化，已安装用户可直接覆盖升级。
+
+### v1.1.4（2026-11-10）
+
+- 修复「前置」模式被 AGH 限速误伤：模板默认把 `127.0.0.0/8`、`::1/128` 加入 `ratelimit_whitelist`；旧配置在应用前置模式时若白名单为空会自动补上
+- `agh_dns_redirect` 增加 IPv6 收回规则（限定 LAN 接口），写入后实际校验规则是否生效；改用防火墙 restart 重建规则（iStoreOS 上 `fw4 reload` 不会重建），并清理残留空链
+- 「OpenClash 串联」下线：旧配置自动迁移为「接管 53 端口」，界面与文档同步移除该选项
+- 面板提示改为「劫持已开启但收回规则未生效」时才告警，不再误报「接管 53 会被绕过」
 
 ### v1.1.3（2026-11-10）
 

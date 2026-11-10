@@ -128,33 +128,77 @@ patch_agh_port() {
 # 重定向，把局域网设备的 DNS 查询统一收回路由器 53 端口，交给 AdGuard Home 过滤。
 AGH_NFT_FILE="/etc/nftables.d/30-adguardhome-lite-dns.nft"
 
+# 局域网接口名，用于限定 IPv6 重定向范围，避免把 WAN 进来的查询也收进来
+agh_nft_lan_iface() {
+    _if="$(uci -q get network.lan.device 2>/dev/null)"
+    [ -n "$_if" ] || _if="$(uci -q get network.lan.ifname 2>/dev/null)"
+    [ -n "$_if" ] || _if="br-lan"
+    echo "$_if"
+}
+
+agh_nft_rule_present() {
+    have_cmd nft || return 1
+    nft list chain inet fw4 agh_dns_redirect 2>/dev/null | grep -q 'redirect to :53'
+}
+
 agh_nft_reload() {
-    have_cmd fw4 || return 0
-    fw4 reload >/dev/null 2>&1
+    # 注意：部分固件（如 iStoreOS 24.10）的 `fw4 reload` 不会重建整份规则集，
+    # 必须走 /etc/init.d/firewall restart 才能让新增/删除的链真正生效。
+    if [ -x /etc/init.d/firewall ]; then
+        _out=$(/etc/init.d/firewall restart 2>&1)
+    elif have_cmd fw4; then
+        _out=$(fw4 restart 2>&1)
+    else
+        return 0
+    fi
+
+    if [ $? -ne 0 ]; then
+        log_msg "防火墙重载失败：$(echo "$_out" | tail -n 2 | tr '\n' ' ')"
+        return 1
+    fi
+    return 0
 }
 
 agh_nft_ensure() {
     [ -d /etc/nftables.d ] || return 0
     have_cmd nft || return 0
 
+    _lan="$(agh_nft_lan_iface)"
     _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 OpenClash 的 DNS 劫持绕过。
 chain agh_dns_redirect {
     type nat hook prerouting priority -101; policy accept;
-    meta nfproto ipv4 ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect\"
+    meta nfproto ipv4 ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v4\"
+    meta nfproto ipv6 iifname \"$_lan\" meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v6\"
 }"
 
-    if [ -f "$AGH_NFT_FILE" ] && [ "$(cat "$AGH_NFT_FILE")" = "$_want" ]; then
-        return 0
+    if [ ! -f "$AGH_NFT_FILE" ] || [ "$(cat "$AGH_NFT_FILE")" != "$_want" ]; then
+        printf '%s\n' "$_want" > "$AGH_NFT_FILE"
     fi
 
-    printf '%s\n' "$_want" > "$AGH_NFT_FILE"
+    # 文件存在不代表规则已加载（防火墙并发重载可能留下空链），这里做一次实际校验
+    agh_nft_rule_present && return 0
     agh_nft_reload
+    agh_nft_rule_present && return 0
+
+    sleep 1
+    agh_nft_reload
+    if ! agh_nft_rule_present; then
+        log_msg "DNS 重定向规则未生效：OpenClash 的劫持可能仍会绕过 AdGuard Home，请检查防火墙状态。"
+    fi
 }
 
 agh_nft_clear() {
-    [ -f "$AGH_NFT_FILE" ] || return 0
+    _had="0"
+    [ -f "$AGH_NFT_FILE" ] && _had="1"
     rm -f "$AGH_NFT_FILE"
-    agh_nft_reload
+
+    # 文件删掉后链可能还留在内核里，直接删掉我们的链，避免残留空链
+    if have_cmd nft && nft list chain inet fw4 agh_dns_redirect >/dev/null 2>&1; then
+        nft delete chain inet fw4 agh_dns_redirect 2>/dev/null && _had="1"
+    fi
+
+    [ "$_had" = "1" ] && agh_nft_reload
+    return 0
 }
 
 # 判断当前 DNSMasq 是否已经是目标模式
@@ -194,7 +238,7 @@ mode_is_applied() {
 mode_name() {
     case "$dns_mode" in
         takeover) echo "接管 53 端口模式（DNSMasq 移至 1745）" ;;
-        openclash) echo "OpenClash 串联模式（DNSMasq 53 → AdGuard Home 5333 → Clash 7874）" ;;
+        openclash) echo "OpenClash 串联模式（已下线）" ;;
         clashfirst) echo "OpenClash 前置模式（Clash 7874 → AdGuard Home 5335 → 真实 DNS）" ;;
         none) echo "仅面板模式（不接管 DNS）" ;;
         *) echo "DNSMasq 上游模式（AdGuard Home 监听 5333）" ;;
@@ -206,6 +250,17 @@ apply_mode() {
         upstream|takeover|none|openclash|clashfirst) ;;
         *) dns_mode="upstream" ;;
     esac
+
+    # 「OpenClash 串联」已下线：OpenClash 写入 dnsmasq 的默认上游排在 conf-dir 前面，
+    # strict-order 下查询会被 Clash 先应答，AdGuard Home 实际收不到查询。
+    if [ "$dns_mode" = "openclash" ]; then
+        log_msg "「OpenClash 串联」模式已下线（过滤会被 Clash 抢先应答），已切换为「接管 53 端口」。"
+        openclash_forward_del
+        uci -q set "$CONF.main.dns_mode=takeover"
+        uci -q commit "$CONF" 2>/dev/null
+        dns_mode="takeover"
+        dnsport="53"
+    fi
 
     if ! uci -q get dhcp.@dnsmasq[0] >/dev/null 2>&1; then
         log_msg "未找到 DNSMasq 配置，跳过 DNS 接管设置。"

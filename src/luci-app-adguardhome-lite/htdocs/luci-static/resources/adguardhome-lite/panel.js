@@ -146,7 +146,7 @@
 
 	function modeLabel(mode) {
 		if (mode === 'takeover') return '接管 53 端口';
-		if (mode === 'openclash') return 'OpenClash 串联（DNSMasq → AGH → Clash）';
+		if (mode === 'openclash') return 'OpenClash 串联（已下线）';
 		if (mode === 'clashfirst') return 'OpenClash 前置（Clash → AGH → 真实 DNS）';
 		if (mode === 'none') return '仅面板（不接管 DNS）';
 		return 'DNSMasq 上游';
@@ -154,7 +154,7 @@
 
 	function modeChain(d) {
 		var cdp = d.clash_dns_port || '7874';
-		if (d.dns_mode === 'takeover') return '客户端 → 53 AdGuard Home → 1745 DNSMasq → 上游 DNS';
+		if (d.dns_mode === 'takeover') return '客户端 → 53 AdGuard Home → 1745 DNSMasq → Clash / WAN DNS';
 		if (d.dns_mode === 'openclash') return '客户端 → 53 DNSMasq → 5333 AdGuard Home → ' + cdp + ' Clash DNS';
 		if (d.dns_mode === 'clashfirst') return '客户端 → OpenClash 劫持 → ' + cdp + ' Clash DNS → 5335 AdGuard Home → 真实 DNS';
 		if (d.dns_mode === 'none') return '不接管 DNS，仅保留管理面板';
@@ -249,8 +249,8 @@
 			['工作目录', '<span class="agh-path">' + esc(d.workdir || '') + '</span>']
 		];
 
-		if (d.openclash_hijack && d.dns_mode === 'takeover') {
-			rows.push(['配置建议', '<span class="agh-warn">检测到 OpenClash DNS 劫持，当前「接管 53」会被绕过：请关闭 OpenClash 的 DNS 劫持，或改用「OpenClash 前置」。</span>']);
+		if (d.dns_mode === 'takeover' && d.openclash_hijack && !d.dns_redirect) {
+			rows.push(['配置建议', '<span class="agh-warn">检测到 OpenClash DNS 劫持，但把查询收回 53 的规则没有生效，查询可能绕过 AdGuard Home。请在「基础设置」重新保存一次「接管 53 端口」，或检查防火墙状态。</span>']);
 		}
 		if (d.dns_mode === 'openclash' && d.openclash_hijack_port &&
 			d.openclash_hijack_port !== '53' && d.openclash_hijack_port !== String(d.dns_port)) {
