@@ -209,6 +209,10 @@ function action_status()
     local configpath = cfg("config", "/etc/AdGuardHome.yaml")
     local workdir = cfg("workdir", "/etc/AdGuardHome")
     local dns_mode = cfg("dns_mode", "takeover")
+    -- 「OpenClash 串联」已下线，历史配置在界面上按「接管 53 端口」展示
+    if dns_mode == "openclash" then
+        dns_mode = "takeover"
+    end
     local dnsport = 5333
     if dns_mode == "takeover" then
         dnsport = 53
@@ -243,6 +247,8 @@ function action_status()
         openclash_upstream_agh = openclash_upstream_agh(dnsport),
         clash_dns_port = uci:get("openclash", "config", "dns_port") or "",
         dnsmasq_port = uci:get("dhcp", "@dnsmasq[0]", "port") or "53",
+        -- 接管 53 时是否有实际生效的收回规则（被 OpenClash 劫持时靠它兜底）
+        dns_redirect = (sys.call("nft list chain inet fw4 agh_dns_redirect 2>/dev/null | grep -q 'redirect to :53'") == 0),
         agh_bypassed = cfg("agh_bypassed", "0"),
         update_running = update_running(),
         action_running = action_running(),
@@ -363,13 +369,17 @@ end
 function action_settings_get()
     local binpath = cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome")
     local configpath = cfg("config", "/etc/AdGuardHome.yaml")
+    local mode = cfg("dns_mode", "takeover")
+    if mode == "openclash" then
+        mode = "takeover"
+    end
 
     http.header("Cache-Control", "no-store")
     http.prepare_content("application/json")
     http.write_json({
         ok = true,
         enabled = is_enabled(),
-        dns_mode = cfg("dns_mode", "takeover"),
+        dns_mode = mode,
         webport = tonumber(cfg("webport", "13800")) or 13800,
         binpath = binpath,
         workdir = cfg("workdir", "/etc/AdGuardHome"),
@@ -407,8 +417,7 @@ function action_settings_save()
     end
 
     local allowed_modes = {
-        takeover = true, upstream = true, none = true,
-        openclash = true, clashfirst = true
+        takeover = true, upstream = true, none = true, clashfirst = true
     }
     local allowed_bins = {
         ["/usr/bin/AdGuardHome/AdGuardHome"] = true,

@@ -6,6 +6,17 @@
 
 load_conf
 
+# 「OpenClash 串联」已下线：dnsmasq 会优先采用 OpenClash 写入的默认上游，
+# 过滤实际不生效，这里自动迁移到「接管 53 端口」。
+if [ "$dns_mode" = "openclash" ]; then
+    log_msg "「OpenClash 串联」模式已下线，已切换为「接管 53 端口」。"
+    openclash_forward_del
+    uci -q set "$CONF.main.dns_mode=takeover"
+    uci -q commit "$CONF" 2>/dev/null
+    dns_mode="takeover"
+    dnsport="53"
+fi
+
 case "$webport" in
     ''|*[!0-9]*) webport="13800" ;;
 esac
@@ -80,6 +91,17 @@ if [ -s "$configpath" ]; then
             fi
             ;;
     esac
+
+    # 前置模式下来源全是 127.0.0.1，回环地址必须跳出限速，
+    # 否则一个客户端超过 20 qps 就会被 AdGuard Home 拒绝。
+    if [ "$dns_mode" = "clashfirst" ]; then
+        _rl=$(awk '$0 ~ "^  ratelimit:" {print $2; exit}' "$configpath" 2>/dev/null)
+        _wl=$(yaml_get_list "$configpath" "ratelimit_whitelist")
+        if [ -n "$_rl" ] && [ "$_rl" != "0" ] && [ -z "$_wl" ]; then
+            yaml_set_list "$configpath" "ratelimit_whitelist" "127.0.0.0/8 ::1/128"
+            log_msg "已把回环地址加入限速白名单（前置模式查询来源都是 127.0.0.1）。"
+        fi
+    fi
 
     if ! check_agh_config; then
         _err=$(tail -n 3 /var/run/adguardhome_lite_check.log 2>/dev/null | tr '\n' ' ')
