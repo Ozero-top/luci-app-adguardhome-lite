@@ -121,7 +121,7 @@ wget -qO- https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/
 curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
 ```
 
-脚本会依次尝试 `gh-proxy.org`、`ghfast.top`、`ghproxy.cc` 和 GitHub 直连，哪一个能用就用哪一个；`curl` 与 `wget` 都支持。
+脚本会依次尝试 `gh-proxy.org`、`ghfast.top`、`gh-proxy.com` 和 GitHub 直连，哪一个能用就用哪一个；`curl` 与 `wget` 都支持。
 
 常用参数：
 
