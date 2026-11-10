@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 一键版 - 首次安装初始化
+# AdGuard Home 助手 - 首次安装初始化
 # 只准备目录和权限，不自动启动服务，避免安装后立即改变 DNS 设置。
 
 mkdir -p /etc/AdGuardHome /usr/bin/AdGuardHome 2>/dev/null

@@ -1,6 +1,6 @@
 # AdGuard Home 一键版
 
-面向 OpenWrt / ImmortalWrt / iStoreOS 的 **AdGuard Home 一键版 LuCI 插件**，三步完成「装内核 → 接 DNS → 看状态」。
+面向 OpenWrt / ImmortalWrt / iStoreOS 的 **AdGuard Home 助手**（LuCI 插件），三步完成「装内核 → 接 DNS → 看状态」。
 
 > 插件负责安装内核、接管 DNS 与服务管理；过滤规则、查询统计、家长控制等请直接在 AdGuard Home 面板中操作。
 
@@ -68,7 +68,7 @@
 
 1. 打开 `http://路由器IP` → **系统 → 软件包**。
 2. 找到 **上传安装包**，选择对应 `.ipk` 上传。
-3. 等待依赖安装完成，在 **服务** 菜单下打开 **AdGuard Home 一键版**。
+3. 等待依赖安装完成，在 **服务** 菜单下打开 **AdGuard Home 助手**。
 
 **命令行安装（备用）**
 
@@ -281,6 +281,12 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新记录
+
+> 更名说明：插件显示名由「AdGuard Home 一键版」改为「AdGuard Home 助手」。包名 `luci-app-adguardhome-lite`、配置 `/etc/config/adguardhome_lite` 与安装方式均未变化，已安装用户可直接覆盖升级。
+
+### v1.1.3（2026-11-10）
+
+- 插件显示名由「AdGuard Home 一键版」改为「AdGuard Home 助手」：LuCI 菜单、页面标题、安装包描述与文档同步更新；包名 `luci-app-adguardhome-lite` 与配置目录不变，可直接覆盖升级
 
 ### v1.1.2（2026-11-09）
 

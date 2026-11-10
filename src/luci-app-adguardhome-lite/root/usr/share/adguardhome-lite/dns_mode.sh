@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 一键版 - DNS 接管模式管理
+# AdGuard Home 助手 - DNS 接管模式管理
 # 用法：dns_mode.sh apply|revert|status
 # 说明：自动保存和恢复 DNSMasq 原始设置，关闭服务或切换模式时不会破坏上网。
 
@@ -137,7 +137,7 @@ agh_nft_ensure() {
     [ -d /etc/nftables.d ] || return 0
     have_cmd nft || return 0
 
-    _want="# AdGuard Home 一键版：接管 53 端口时启用，避免被 OpenClash 的 DNS 劫持绕过。
+    _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 OpenClash 的 DNS 劫持绕过。
 chain agh_dns_redirect {
     type nat hook prerouting priority -101; policy accept;
     meta nfproto ipv4 ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect\"

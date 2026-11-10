@@ -28,7 +28,7 @@ import tempfile
 SOURCE_DATE_EPOCH = 1794096000  # 2026-11-08 00:00:00 UTC，保证构建结果可复现
 
 PKG_NAME = "luci-app-adguardhome-lite"
-PKG_VERSION = "1.1.2"
+PKG_VERSION = "1.1.3"
 PKG_RELEASE = "1"
 PKG_MAINTAINER = "Ozero-top"
 
@@ -214,7 +214,7 @@ Maintainer: {maintainer}
 Architecture: all
 Installed-Size: {installed}
 SourceDateEpoch: {epoch}
-Description: AdGuard Home 一键版：自动安装官方最新内核、一键接管 DNS、内置中文引导。
+Description: AdGuard Home 助手：自动安装官方最新内核、一键接管 DNS、内置中文引导。
 """.format(
         name=PKG_NAME,
         version=version,

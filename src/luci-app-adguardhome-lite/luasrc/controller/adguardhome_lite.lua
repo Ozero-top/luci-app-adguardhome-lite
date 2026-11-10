@@ -1,4 +1,4 @@
--- AdGuard Home 一键版 - LuCI 控制器
+-- AdGuard Home 助手 - LuCI 控制器
 -- 负责菜单注册、状态查询、内核安装、服务控制和密码修改。
 module("luci.controller.adguardhome_lite", package.seeall)
 
@@ -182,7 +182,7 @@ function index()
     local root = entry(
         { "admin", "services", "adguardhome_lite" },
         template("adguardhome_lite/wrapper"),
-        "AdGuard Home 一键版",
+        "AdGuard Home 助手",
         60
     )
     root.dependent = true

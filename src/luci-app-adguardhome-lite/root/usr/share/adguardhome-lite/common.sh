@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 一键版 - 公共函数库
+# AdGuard Home 助手 - 公共函数库
 # 本文件只被插件内的其他脚本引用，请不要直接执行。
 
 CONF="adguardhome_lite"

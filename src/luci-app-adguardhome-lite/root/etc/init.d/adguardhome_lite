@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# AdGuard Home 一键版 - 服务控制脚本
+# AdGuard Home 助手 - 服务控制脚本
 # 说明：由 procd 管理，负责首次配置、DNS 接管、启动/停止与失败恢复。
 
 USE_PROCD=1

@@ -1,5 +1,5 @@
-# AdGuard Home 一键版（luci-app-adguardhome-lite）配置文件
-# 普通用户请通过 LuCI 界面“服务 -> AdGuard Home 一键版”修改，不建议手动编辑。
+# AdGuard Home 助手（luci-app-adguardhome-lite）配置文件
+# 普通用户请通过 LuCI 界面“服务 -> AdGuard Home 助手”修改，不建议手动编辑。
 
 config adguardhome_lite 'main'
 	# 是否启用：1=开机自启并立即运行；0=停止服务并恢复系统原始 DNS 设置

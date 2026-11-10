@@ -20,12 +20,12 @@ import tarfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "dist")
-MODERN = "luci-app-adguardhome-lite_1.1.2-1_all.ipk"
-LEGACY = "luci-app-adguardhome-lite_1.1.2-1-legacy_all.ipk"
-OUTPUT = "luci-app-adguardhome-lite_1.1.2-1.run"
+MODERN = "luci-app-adguardhome-lite_1.1.3-1_all.ipk"
+LEGACY = "luci-app-adguardhome-lite_1.1.3-1-legacy_all.ipk"
+OUTPUT = "luci-app-adguardhome-lite_1.1.3-1.run"
 
 INSTALL_SH = """#!/bin/sh
-# AdGuard Home 一键版 - 离线安装脚本
+# AdGuard Home 助手 - 离线安装脚本
 set -u
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -35,7 +35,7 @@ MODERN="{modern}"
 LEGACY="{legacy}"
 
 echo "=============================================="
-echo " AdGuard Home 一键版 - 离线安装"
+echo " AdGuard Home 助手 - 离线安装"
 echo "=============================================="
 
 if [ ! -f "$MODERN" ] || [ ! -f "$LEGACY" ]; then
@@ -65,14 +65,14 @@ fi
 
 echo ""
 echo "下一步："
-echo "  1. 打开 LuCI：服务 → AdGuard Home 一键版"
+echo "  1. 打开 LuCI：服务 → AdGuard Home 助手"
 echo "  2. 安装内核 → 一键启用 → 打开控制台"
 echo "  3. 默认账号 admin / 密码 admin123（请及时修改）"
 echo ""
 """
 
 HEADER = """#!/bin/sh
-# AdGuard Home 一键版 - 离线安装包（自解压）
+# AdGuard Home 助手 - 离线安装包（自解压）
 # 用法：sh {output}
 # 说明：解压到临时目录后执行 install.sh，不会修改固件其他文件。
 set -u
