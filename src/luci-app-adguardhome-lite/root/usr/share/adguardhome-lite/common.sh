@@ -51,6 +51,15 @@ load_conf() {
     esac
 }
 
+# DNSMasq 实际 DNS 端口；UCI 未显式设置时 OpenWrt 默认 53
+dnsmasq_port() {
+    _dmp="$(uci -q get dhcp.@dnsmasq[0].port 2>/dev/null)"
+    case "$_dmp" in
+        ''|*[!0-9]*) _dmp="53" ;;
+    esac
+    echo "$_dmp"
+}
+
 have_cmd() {
     command -v "$1" >/dev/null 2>&1
 }

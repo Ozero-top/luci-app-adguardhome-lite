@@ -325,7 +325,7 @@
 				</div>
 				<ol class="agh-guide-list">
 					<li><b>安装内核：</b>在“概览”页点击“安装/更新内核”，自动识别架构并下载官方最新稳定版。</li>
-					<li><b>一键启用：</b>首次启用从内置模板生成配置，默认密码 admin123，默认用“接管 53 端口”。<b>如果路由器装了 OpenClash，请到“基础设置”把 DNS 接管方式改成“OpenClash 前置”</b>，否则广告过滤会被 OpenClash 绕过。</li>
+					<li><b>一键启用：</b>首次启用从内置模板生成配置，默认密码 admin123，默认用“接管 53 端口”。<b>装了 OpenClash 也可以保持“接管 53 端口”</b>；只有 OpenClash 把 53 直接劫持到 7874 时，才需要改成“OpenClash 前置”。</li>
 					<li><b>打开控制台：</b>用概览页显示的地址、账号和默认密码登录 AdGuard Home。</li>
 				</ol>
 				<p class="agh-hint">国内网络如果下载失败，可在“基础设置”选择 GitHub 反代（推荐 gh-proxy.org）；反代不可用时自动回退。</p>

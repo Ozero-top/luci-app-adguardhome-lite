@@ -57,14 +57,14 @@ if [ -s "$configpath" ]; then
         openclash) _target_up="127.0.0.1:$clash_dns_port" ;;
         clashfirst) _target_up="$(detect_real_upstream_dns)" ;;
         upstream) _target_up="$(detect_upstream_dns)" ;;
-        *) _target_up="127.0.0.1" ;;
+        *) _target_up="127.0.0.1:$(dnsmasq_port)" ;;
     esac
 
     # 兼容旧版本：auto_upstream 缺失时，current 为插件曾写入的默认值也视为可改
     _is_auto=0
     [ -n "$_auto_up" ] && [ "$_cur_up" = "$_auto_up" ] && _is_auto=1
     case "$_cur_up" in
-        "127.0.0.1"|"127.0.0.1:1745"|"127.0.0.1:$clash_dns_port"|"127.0.0.1:5335"|"223.5.5.5 119.29.29.29"|"$_self_ip")
+        "127.0.0.1"|"127.0.0.1:53"|"127.0.0.1:1745"|"127.0.0.1:$clash_dns_port"|"127.0.0.1:5335"|"223.5.5.5 119.29.29.29"|"$_self_ip")
             _is_auto=1
             ;;
     esac
