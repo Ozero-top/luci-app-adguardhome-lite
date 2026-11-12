@@ -395,6 +395,7 @@
 					</table>
 				</div>
 				<p class="agh-hint">原来的「OpenClash 串联」已下线：DNSMasq 会优先用 OpenClash 写入的上游，查询被 Clash 抢先应答，AdGuard Home 实际收不到，旧配置会自动迁移到「接管 53 端口」。</p>
+				<p class="agh-hint">切换方式时，与当前方式无关的设置会自动置灰：排除接口/客户端只在「接管 53 端口」可用；没装 OpenClash 时「OpenClash 前置」不可选；选「DNSMasq 上游」且开着 OpenClash 会提示上游可能被覆盖。置灰只是禁止修改，已保存的值不会丢。</p>
 			</div>
 
 			<div class="agh-card">
@@ -404,7 +405,8 @@
 				<ul class="agh-tips">
 					<li><b>接管 53 端口（默认）：</b>相当于把「问路的前台」直接换成 AdGuard Home。设备一上来就问它，它先把广告域名拦掉，剩下的再转交给系统原来的 DNSMasq（被挪到 1745 端口）。<br>
 					<b>什么时候用：</b>想看到每台设备、让所有域名都先过滤；装了 OpenClash 也推荐这个。<br>
-					<b>要注意：</b>插件会自建一条 nft 规则，把设备的 53 查询在 OpenClash 劫持之前收回 53；如果这条规则没生效（面板会提示），查询仍可能被 Clash 抢走。</li>
+					<b>要注意：</b>插件会自建一条 nft 规则，把设备的 53 查询在 OpenClash 劫持之前收回 53；如果这条规则没生效（面板会提示），查询仍可能被 Clash 抢走。<br>
+					<b>不想被接管：</b>访客 WiFi、IoT 网段、旁路由或某台自建 DNS 的设备，可在“基础设置 → 不参与接管的接口 / 客户端”里排除；这些查询直接交给系统 DNSMasq（1745）应答，不进入 AdGuard Home，也不计入统计。</li>
 					<li><b>DNSMasq 上游：</b>前台还是 DNSMasq，但它不再自己查，而是把所有查询转给 AdGuard Home（5333）过滤。<br>
 					<b>什么时候用：</b>你不想让 AdGuard Home 占用 53 端口，同时又没有程序抢 53。<br>
 					<b>要注意：</b>OpenClash 开着 DNS 劫持时不要用。</li>
