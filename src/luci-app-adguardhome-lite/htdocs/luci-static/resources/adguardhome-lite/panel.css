@@ -546,6 +546,106 @@ code {
 	gap: 14px;
 }
 
+/* 基础设置固定三列，排成整齐的两行 */
+.agh-form-grid-3 {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+	.agh-form-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* 当前 DNS 模式下不生效的设置整体置灰 */
+.is-locked {
+	opacity: 0.5;
+}
+
+.is-locked input,
+.is-locked button,
+.is-locked select {
+	cursor: not-allowed;
+}
+
+.agh-hint-warn {
+	color: var(--agh-warning);
+}
+
+/* 下拉多选 */
+.agh-select {
+	position: relative;
+}
+
+.agh-select-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100%;
+	padding: 9px 11px;
+	border-radius: 10px;
+	border: 1px solid var(--agh-border);
+	background: var(--agh-surface-2);
+	color: var(--agh-text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.agh-select-toggle span:first-child {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agh-select-arrow {
+	flex: 0 0 auto;
+	color: var(--agh-muted);
+	font-size: 11px;
+}
+
+.agh-select-menu {
+	position: absolute;
+	z-index: 30;
+	top: calc(100% + 4px);
+	left: 0;
+	right: 0;
+	max-height: 216px;
+	overflow-y: auto;
+	padding: 5px;
+	border-radius: 10px;
+	border: 1px solid var(--agh-border);
+	background: var(--agh-surface);
+	box-shadow: 0 10px 26px rgba(51, 74, 44, 0.16);
+}
+
+.agh-select-menu[hidden] {
+	display: none;
+}
+
+.agh-select-menu .agh-option {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 6px 8px;
+	margin: 0;
+	border-radius: 7px;
+	font-size: 13px;
+	font-weight: 400;
+	cursor: pointer;
+}
+
+.agh-select-menu .agh-option:hover {
+	background: var(--agh-primary-soft);
+}
+
+.agh-select-menu .agh-option input {
+	width: auto;
+	margin: 0;
+	padding: 0;
+	accent-color: var(--agh-primary);
+	cursor: pointer;
+}
+
 .agh-field {
 	min-width: 0;
 }

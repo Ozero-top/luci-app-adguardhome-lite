@@ -46,6 +46,97 @@ local function cfg(opt, default)
     return v
 end
 
+-- 排除列表（接口 / 客户端 IP）的解析与校验。
+-- 这些值最终会写进 nft 规则文件，必须先做严格的白名单校验。
+local function split_words(v)
+    local t = {}
+    for w in tostring(v or ""):gmatch("%S+") do
+        t[#t + 1] = w
+    end
+    return t
+end
+
+local function join_words(v)
+    if type(v) == "table" then
+        return table.concat(v, " ")
+    end
+    return tostring(v or "")
+end
+
+local function valid_iface_name(name)
+    return #name <= 15 and name:match("^[%w_%.%-]+$") ~= nil
+end
+
+local function valid_ipv4(addr)
+    local a, b, c, d = addr:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
+    if not a then
+        return false
+    end
+    return tonumber(a) <= 255 and tonumber(b) <= 255 and tonumber(c) <= 255 and tonumber(d) <= 255
+end
+
+local function valid_ipv6(addr)
+    if not addr:match("^[%x:]+$") or not addr:find(":", 1, true) then
+        return false
+    end
+    if addr:find(":::", 1, true) then
+        return false
+    end
+    local _, doubles = addr:gsub("::", "")
+    if doubles > 1 then
+        return false
+    end
+    local colons = select(2, addr:gsub(":", ""))
+    if doubles == 1 then
+        return colons >= 2 and colons <= 7
+    end
+    return colons == 7
+end
+
+local function valid_client_spec(spec)
+    local addr, bits = spec:match("^([^/]+)/(%d+)$")
+    if addr then
+        if addr:find(":", 1, true) then
+            return valid_ipv6(addr) and tonumber(bits) <= 128
+        end
+        return valid_ipv4(addr) and tonumber(bits) <= 32
+    end
+    if spec:find(":", 1, true) then
+        return valid_ipv6(spec)
+    end
+    return valid_ipv4(spec)
+end
+
+-- 当前设备名，仅用于界面提示可排除的接口
+-- 只取目录：/sys/class/net 下还有 bonding_masters 等普通文件，不是网卡；
+-- 内核自带的空隧道/占位设备不会有客户端接入，也一并跳过。
+local IGNORED_IFACE_PATTERNS = {
+    "^lo$", "^dummy%d+$", "^sit%d+$", "^ip6tnl%d+$", "^tunl%d+$",
+    "^gre%d+$", "^gretap%d+$", "^erspan%d+$", "^ip6gre%d+$",
+    "^ip6_vti%d+$", "^teql%d+$", "^siit%d+$", "^utun%d*$",
+}
+
+local function iface_ignored(name)
+    for _, pat in ipairs(IGNORED_IFACE_PATTERNS) do
+        if name:match(pat) then
+            return true
+        end
+    end
+    return false
+end
+
+local function net_devices()
+    local out = sys.exec("for d in /sys/class/net/*; do [ -d \"$d\" ] && echo \"${d##*/}\"; done") or ""
+    local list = {}
+    for name in out:gmatch("[^\n]+") do
+        if not iface_ignored(name) and valid_iface_name(name) then
+            list[#list + 1] = name
+        end
+    end
+    table.sort(list)
+    return list
+end
+
 local function is_enabled()
     local v = cfg("enabled", "0")
     return v == "1" or v == 1 or v == true
@@ -591,6 +682,10 @@ function action_settings_get()
         channel = cfg("channel", "stable"),
         github_proxy = cfg("github_proxy", "gh-proxy.org"),
         adult_block = cfg("adult_block", "0") == "1",
+        bypass_ifaces = join_words(uci:get(CONF, "main", "bypass_ifaces")),
+        bypass_clients = join_words(uci:get(CONF, "main", "bypass_clients")),
+        devices = net_devices(),
+        openclash_installed = uci:get("openclash", "config") ~= nil,
         admin_user = cfg("adminuser", "admin"),
         admin_pass = cfg("adminpass", "admin123"),
         config_path = configpath,
@@ -617,6 +712,8 @@ function action_settings_save()
     local channel = http.formvalue("channel") or "stable"
     local proxy = http.formvalue("github_proxy") or "gh-proxy.org"
     local adult = http.formvalue("adult_block") or "0"
+    local bypass_ifaces_raw = http.formvalue("bypass_ifaces") or ""
+    local bypass_clients_raw = http.formvalue("bypass_clients") or ""
 
     if adult ~= "0" and adult ~= "1" then
         json_error("成人内容拦截参数不正确。")
@@ -666,6 +763,39 @@ function action_settings_save()
         return
     end
 
+    local ifaces, iface_seen = {}, {}
+    for _, name in ipairs(split_words(bypass_ifaces_raw)) do
+        if name == "lo" then
+            json_error("不能把 lo（回环接口）设为排除接口。")
+            return
+        end
+        if not valid_iface_name(name) then
+            json_error("接口名不合法：" .. name .. "（仅支持字母、数字、下划线、点和短横线，最长 15 字符）。")
+            return
+        end
+        if not iface_seen[name] then
+            iface_seen[name] = true
+            ifaces[#ifaces + 1] = name
+        end
+    end
+
+    local clients, client_seen = {}, {}
+    for _, spec in ipairs(split_words(bypass_clients_raw)) do
+        if not valid_client_spec(spec) then
+            json_error("客户端地址不合法：" .. spec .. "（支持 IPv4 / IPv6 地址或 CIDR）。")
+            return
+        end
+        if not client_seen[spec] then
+            client_seen[spec] = true
+            clients[#clients + 1] = spec
+        end
+    end
+
+    if #ifaces > 32 or #clients > 64 then
+        json_error("排除项过多，接口最多 32 个、客户端最多 64 个。")
+        return
+    end
+
     local port = tonumber(webport)
     if not port or port ~= math.floor(port) or port < 1 or port > 65535 then
         json_error("管理面板端口必须是 1-65535 之间的整数。")
@@ -689,6 +819,14 @@ function action_settings_save()
     uci:set(CONF, "main", "channel", channel)
     uci:set(CONF, "main", "github_proxy", proxy)
     uci:set(CONF, "main", "adult_block", adult)
+    uci:delete(CONF, "main", "bypass_ifaces")
+    for i = 1, #ifaces do
+        uci:add_list(CONF, "main", "bypass_ifaces", ifaces[i])
+    end
+    uci:delete(CONF, "main", "bypass_clients")
+    for i = 1, #clients do
+        uci:add_list(CONF, "main", "bypass_clients", clients[i])
+    end
     uci:commit(CONF)
 
     start_action("sh " .. SHARE .. "/apply_settings.sh")
