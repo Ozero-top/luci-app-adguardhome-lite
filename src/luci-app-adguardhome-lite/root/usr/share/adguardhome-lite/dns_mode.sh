@@ -159,7 +159,58 @@ agh_nft_rule_present() {
     _rules="$(nft list chain inet fw4 agh_dns_redirect 2>/dev/null)" || return 1
     echo "$_rules" | grep -q 'DNS Redirect v4' || return 1
     echo "$_rules" | grep -q 'DNS Redirect v6' || return 1
+    # 配置了排除项就必须真的存在对应规则，否则会误判为已生效
+    [ -n "$(bypass_ifaces)" ] && {
+        echo "$_rules" | grep -q 'AGH bypass iface to-dnsmasq' || return 1
+        echo "$_rules" | grep -q 'AGH bypass iface direct' || return 1
+    }
+    bypass_clients
+    [ -n "$BYPASS_V4" ] && {
+        echo "$_rules" | grep -q 'AGH bypass client v4 to-dnsmasq' || return 1
+        echo "$_rules" | grep -q 'AGH bypass client v4 direct' || return 1
+    }
+    [ -n "$BYPASS_V6" ] && {
+        echo "$_rules" | grep -q 'AGH bypass client v6 to-dnsmasq' || return 1
+        echo "$_rules" | grep -q 'AGH bypass client v6 direct' || return 1
+    }
     return 0
+}
+
+# 排除规则的 nft 片段：命中的查询直接交给 DNSMasq（接管模式下固定 1745），
+# 不进入 AdGuard Home。问路由器本机的查询重定向给 DNSMasq，其余查询直接放行，
+# 既不会被 OpenClash 的 DNS 劫持带走，也不会把排除变成另一种全局劫持。
+agh_nft_bypass_lines() {
+    _lines=""
+
+    _ifs="$(bypass_ifaces)"
+    if [ -n "$_ifs" ]; then
+        _set=""
+        for _i in $_ifs; do _set="$_set\"$_i\", "; done
+        _set="${_set%, }"
+        _lines="    iifname { $_set } meta l4proto { tcp, udp } th dport 53 fib daddr type local redirect to :1745 comment \"AGH bypass iface to-dnsmasq\"
+    iifname { $_set } meta l4proto { tcp, udp } th dport 53 accept comment \"AGH bypass iface direct\"
+"
+    fi
+
+    bypass_clients
+    if [ -n "$BYPASS_V4" ]; then
+        _set=""
+        for _c in $BYPASS_V4; do _set="$_set$_c, "; done
+        _set="${_set%, }"
+        _lines="${_lines}    meta nfproto ipv4 ip saddr { $_set } meta l4proto { tcp, udp } th dport 53 fib daddr type local redirect to :1745 comment \"AGH bypass client v4 to-dnsmasq\"
+    meta nfproto ipv4 ip saddr { $_set } meta l4proto { tcp, udp } th dport 53 accept comment \"AGH bypass client v4 direct\"
+"
+    fi
+    if [ -n "$BYPASS_V6" ]; then
+        _set=""
+        for _c in $BYPASS_V6; do _set="$_set$_c, "; done
+        _set="${_set%, }"
+        _lines="${_lines}    meta nfproto ipv6 ip6 saddr { $_set } meta l4proto { tcp, udp } th dport 53 fib daddr type local redirect to :1745 comment \"AGH bypass client v6 to-dnsmasq\"
+    meta nfproto ipv6 ip6 saddr { $_set } meta l4proto { tcp, udp } th dport 53 accept comment \"AGH bypass client v6 direct\"
+"
+    fi
+
+    printf '%s' "$_lines"
 }
 
 agh_nft_reload() {
@@ -185,12 +236,29 @@ agh_nft_ensure() {
     have_cmd nft || return 0
 
     _wan="$(agh_nft_wan_iface)"
+    _bypass="$(agh_nft_bypass_lines)"
     _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 OpenClash 的 DNS 劫持绕过。
 chain agh_dns_redirect {
     type nat hook prerouting priority -101; policy accept;
+${_bypass}
     meta nfproto ipv4 ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v4\"
     meta nfproto ipv6 iifname != \"$_wan\" meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v6\"
 }"
+
+    # 规则写进 /etc/nftables.d 后会被 fw4 整份加载，语法错误会直接拖垮防火墙，
+    # 所以先在临时表里用 nft -c 校验，失败就保持原规则不动。
+    _check="/tmp/agh_nft_check.$$"
+    {
+        printf 'table inet agh_check {\n'
+        printf '%s\n' "$_want"
+        printf '}\n'
+    } > "$_check"
+    if ! nft -c -f "$_check" >/dev/null 2>&1; then
+        log_msg "DNS 重定向规则校验失败（排除接口或客户端写法有误），已跳过本次更新。"
+        rm -f "$_check"
+        return 1
+    fi
+    rm -f "$_check"
 
     _changed="0"
     if [ ! -f "$AGH_NFT_FILE" ] || [ "$(cat "$AGH_NFT_FILE")" != "$_want" ]; then

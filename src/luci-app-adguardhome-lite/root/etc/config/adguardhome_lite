@@ -46,6 +46,13 @@ config adguardhome_lite 'main'
 	# 成人内容拦截：1=启用（自动追加 HaGeZi NSFW 规则）；0=关闭
 	option adult_block '0'
 
+	# 以下两个排除项仅在「接管 53 端口」模式生效：
+	# 命中的 DNS 查询交给 DNSMasq（1745）直接应答，不进入 AdGuard Home。
+	# 不参与接管的接口（网络设备名，如 br-guest、wg0），多个值写多条 list
+	# list bypass_ifaces 'br-guest'
+	# 不参与接管的客户端 IP 或 CIDR（IPv4 / IPv6 均可），多个值写多条 list
+	# list bypass_clients '192.168.2.0/24'
+
 	# 以下为插件内部状态，请勿手动修改
 	option mode_applied 'none'
 	option core_version ''

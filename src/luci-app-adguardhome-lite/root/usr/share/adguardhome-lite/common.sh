@@ -64,6 +64,44 @@ have_cmd() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# 不参与接管的接口列表（空格分隔）。
+# 只做字符校验，不校验网卡是否存在：nft 的 iifname 是字符串匹配，
+# 接口稍后创建（如 wg0）也能直接命中，无需重新生成规则。
+bypass_ifaces() {
+    _bi=""
+    for _i in $(uci -q get "$CONF.main.bypass_ifaces" 2>/dev/null); do
+        case "$_i" in
+            ''|*[!A-Za-z0-9_.-]*)
+                log_msg "忽略非法的排除接口名：$_i" >&2
+                continue
+                ;;
+        esac
+        [ "${#_i}" -le 15 ] || { log_msg "忽略超长接口名：$_i" >&2; continue; }
+        _bi="$_bi $_i"
+    done
+    echo "${_bi# }"
+}
+
+# 不参与接管的客户端列表，按协议族拆成 BYPASS_V4 / BYPASS_V6
+bypass_clients() {
+    BYPASS_V4=""
+    BYPASS_V6=""
+    for _c in $(uci -q get "$CONF.main.bypass_clients" 2>/dev/null); do
+        case "$_c" in
+            ''|*[!0-9A-Fa-f:./]*)
+                log_msg "忽略非法的排除客户端地址：$_c" >&2
+                continue
+                ;;
+        esac
+        case "$_c" in
+            *:*) BYPASS_V6="$BYPASS_V6 $_c" ;;
+            *.*) BYPASS_V4="$BYPASS_V4 $_c" ;;
+        esac
+    done
+    BYPASS_V4="${BYPASS_V4# }"
+    BYPASS_V6="${BYPASS_V6# }"
+}
+
 # 解析 IPv4 地址；可指定公共 DNS，用于绕过 OpenClash/Clash 等 fake-IP DNS
 resolve_ipv4() {
     _rhost="$1"

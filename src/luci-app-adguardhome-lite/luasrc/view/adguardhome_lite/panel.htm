@@ -8,7 +8,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>AdGuard Home 助手</title>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261112b">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261112f">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -184,7 +184,18 @@
 						</label>
 					</div>
 
-					<div class="agh-form-grid">
+					<div class="agh-field agh-field-switch">
+						<div>
+							<label for="agh-set-adult">成人内容拦截</label>
+							<p class="agh-hint">开启后自动追加 HaGeZi NSFW 规则（AdGuard 兼容格式），拦截结果计入「已拦截」；关闭时移除该规则。默认关闭，保存后约 5-10 秒生效。</p>
+						</div>
+						<label class="agh-switch">
+							<input type="checkbox" id="agh-set-adult">
+							<span></span>
+						</label>
+					</div>
+
+					<div class="agh-form-grid agh-form-grid-3">
 						<div class="agh-field">
 							<label for="agh-set-dns-mode">DNS 接管方式</label>
 							<select id="agh-set-dns-mode">
@@ -194,6 +205,7 @@
 								<option value="none">仅面板模式（不接管 DNS）</option>
 							</select>
 							<p class="agh-hint">大白话选择：<b>想统计每台设备、让所有域名都先过滤 → 选「接管 53 端口」</b>；装了 OpenClash、开着 DNS 劫持也能用，插件会把设备的 53 查询收回 53，不会再被 Clash 抢走。<b>不想让 AdGuard Home 占 53，或不在乎逐设备统计 → 选「OpenClash 前置」</b>（这种模式下面板里来源全是 127.0.0.1）。切换时会自动恢复原来的 DNS 设置，不会叠加。</p>
+							<p class="agh-hint agh-hint-warn" id="agh-dns-mode-note" style="display:none"></p>
 						</div>
 
 						<div class="agh-field">
@@ -207,14 +219,6 @@
 							<select id="agh-set-binpath">
 								<option value="/usr/bin/AdGuardHome/AdGuardHome">内置存储（推荐，重启保留）</option>
 								<option value="/tmp/AdGuardHome/AdGuardHome">内存临时（重启后需重新安装）</option>
-							</select>
-						</div>
-
-						<div class="agh-field">
-							<label for="agh-set-workdir">数据工作目录</label>
-							<select id="agh-set-workdir">
-								<option value="/etc/AdGuardHome">内置存储（推荐，数据保留）</option>
-								<option value="/tmp/AdGuardHome">内存临时（减少闪存写入）</option>
 							</select>
 						</div>
 
@@ -237,18 +241,35 @@
 							</select>
 							<p class="agh-hint">官方 CDN 失败时通过反代下载 GitHub 内核；反代不可用时回退直连。</p>
 						</div>
+
+						<div class="agh-field">
+							<label for="agh-set-workdir">数据工作目录</label>
+							<select id="agh-set-workdir">
+								<option value="/etc/AdGuardHome">内置存储（推荐，数据保留）</option>
+								<option value="/tmp/AdGuardHome">内存临时（减少闪存写入）</option>
+							</select>
+						</div>
 					</div>
 
-					<div class="agh-field agh-field-switch">
-						<div>
-							<label for="agh-set-adult">成人内容拦截</label>
-							<p class="agh-hint">开启后自动追加 HaGeZi NSFW 规则（AdGuard 兼容格式），拦截结果计入「已拦截」；关闭时移除该规则。默认关闭，保存后约 5-10 秒生效。</p>
+					<div class="agh-form-grid" id="agh-bypass-group">
+						<div class="agh-field">
+							<label>不参与接管的接口</label>
+							<div class="agh-select" id="agh-bypass-iface-dd">
+								<button type="button" class="agh-select-toggle" id="agh-bypass-iface-toggle">
+									<span id="agh-bypass-iface-label">全部接管</span>
+									<span class="agh-select-arrow">▾</span>
+								</button>
+								<div class="agh-select-menu" id="agh-bypass-iface-menu" hidden></div>
+							</div>
+							<p class="agh-hint">选中后，从该接口进入的 DNS 查询直接交给系统 DNSMasq（1745），不经过 AdGuard Home；不选表示全部接管。</p>
 						</div>
-						<label class="agh-switch">
-							<input type="checkbox" id="agh-set-adult">
-							<span></span>
-						</label>
+						<div class="agh-field">
+							<label for="agh-set-bypass-clients">不参与接管的客户端 IP / CIDR</label>
+							<input type="text" id="agh-set-bypass-clients" placeholder="192.168.1.50 192.168.2.0/24 fd00::5">
+							<p class="agh-hint">多个用空格分隔，支持 IPv4、IPv6 与 CIDR。命中的设备查询路由器 DNS 时由 DNSMasq 直接应答，不计入 AdGuard Home 统计；指向外部 DNS 的查询不受影响。</p>
+						</div>
 					</div>
+					<p class="agh-hint" id="agh-bypass-note" style="display:none">「不参与接管」只在「接管 53 端口」模式下生效：该模式由插件自建 nft 规则接管查询，其它模式不经过这些规则。</p>
 
 					<div class="agh-form-actions">
 						<button type="submit" id="agh-save-settings-btn" class="agh-btn agh-btn-primary">保存并应用</button>
@@ -455,6 +476,6 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261112a"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261112f"></script>
 </body>
 </html>

@@ -49,6 +49,7 @@ OpenWrt / ImmortalWrt / iStoreOS 上的 LuCI 插件，把 AdGuard Home 的安装
 - **OpenClash 共存**：推荐「接管 53 + OpenClash DNS 劫持/转发」。插件会自建 `agh_dns_redirect` 链把设备的 53 查询收回，OpenClash 劫持指向 `53`、`1745` 还是 `7874` 都绕不过过滤；也支持「Clash → AdGuard Home → 真实 DNS」的前置链路。
 - **页内看统计**：概览直接显示 DNS 查询、过滤器拦截、恶意/钓鱼、成人内容四项数据，每 10 秒随状态刷新，不用打开控制台。
 - **成人内容拦截**：基础设置里一个开关，自动追加/移除 HaGeZi NSFW 规则，关闭即还原。
+- **按接口 / 客户端放行**：「接管 53」模式下可指定不参与接管的网络设备或客户端 IP/CIDR，这些查询直接由 DNSMasq 应答，不进 AdGuard Home。
 - **规则更新走代理**：自动检测 OpenClash 的 HTTP 代理并写入 `http_proxy`，避免国内直连 GitHub 更新失败。
 - **参数自动配置**：保存接管方式时自动关闭缓存与 DNSSEC、改用并行上游，并按模式写入上游与 PTR。
 - **版本提示**：页面标题下显示插件版本，有新版本时给出提示，每 24 小时后台检查一次。
@@ -137,14 +138,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.1.8-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.2.0-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.1.8` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.2.0` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -159,7 +160,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.1.8 -m https://gh-proxy.org
+sh install.sh -v 1.2.0 -m https://gh-proxy.org
 ```
 
 > 脚本安装不会在 `apk` 的已安装列表里留记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
@@ -233,6 +234,19 @@ nft list chain inet fw4 dstnat | grep 'OpenClash DNS Hijack'
 - 没有 `agh_dns_redirect` 且劫持直接指向 `:7874`：查询会跳过 AdGuard Home，重新选一次「接管 53 端口」。
 
 注意：这套组合里 Clash 必须保持运行（DNSMasq 上游指向 7874），Clash 停止时会解析失败。
+
+### 排除接口与客户端（仅「接管 53」）
+
+「接管 53」会收回所有私网来源的 53 查询。如果访客网络、IoT 网段或某台自建 DNS 的设备不想被过滤，在「基础设置」里填：
+
+- **不参与接管的接口**：网络设备名，空格分隔，例如 `br-guest wg0`；
+- **不参与接管的客户端 IP / CIDR**：IPv4、IPv6 均可，例如 `192.168.1.50 192.168.2.0/24 fd00::5`。
+
+命中的查询由插件生成的 nft 规则直接交给系统 DNSMasq（1745）应答，不进入 AdGuard Home，也不计入统计。只有「问路由器本机」的查询会重定向到 DNSMasq，指向 `8.8.8.8` 这类外部 DNS 的查询直接放行，既不会被 AdGuard Home 过滤，也不会被 OpenClash 的 DNS 劫持带走。留空即维持原来的「全部接管」。
+
+AdGuard Home 官方配置没有「按接口放行」的开关（`dns.allowed_clients` 是「只接受这些客户端」，`disallowed_clients` 是「直接丢弃请求」），所以这里在防火墙层实现，不改 `AdGuardHome.yaml`，也不会影响 `--check-config`。
+
+排查：`nft list chain inet fw4 agh_dns_redirect` 能看到 `AGH bypass ... to-dnsmasq` 和 `... direct` 成对规则就说明已生效。
 
 ### OpenClash 前置说明
 

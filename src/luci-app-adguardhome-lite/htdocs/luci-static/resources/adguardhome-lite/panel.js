@@ -15,6 +15,7 @@
 		yamlLoaded: false,
 		busy: false,
 		passShown: false,
+		openclash: false,
 		updateTimer: null,
 		actionTimer: null,
 		logTimer: null,
@@ -584,6 +585,91 @@
 		}
 	}
 
+	function pickedBypassIfaces() {
+		var menu = $('agh-bypass-iface-menu');
+		if (!menu) return '';
+		return Array.prototype.slice.call(menu.querySelectorAll('input:checked'))
+			.map(function (el) { return el.value; })
+			.join(' ');
+	}
+
+	function updateBypassIfaceLabel() {
+		var label = $('agh-bypass-iface-label');
+		if (!label) return;
+		var picked = pickedBypassIfaces().split(/\s+/).filter(Boolean);
+		label.textContent = picked.length ? ('已排除：' + picked.join('、')) : '全部接管';
+		label.title = picked.join(' ');
+	}
+
+	function renderBypassIfaces(devices, configured) {
+		var menu = $('agh-bypass-iface-menu');
+		if (!menu) return;
+		var picked = (configured || '').split(/\s+/);
+		var list = (devices || []).slice();
+		picked.forEach(function (name) {
+			if (name && list.indexOf(name) < 0) list.push(name);
+		});
+		menu.innerHTML = '';
+		if (!list.length) {
+			menu.textContent = '未检测到可用接口';
+			updateBypassIfaceLabel();
+			return;
+		}
+		list.sort();
+		list.forEach(function (name) {
+			var item = document.createElement('label');
+			item.className = 'agh-option';
+			var input = document.createElement('input');
+			input.type = 'checkbox';
+			input.value = name;
+			input.checked = picked.indexOf(name) >= 0;
+			input.addEventListener('change', updateBypassIfaceLabel);
+			var text = document.createElement('span');
+			text.textContent = name;
+			item.appendChild(input);
+			item.appendChild(text);
+			menu.appendChild(item);
+		});
+		updateBypassIfaceLabel();
+	}
+
+	function applyModeLocks(mode) {
+		var takeover = mode === 'takeover';
+		var group = $('agh-bypass-group');
+		if (group) {
+			group.classList.toggle('is-locked', !takeover);
+			Array.prototype.slice.call(group.querySelectorAll('input, button, select')).forEach(function (el) {
+				el.disabled = !takeover;
+			});
+			if (!takeover) {
+				var menu = $('agh-bypass-iface-menu');
+				if (menu) menu.hidden = true;
+			}
+		}
+		var note = $('agh-bypass-note');
+		if (note) note.style.display = takeover ? 'none' : '';
+
+		var clashOption = document.querySelector('#agh-set-dns-mode option[value="clashfirst"]');
+		if (clashOption) {
+			clashOption.disabled = !state.openclash;
+			clashOption.textContent = state.openclash
+				? 'OpenClash 前置（Clash 7874 → AGH 5335 → 真实 DNS）'
+				: 'OpenClash 前置（未安装 OpenClash，不可用）';
+		}
+
+		var modeNote = $('agh-dns-mode-note');
+		if (modeNote) {
+			var text = '';
+			if (state.openclash && mode === 'upstream') {
+				text = '检测到 OpenClash：该模式会改写 DNSMasq 上游，重启 OpenClash 后可能被覆盖，建议改用「接管 53 端口」。';
+			} else if (!state.openclash && mode === 'clashfirst') {
+				text = 'OpenClash 未安装，「OpenClash 前置」模式不会生效，请改用「接管 53 端口」。';
+			}
+			modeNote.textContent = text;
+			modeNote.style.display = text ? '' : 'none';
+		}
+	}
+
 	async function loadSettings() {
 		var msgEl = $('agh-settings-msg');
 		try {
@@ -601,6 +687,11 @@
 			setSelectValue('agh-set-github-proxy', d.github_proxy);
 			var adult = $('agh-set-adult');
 			if (adult) adult.checked = !!d.adult_block;
+			renderBypassIfaces(d.devices, d.bypass_ifaces);
+			var bypassClients = $('agh-set-bypass-clients');
+			if (bypassClients) bypassClients.value = d.bypass_clients || '';
+			state.openclash = !!d.openclash_installed;
+			applyModeLocks(d.dns_mode);
 			var path = $('agh-yaml-path');
 			if (path && d.config_path) path.textContent = d.config_path;
 			setMsg(msgEl, '', '');
@@ -634,7 +725,9 @@
 			workdir: $('agh-set-workdir').value,
 			channel: $('agh-set-channel').value,
 			github_proxy: $('agh-set-github-proxy').value,
-			adult_block: ($('agh-set-adult') && $('agh-set-adult').checked) ? '1' : '0'
+			adult_block: ($('agh-set-adult') && $('agh-set-adult').checked) ? '1' : '0',
+			bypass_ifaces: pickedBypassIfaces(),
+			bypass_clients: $('agh-set-bypass-clients') ? $('agh-set-bypass-clients').value.trim() : ''
 		};
 
 		if (btn) btn.disabled = true;
@@ -858,6 +951,23 @@
 		};
 
 		if ($('agh-settings-form')) $('agh-settings-form').onsubmit = saveSettings;
+		if ($('agh-set-dns-mode')) {
+			$('agh-set-dns-mode').onchange = function () {
+				applyModeLocks(this.value);
+			};
+		}
+		if ($('agh-bypass-iface-toggle')) {
+			$('agh-bypass-iface-toggle').onclick = function (e) {
+				e.stopPropagation();
+				var menu = $('agh-bypass-iface-menu');
+				if (menu) menu.hidden = !menu.hidden;
+			};
+			document.addEventListener('click', function (e) {
+				var menu = $('agh-bypass-iface-menu');
+				var dd = $('agh-bypass-iface-dd');
+				if (menu && !menu.hidden && dd && !dd.contains(e.target)) menu.hidden = true;
+			});
+		}
 		if ($('agh-password-form')) $('agh-password-form').onsubmit = savePassword;
 		if ($('agh-yaml-load')) $('agh-yaml-load').onclick = function () {
 			if (state.yamlLoaded && !window.confirm('重新加载会丢弃当前未保存的修改。确定继续？')) return;
