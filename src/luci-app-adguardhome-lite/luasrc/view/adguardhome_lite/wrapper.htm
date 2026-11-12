@@ -40,11 +40,10 @@
 				if (doc.body) doc.body.style.overflow = 'hidden';
 
 				var app = doc.querySelector('.agh-app');
-				var height = Math.max(
-					app ? Math.ceil(app.getBoundingClientRect().height) : 0,
-					doc.body ? (doc.body.scrollHeight || 0) : 0,
-					320
-				);
+				var height = app
+					? Math.ceil(app.getBoundingClientRect().height)
+					: (doc.body ? (doc.body.scrollHeight || 0) : 0);
+				height = Math.max(height, 320);
 				if (Math.abs(height - lastHeight) > 1) {
 					lastHeight = height;
 					frame.style.height = height + 'px';

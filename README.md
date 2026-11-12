@@ -127,7 +127,7 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.1.6` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.1.7` | 指定版本；`-v latest` 取最新 Release |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
 | `--uninstall` | 卸载插件，恢复 DNSMasq 原始设置，保留配置与内核 |
@@ -140,7 +140,7 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 sh install.sh --uninstall
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.1.6 -m https://gh-proxy.org
+sh install.sh -v 1.1.7 -m https://gh-proxy.org
 ```
 
 > 脚本安装不会在 `apk` 的已安装列表里留下记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
@@ -329,6 +329,10 @@ make package/luci-app-adguardhome-lite/compile V=s
 ## 更新记录
 
 > 更名说明：插件显示名由「AdGuard Home 一键版」改为「AdGuard Home 助手」。包名 `luci-app-adguardhome-lite`、配置 `/etc/config/adguardhome_lite` 与安装方式均未变化，已安装用户可直接覆盖升级。
+
+### v1.1.7（2026-11-12）
+
+- 调整运行日志与高级配置框高度，修复独立页面背景无法随内容收缩的问题
 
 ### v1.1.6（2026-11-10）
 
