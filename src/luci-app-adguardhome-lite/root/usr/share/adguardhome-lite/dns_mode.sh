@@ -123,22 +123,43 @@ patch_agh_port() {
     return 0
 }
 
+# 强制 DNSMasq 监听指定端口，并确认 UCI 实际写入成功
+set_dnsmasq_port() {
+    _want_port="$1"
+    uci -q set "dhcp.@dnsmasq[0].port=$_want_port" || return 1
+    uci -q commit dhcp 2>/dev/null || return 1
+    [ "$(get_uci dhcp.@dnsmasq[0].port)" = "$_want_port" ]
+}
+
+# 接管失败时恢复 DNSMasq 并标记未应用，避免半接管导致断网
+cancel_dns_mode_apply() {
+    log_msg "$1"
+    restore_original
+    uci -q set "$CONF.main.mode_applied=none"
+    uci -q commit "$CONF" 2>/dev/null
+    return 1
+}
+
 # 接管 53 端口模式：OpenClash 的 DNS 劫持会把设备的 53 查询直接拽到 DNSMasq（1745），
 # 从而绕过 AdGuard Home。这里在它的 dstnat 规则之前（priority -101）再加一条
 # 重定向，把局域网设备的 DNS 查询统一收回路由器 53 端口，交给 AdGuard Home 过滤。
 AGH_NFT_FILE="/etc/nftables.d/30-adguardhome-lite-dns.nft"
 
-# 局域网接口名，用于限定 IPv6 重定向范围，避免把 WAN 进来的查询也收进来
-agh_nft_lan_iface() {
-    _if="$(uci -q get network.lan.device 2>/dev/null)"
-    [ -n "$_if" ] || _if="$(uci -q get network.lan.ifname 2>/dev/null)"
-    [ -n "$_if" ] || _if="br-lan"
+# IPv6 仅排除 WAN 默认路由接口，其余接口（LAN/访客/IoT）全部纳入接管
+agh_nft_wan_iface() {
+    _if="$(ip -6 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
+    [ -n "$_if" ] || _if="$(uci -q get network.wan.device 2>/dev/null)"
+    [ -n "$_if" ] || _if="$(uci -q get network.wan.ifname 2>/dev/null)"
+    [ -n "$_if" ] || _if="wan"
     echo "$_if"
 }
 
 agh_nft_rule_present() {
     have_cmd nft || return 1
-    nft list chain inet fw4 agh_dns_redirect 2>/dev/null | grep -q 'redirect to :53'
+    _rules="$(nft list chain inet fw4 agh_dns_redirect 2>/dev/null)" || return 1
+    echo "$_rules" | grep -q 'DNS Redirect v4' || return 1
+    echo "$_rules" | grep -q 'DNS Redirect v6' || return 1
+    return 0
 }
 
 agh_nft_reload() {
@@ -163,20 +184,24 @@ agh_nft_ensure() {
     [ -d /etc/nftables.d ] || return 0
     have_cmd nft || return 0
 
-    _lan="$(agh_nft_lan_iface)"
+    _wan="$(agh_nft_wan_iface)"
     _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 OpenClash 的 DNS 劫持绕过。
 chain agh_dns_redirect {
     type nat hook prerouting priority -101; policy accept;
     meta nfproto ipv4 ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v4\"
-    meta nfproto ipv6 iifname \"$_lan\" meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v6\"
+    meta nfproto ipv6 iifname != \"$_wan\" meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v6\"
 }"
 
+    _changed="0"
     if [ ! -f "$AGH_NFT_FILE" ] || [ "$(cat "$AGH_NFT_FILE")" != "$_want" ]; then
         printf '%s\n' "$_want" > "$AGH_NFT_FILE"
+        _changed="1"
     fi
 
-    # 文件存在不代表规则已加载（防火墙并发重载可能留下空链），这里做一次实际校验
-    agh_nft_rule_present && return 0
+    # 文件变化或规则不完整时都必须重载，否则旧链不会更新
+    if [ "$_changed" = "0" ] && agh_nft_rule_present; then
+        return 0
+    fi
     agh_nft_reload
     agh_nft_rule_present && return 0
 
@@ -207,12 +232,12 @@ mode_is_applied() {
 
     case "$dns_mode" in
         upstream)
+            [ "$(dnsmasq_port)" = "53" ] || return 1
             [ "$(get_uci dhcp.@dnsmasq[0].noresolv)" = "1" ] || return 1
             echo "$(get_uci dhcp.@dnsmasq[0].server)" | grep -q '127.0.0.1#5333' || return 1
             ;;
         takeover)
-            _port="$(get_uci dhcp.@dnsmasq[0].port)"
-            [ -n "$_port" ] && [ "$_port" != "53" ] || return 1
+            [ "$(dnsmasq_port)" = "1745" ] || return 1
             ;;
         openclash)
             openclash_forward_present || return 1
@@ -224,6 +249,7 @@ mode_is_applied() {
             ;;
         clashfirst)
             grep -q "^  port: $dnsport$" "$configpath" || return 1
+            [ "$(dnsmasq_port)" = "53" ] || return 1
             # 未安装 OpenClash 时无法自动写上游，只要端口正确就视为已应用
             if uci -q get openclash.config >/dev/null 2>&1; then
                 [ -n "$(get_uci "$CONF.main.oc_agh_sid")" ] || return 1
@@ -304,24 +330,25 @@ apply_mode() {
 
     # 端口写入失败时立即取消接管，避免 DNSMasq 与 AdGuard Home 端口不一致导致断网
     if ! patch_agh_port; then
-        log_msg "无法将 AdGuard Home DNS 端口写为 $dnsport，已取消本次 DNS 接管。"
-        restore_original
-        uci -q set "$CONF.main.mode_applied=none"
-        uci -q commit "$CONF" 2>/dev/null
+        cancel_dns_mode_apply "无法将 AdGuard Home DNS 端口写为 $dnsport，已取消本次 DNS 接管。"
         return 1
     fi
 
     case "$dns_mode" in
         upstream)
+            if ! set_dnsmasq_port 53; then
+                cancel_dns_mode_apply "无法将 DNSMasq 端口写为 53，已取消本次 DNS 接管。"
+                return 1
+            fi
             uci -q delete dhcp.@dnsmasq[0].server
             uci -q add_list 'dhcp.@dnsmasq[0].server=127.0.0.1#5333'
             uci -q set dhcp.@dnsmasq[0].noresolv=1
             uci -q delete dhcp.@dnsmasq[0].resolvfile
             ;;
         takeover)
-            _port="$(get_uci dhcp.@dnsmasq[0].port)"
-            if [ -z "$_port" ] || [ "$_port" = "53" ]; then
-                uci -q set dhcp.@dnsmasq[0].port=1745
+            if ! set_dnsmasq_port 1745; then
+                cancel_dns_mode_apply "无法将 DNSMasq 端口写为 1745，已取消本次 DNS 接管。"
+                return 1
             fi
             ;;
         openclash)
@@ -337,6 +364,10 @@ apply_mode() {
             ensure_safe_dnsmasq_layout
             ;;
         clashfirst)
+            if ! set_dnsmasq_port 53; then
+                cancel_dns_mode_apply "无法将 DNSMasq 端口写为 53，已取消本次 DNS 接管。"
+                return 1
+            fi
             _oc_rc=0
             clashfirst_openclash_apply || _oc_rc=$?
             case "$_oc_rc" in
@@ -346,10 +377,7 @@ apply_mode() {
                 *) log_msg "写入 OpenClash 上游失败：请手动把上游 DNS 设为 127.0.0.1:$dnsport" ;;
             esac
 
-            # 前置模式不改 DNSMasq 转发，只确保它留在 53
-            if [ "$(get_uci dhcp.@dnsmasq[0].port)" != "53" ]; then
-                uci -q set dhcp.@dnsmasq[0].port=53
-            fi
+            # 前置模式不改 DNSMasq 转发，只需确保它留在 53
             ensure_clashfirst_chain
             ;;
         none)

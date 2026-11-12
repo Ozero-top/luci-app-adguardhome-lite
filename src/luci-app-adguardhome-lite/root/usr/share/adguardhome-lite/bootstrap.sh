@@ -63,9 +63,10 @@ case "$dns_mode" in
         upstream_note="系统上游 DNS（$upstream）"
         ;;
     *)
-        # 仅面板模式：DNSMasq 保持 53，可直接作为本地上游
-        upstream="127.0.0.1"
-        upstream_note="系统 DNSMasq（53）"
+        # 仅面板模式：DNSMasq 保持原端口，AGH 上游必须跟随实际端口
+        _dmp="$(dnsmasq_port)"
+        upstream="127.0.0.1:$_dmp"
+        upstream_note="系统 DNSMasq（$_dmp）"
         ;;
 esac
 yaml_set_list "$configpath" "upstream_dns" "$upstream"
