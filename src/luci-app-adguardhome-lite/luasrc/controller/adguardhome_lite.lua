@@ -12,6 +12,9 @@ local SHARE = "/usr/share/adguardhome-lite"
 local RUN = "/var/run/adguardhome_lite"
 local STATS_CACHE = RUN .. "_stats.json"
 local VERSION_CACHE = RUN .. "_core_version"
+local PLUGIN_UPDATE = RUN .. "_plugin_update"
+local INSTALL_VERSION = SHARE .. "/install_version"
+local RELEASE_URL = "https://github.com/Ozero-top/luci-app-adguardhome-lite/releases/latest"
 
 -- 前置声明：action_status 会内联统计结果，定义在下方
 local collect_stats
@@ -74,6 +77,89 @@ local function core_version(binpath)
         fs.writefile(VERSION_CACHE, ver)
     end
     return ver
+end
+
+local function version_parts(v)
+    local parts = {}
+    for n in tostring(v or ""):gmatch("%d+") do
+        parts[#parts + 1] = tonumber(n)
+    end
+    return parts
+end
+
+local function version_newer(latest, current)
+    if latest == "" or current == "" then
+        return false
+    end
+
+    local a, b = version_parts(latest), version_parts(current)
+    for i = 1, math.max(#a, #b) do
+        local x, y = a[i] or 0, b[i] or 0
+        if x ~= y then
+            return x > y
+        end
+    end
+    return false
+end
+
+-- 插件版本：取包管理器与 install.sh 记录中较新的一个，兼容 ipk 与脚本安装混用
+local function plugin_version()
+    local cached = read_cache(RUN .. "_plugin_version", 3600)
+    if cached and cached ~= "" then
+        return cached
+    end
+
+    local candidates = {}
+
+    local out = sys.exec("opkg list-installed 2>/dev/null | awk '$1 == \"luci-app-adguardhome-lite\" { print $3; exit }'") or ""
+    out = out:gsub("%s+", "")
+    if out ~= "" then
+        candidates[#candidates + 1] = out
+    end
+
+    out = sys.exec("apk info -v luci-app-adguardhome-lite 2>/dev/null | head -n 1") or ""
+    local ver = out:match("%d+%.%d+%.%d+[%w%.%-]*")
+    if ver then
+        candidates[#candidates + 1] = ver
+    end
+
+    local v = (fs.readfile(INSTALL_VERSION) or ""):gsub("%s+", "")
+    if v:match("^%d+%.%d+") then
+        candidates[#candidates + 1] = v
+    end
+
+    local best = ""
+    for i = 1, #candidates do
+        if best == "" or version_newer(candidates[i], best) then
+            best = candidates[i]
+        end
+    end
+
+    if best ~= "" then
+        fs.writefile(RUN .. "_plugin_version", best)
+    end
+    return best
+end
+
+-- 插件更新检查：结果缓存 24 小时，过期后在后台重新检查，不阻塞状态接口
+local function plugin_update_info()
+    local cache = fs.readfile(PLUGIN_UPDATE) or ""
+    local latest = cache:match("latest=([^\n]*)") or ""
+    local checked = tonumber(cache:match("time=(%d+)"))
+
+    if not checked or (os.time() - checked) > 86400 then
+        -- 先写占位时间，避免每次轮询都重复启动检查任务
+        fs.writefile(PLUGIN_UPDATE, "latest=" .. latest .. "\ntime=" .. os.time() .. "\n")
+        sys.exec("sh " .. SHARE .. "/check_plugin_update.sh >/dev/null 2>&1 &")
+    end
+
+    local current = plugin_version()
+    return {
+        current = current,
+        latest = latest,
+        update = version_newer(latest, current),
+        url = RELEASE_URL
+    }
 end
 
 local function service_running(binpath)
@@ -290,7 +376,8 @@ function action_status()
         agh_bypassed = cfg("agh_bypassed", "0"),
         update_running = update_running(),
         action_running = action_running(),
-        action_code = read_number(RUN .. "_action.code")
+        action_code = read_number(RUN .. "_action.code"),
+        plugin = plugin_update_info()
     }
 
     -- 统计跟着状态一起返回，前端一次请求即可刷新两块内容

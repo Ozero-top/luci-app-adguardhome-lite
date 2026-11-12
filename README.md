@@ -123,11 +123,27 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 
 脚本会依次尝试 `gh-proxy.org`、`ghfast.top`、`gh-proxy.com` 和 GitHub 直连，哪一个能用就用哪一个；`curl` 与 `wget` 都支持。
 
+强制更新（不升版也能覆盖同版本文件，直接安装 main 分支最新代码）：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -f
+
+# 国内网络
+curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -f -m https://gh-proxy.org
+```
+
+已用 ipk 安装的设备可强制重装：
+
+```sh
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.1.8-1_all.ipk
+```
+
 常用参数：
 
 | 参数 | 作用 |
 |---|---|
 | `-v 1.1.8` | 指定版本；`-v latest` 取最新 Release |
+| `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
 | `--uninstall` | 卸载插件，恢复 DNSMasq 原始设置，保留配置与内核 |
@@ -138,6 +154,9 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 ```sh
 # 卸载（保留配置）
 sh install.sh --uninstall
+
+# 强制更新到 main 分支最新代码（不升版）
+sh install.sh -f
 
 # 安装指定版本并指定反代
 sh install.sh -v 1.1.8 -m https://gh-proxy.org
@@ -332,6 +351,8 @@ make package/luci-app-adguardhome-lite/compile V=s
 
 ### v1.1.8（2026-11-12）
 
+- 页面标题下显示插件版本，发现新版本时提示「前往更新」；每 24 小时后台检测一次，失败自动顺延
+- `install.sh` 新增 `-f` / `--force` 强制更新：忽略版本标签，直接用 main 分支最新代码覆盖同版本文件
 - 修复「接管 53 端口」下 DNSMasq 端口未强制为 1745 导致的抢端口/断网风险：写入后回读校验，失败即回滚 DNSMasq 设置并标记未接管
 - 修复 «DNSMasq 上游» / «OpenClash 前置» 模式未强制 DNSMasq 回到 53 的问题，模式判定改为校验实际端口
 - 修复「仅面板」模式上游写死 `127.0.0.1` 的问题，改为跟随 DNSMasq 实际端口

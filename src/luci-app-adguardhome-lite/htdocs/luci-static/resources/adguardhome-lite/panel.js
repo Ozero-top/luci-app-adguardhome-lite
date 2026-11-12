@@ -174,6 +174,22 @@
 		updateSteps(state.status);
 	}
 
+	function updatePluginVersion(d) {
+		var ver = $('agh-plugin-version');
+		var tip = $('agh-plugin-update');
+		var p = d && d.plugin;
+		if (ver) ver.textContent = (p && p.current) ? 'v' + p.current : '未知';
+		if (!tip) return;
+
+		if (p && p.update && p.latest) {
+			tip.href = p.url || '#';
+			tip.textContent = '发现新版本 v' + p.latest + '，前往更新';
+			tip.hidden = false;
+		} else {
+			tip.hidden = true;
+		}
+	}
+
 	function updateHeaderStatus() {
 		var el = $('agh-header-status');
 		if (!el) return;
@@ -221,6 +237,7 @@
 	function renderStatus() {
 		var d = state.status;
 		updateHeaderStatus();
+		updatePluginVersion(d);
 		if (!d) {
 			var grid = $('agh-status-grid');
 			if (grid) grid.innerHTML = '<div class="agh-empty">无法读取状态</div>';

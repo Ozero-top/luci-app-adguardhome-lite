@@ -222,6 +222,29 @@ code {
 	max-width: 860px;
 }
 
+.agh-hero-version {
+	margin-top: 8px !important;
+	font-size: 12px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.agh-update-tip {
+	padding: 2px 9px;
+	border-radius: 999px;
+	font-weight: 700;
+	text-decoration: none;
+	color: #8a5a00;
+	background: #fff3d4;
+	border: 1px solid #e6c987;
+}
+
+.agh-update-tip:hover {
+	text-decoration: underline;
+}
+
 .agh-hero-actions {
 	display: flex;
 	align-items: center;

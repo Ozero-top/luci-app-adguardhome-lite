@@ -25,6 +25,7 @@ VERSION="1.1.8"
 MIRRORS=""
 NO_DEPS=0
 SRC_DIR=""
+FORCE=0
 ACTION="install"
 
 RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
@@ -38,6 +39,7 @@ usage() {
 AdGuard Home 助手 安装脚本
 
   -v VERSION   指定版本号（默认 1.1.8，latest 表示最新 Release）
+  -f, --force  强制更新：忽略版本标签，直接用 main 分支最新代码覆盖安装
   -m URL       指定 GitHub 反代，可重复，例如 -m https://gh-proxy.org
   --no-deps    跳过依赖安装
   --src DIR    从本地源码目录安装（开发调试用）
@@ -52,6 +54,7 @@ while [ $# -gt 0 ]; do
 		-v) shift; [ $# -gt 0 ] || die "-v 需要版本号"; VERSION="$1" ;;
 		-m|--mirror) shift; [ $# -gt 0 ] || die "-m 需要地址"; MIRRORS="$MIRRORS $1" ;;
 		--no-deps) NO_DEPS=1 ;;
+		-f|--force) FORCE=1 ;;
 		--src) shift; [ $# -gt 0 ] || die "--src 需要目录"; SRC_DIR="$1" ;;
 		--uninstall) ACTION="uninstall" ;;
 		--purge) ACTION="purge" ;;
@@ -172,7 +175,13 @@ download_source() {
 
 	archive="$dest/src.tar.gz"
 	OK=0
-	for ref in "refs/tags/v$VERSION" "refs/heads/main"; do
+	if [ "$FORCE" = "1" ]; then
+		# 强制更新：不取版本标签，直接用 main 分支最新代码覆盖同版本文件
+		refs="refs/heads/main"
+	else
+		refs="refs/tags/v$VERSION refs/heads/main"
+	fi
+	for ref in $refs; do
 		for prefix in $MIRRORS "https://gh-proxy.org" "https://ghfast.top" "https://gh-proxy.com" ""; do
 			base="https://github.com/$REPO/archive/$ref.tar.gz"
 			if [ -n "$prefix" ]; then
@@ -232,6 +241,8 @@ install_from_dir() {
 	ver="$VERSION"
 	[ -n "$SRC_DIR" ] && ver="local"
 	printf '%s\n' "$ver" > /usr/share/adguardhome-lite/install_version 2>/dev/null
+	# 清掉版本与更新检查缓存，面板立即显示新版本
+	rm -f /var/run/adguardhome_lite_plugin_version /var/run/adguardhome_lite_plugin_update 2>/dev/null
 }
 
 main_install() {
@@ -239,8 +250,10 @@ main_install() {
 	trap 'rm -rf "$tmp"' EXIT INT TERM
 
 	[ -n "$SRC_DIR" ] && log "==> 使用本地源码：$SRC_DIR"
+	[ "$FORCE" = "1" ] && log "==> 强制更新：忽略版本标签，安装 main 分支最新代码"
 	install_deps
-	resolve_version "$tmp"
+	# 强制更新直接从 main 安装，不需要再查询最新 Release 标签
+	[ "$FORCE" = "1" ] || resolve_version "$tmp"
 	download_source "$tmp"
 
 	src="$SRC_DIR"
