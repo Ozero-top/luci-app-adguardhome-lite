@@ -8,7 +8,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>AdGuard Home 助手</title>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261112a">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261112b">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -35,6 +35,9 @@
 		<div>
 			<h2>AdGuard Home 助手</h2>
 			<p>一个页面完成内核安装、DNS 接管和过滤统计查看。缓存、DNSSEC、上游模式等常用参数会随接管方式自动配置，不需要再进 AdGuard Home 面板逐项设置。</p>
+			<p class="agh-hero-version">插件版本 <span id="agh-plugin-version">读取中</span>
+				<a href="#" id="agh-plugin-update" class="agh-update-tip" target="_blank" rel="noopener" hidden>发现新版本</a>
+			</p>
 		</div>
 		<div class="agh-hero-actions">
 			<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
@@ -452,6 +455,6 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261110d"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261112a"></script>
 </body>
 </html>
