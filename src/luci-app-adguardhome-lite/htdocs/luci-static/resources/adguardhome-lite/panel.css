@@ -34,7 +34,7 @@ html,
 body {
 	margin: 0;
 	padding: 0;
-	min-height: 100%;
+	min-height: 0;
 }
 
 body {
@@ -508,7 +508,7 @@ code {
 	color: var(--agh-text);
 }
 
-.agh-log-tall { max-height: 520px; margin-top: 10px; }
+.agh-log-tall { min-height: 460px; max-height: 720px; margin-top: 10px; }
 
 /* 表单 */
 .agh-form {
@@ -618,7 +618,7 @@ code {
 
 .agh-code {
 	width: 100%;
-	min-height: 300px;
+	min-height: 520px;
 	padding: 13px;
 	border-radius: 11px;
 	border: 1px solid var(--agh-border);

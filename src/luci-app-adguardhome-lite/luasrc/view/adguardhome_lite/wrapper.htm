@@ -39,8 +39,9 @@
 				doc.documentElement.style.overflow = 'hidden';
 				if (doc.body) doc.body.style.overflow = 'hidden';
 
+				var app = doc.querySelector('.agh-app');
 				var height = Math.max(
-					doc.documentElement.scrollHeight || 0,
+					app ? Math.ceil(app.getBoundingClientRect().height) : 0,
 					doc.body ? (doc.body.scrollHeight || 0) : 0,
 					320
 				);
@@ -55,10 +56,10 @@
 			fitFrame();
 			try {
 				var doc = frame.contentDocument || frame.contentWindow.document;
-				if (window.ResizeObserver && doc && doc.documentElement) {
+				var app = doc.querySelector('.agh-app');
+				if (window.ResizeObserver && app) {
 					var ro = new ResizeObserver(fitFrame);
-					ro.observe(doc.documentElement);
-					if (doc.body) ro.observe(doc.body);
+					ro.observe(app);
 				}
 				if (window.MutationObserver && doc && doc.body) {
 					new MutationObserver(fitFrame).observe(doc.body, {
