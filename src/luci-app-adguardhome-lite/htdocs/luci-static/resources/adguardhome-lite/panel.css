@@ -422,6 +422,10 @@ code {
 	font-size: 12px;
 }
 
+.agh-stats-notice {
+	margin: -4px 0 12px;
+}
+
 .agh-mt-8 { margin-top: 8px; }
 .agh-ml-auto { margin-left: auto; }
 
