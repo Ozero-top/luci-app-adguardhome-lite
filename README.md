@@ -1,7 +1,49 @@
 # AdGuard Home 助手
-OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件，支持三步安装、低侵入 DNS 接管、兼容 IPK 与 APK。
+
+OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件，支持三步安装、低侵入 DNS 接管，兼容 `.ipk` 与 25.12 `apk` 系统。
 
 > 插件管安装与接管；过滤规则、查询日志、家长控制等仍在 AdGuard Home 面板里操作。
+
+## 目录
+
+- [结构化摘要](#结构化摘要)
+- [项目初衷](#项目初衷)
+- [功能特性](#功能特性)
+- [兼容性](#兼容性)
+- [安装](#安装)
+- [三步上手](#三步上手)
+- [DNS 接管方式](#dns-接管方式)
+- [常见问题（FAQ）](#常见问题faq)
+- [项目结构](#项目结构)
+- [构建](#构建)
+- [文档](#文档)
+- [反馈与贡献](#反馈与贡献)
+- [安全建议](#安全建议)
+- [许可证](#许可证)
+
+---
+
+## 结构化摘要
+
+**一句话**：把 AdGuard Home 的「装内核、接 DNS、看状态」收进一个 LuCI 页面，三步完成，不需要手改配置。
+
+**解决的问题**：
+
+- 官方内核下载失败、架构选错；
+- 接管 53 后 DNSMasq 配置混乱，停止或卸载后无法恢复；
+- 新旧 LuCI、`.ipk` 与 `apk` 系统的安装方式不统一。
+
+**核心能力**：
+
+- 自动识别架构并下载官方内核，支持 GitHub 反代与 fake-IP 环境；
+- 四种 DNS 接管方式，停止或卸载时自动还原原 DNS；
+- 兼容 OpenClash DNS 劫持，保留逐设备统计；
+- 概览直接查看查询、拦截、恶意/钓鱼、成人内容统计。
+
+**适用环境**：OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 24.10；25.12 / `apk` 系统用脚本安装；22.03 及更早用 `legacy` 包。  
+**不适用**：Docker、NAS、普通 Linux 发行版；LoongArch 架构暂不支持。
+
+> 快速判断：能装 `.ipk` 就用安装包；软件包页面显示 `apk` 或固件为 25.12 及以上，直接运行 `install.sh`。
 
 ---
 
@@ -40,17 +82,28 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 ## 功能特性
 
+### 安装与内核
+
 - **三步上手**：安装内核 → 一键启用 → 打开控制台，每步都有状态提示和失败原因，不需要敲命令。
 - **官方内核**：自动识别 CPU 架构，从 AdGuard 官方源下载最新稳定版。
 - **下载兜底**：可选 `gh-proxy.org`、`ghproxy.cc`、`ghproxy.com`、`ghfast.top` 反代，失败自动回退官方 CDN 与 GitHub 直连。
-- **fake-IP 兼容**：路由器用 OpenClash 等 fake-IP DNS 时，自动用公共 DNS 解析真实 IP，再以 `curl --resolve` 下载。
-- **四种 DNS 接管方式**：接管 53、DNSMasq 上游、OpenClash 前置、仅面板（「OpenClash 串联」已下线，旧配置自动迁移）。
-- **OpenClash 共存**：推荐「接管 53 + OpenClash DNS 劫持/转发」。插件会自建 `agh_dns_redirect` 链把设备的 53 查询收回，OpenClash 劫持指向 `53`、`1745` 还是 `7874` 都绕不过过滤；也支持「Clash → AdGuard Home → 真实 DNS」的前置链路。
+- **fake-IP 兼容**：路由器使用 fake-IP DNS 时，自动用公共 DNS 解析真实 IP，再以 `curl --resolve` 下载。
+
+### DNS 接管
+
+- **四种接管方式**：接管 53、DNSMasq 上游、OpenClash 前置、仅面板（「OpenClash 串联」已下线，旧配置自动迁移）。
+- **OpenClash 共存**：推荐「接管 53 + OpenClash DNS 劫持/转发」。插件自建 `agh_dns_redirect` 链收回设备的 53 查询，OpenClash 劫持指向 `53`、`1745` 还是 `7874` 都绕不过过滤；也支持「Clash → AdGuard Home → 真实 DNS」的前置链路。
+- **参数自动配置**：保存接管方式时自动关闭缓存与 DNSSEC、改用并行上游，并按模式写入上游与 PTR。
+- **按接口 / 客户端放行**：「接管 53」模式下可指定不参与接管的网络设备或客户端 IP/CIDR，这些查询直接由 DNSMasq 应答，不进 AdGuard Home。
+
+### 过滤与统计
+
 - **页内看统计**：概览直接显示 DNS 查询、过滤器拦截、恶意/钓鱼、成人内容四项数据，每 10 秒随状态刷新，不用打开控制台。
 - **成人内容拦截**：基础设置里一个开关，自动追加/移除 HaGeZi NSFW 规则，关闭即还原。
-- **按接口 / 客户端放行**：「接管 53」模式下可指定不参与接管的网络设备或客户端 IP/CIDR，这些查询直接由 DNSMasq 应答，不进 AdGuard Home。
 - **规则更新走代理**：自动检测 OpenClash 的 HTTP 代理并写入 `http_proxy`，避免国内直连 GitHub 更新失败。
-- **参数自动配置**：保存接管方式时自动关闭缓存与 DNSSEC、改用并行上游，并按模式写入上游与 PTR。
+
+### 维护与安全
+
 - **版本提示**：页面标题下显示插件版本，有新版本时给出提示，每 24 小时后台检查一次。
 - **安全可控**：默认密码 `admin123`，可在插件内重置；停止服务或卸载时自动恢复 DNSMasq 设置。
 - **配置可维护**：内置 YAML 模板（11 个过滤规则 + 1 个白名单，日志/统计保留 30 天）；高级配置保存前自动 `--check-config` 并留备份。
@@ -285,17 +338,92 @@ AdGuard Home 官方配置没有「按接口放行」的开关（`dns.allowed_cli
 
 ---
 
-## 常见问题
+## 常见问题（FAQ）
 
-- **内核下载失败**：检查网络与系统时间；国内网络启用 GitHub 反代；fake-IP 环境已自动绕过。
-- **启用后不能上网**：概览页点「停止并关闭自启」，插件会恢复 DNSMasq；仍异常可执行 `/etc/init.d/adguardhome_lite stop && /etc/init.d/dnsmasq restart`。
-- **停止后面板打不开**：正常现象，面板随服务停止；重新「启动服务」即可。
-- **改了面板端口打不开**：等 5-10 秒，确认服务运行中、UCI 端口与 YAML `address` 一致。
-- **OpenClash 下不去广告**：先确认 `nft list chain inet fw4 agh_dns_redirect` 有 `redirect to :53`；有这条链时无论 OpenClash 劫持指向哪里都会过滤。若不存在，重新保存一次「接管 53 端口」，或改用「OpenClash 前置」。
-- **设备能连路由器但打不开网页**：多为设备没拿到 IPv4 DNS。给 LAN 补一条 DHCP DNS 下发：`uci add_list dhcp.lan.dhcp_option='6,路由器IP'`（换成实际 LAN 地址），然后 `uci commit dhcp && /etc/init.d/dnsmasq restart`，设备重连后生效。
-- **重启后内核消失**：内核装在 `/tmp` 内存位置，重新安装，或改到内置存储。
+### Q1：luci-app-adguardhome-lite 和传统 AdGuard Home 插件有什么区别？
 
-更多内容见 [安装与使用说明](docs/安装与使用说明.md)。
+传统 `luci-app-adguardhome` 更偏向把 AdGuard Home 的配置项全部搬进 LuCI，功能多但配置也重；本插件只做三件事：**装内核、接 DNS、看状态**。
+
+- 默认三步完成，不要求先手动安装 AdGuard Home；
+- 自动识别架构下载官方内核，内置反代与 fake-IP 兜底；
+- 接管前记录 DNSMasq 原值，停止或卸载时自动还原；
+- 过滤规则、查询日志、家长控制仍由 AdGuard Home 面板管理；
+- 与旧插件冲突，安装前需卸载旧插件及中文语言包。
+
+### Q2：OpenWrt 25.12 升级 apk 系统后怎么安装？
+
+25.12 起默认使用 `apk`，不能安装 `.ipk`，直接用 `install.sh`：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh
+```
+
+国内网络可加反代：
+
+```sh
+curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
+```
+
+脚本会补齐依赖、安装文件并清理 LuCI 缓存。常用参数：`-v` 指定版本、`-f` 强制更新、`--uninstall` 卸载保留配置、`--purge` 卸载并删除配置与内核。脚本安装不会在 `apk` 已安装列表里留记录，后续升级和卸载继续使用 `install.sh`。
+
+### Q3：需要先手动安装 AdGuard Home 吗？
+
+不需要。插件自带内核安装流程，首次使用点「安装/更新内核」即可；已存在 `/etc/AdGuardHome.yaml` 时会直接复用。
+
+### Q4：内核下载失败怎么办？
+
+检查网络和系统时间；国内网络在「基础设置」启用 GitHub 反代；fake-IP 环境插件会自动解析真实 IP 并用 `curl --resolve` 下载；空间不足时把内核位置改到内置存储，或清理闪存。
+
+### Q5：启用后不能上网怎么办？
+
+到概览页点「停止并关闭自启」，插件会恢复接管前的 DNSMasq 设置。仍异常可执行：
+
+```sh
+/etc/init.d/adguardhome_lite stop
+/etc/init.d/dnsmasq restart
+```
+
+然后查看「运行日志」，确认 53 / 1745 / 5333 / 5335 端口是否被占用。
+
+### Q6：同时运行 OpenClash 时去广告不生效？
+
+先确认收回规则存在：
+
+```sh
+nft list chain inet fw4 agh_dns_redirect
+```
+
+有 `redirect to :53` 时，OpenClash 劫持指向 `:53`、`:1745` 或 `:7874` 都不影响过滤。若链不存在，重新保存一次「接管 53 端口」，或改用「OpenClash 前置」。
+
+### Q7：停止服务后面板打不开？
+
+正常现象，面板随服务停止。重新点「启动服务」即可；如果服务已运行仍打不开，检查 UCI 端口与 YAML `address` 是否一致，并等待 5–10 秒。
+
+### Q8：设备能连路由器但打不开网页？
+
+常见原因是设备没拿到 IPv4 DNS。给 LAN 补一条 DHCP DNS 下发：
+
+```sh
+uci add_list dhcp.lan.dhcp_option='6,路由器IP'
+uci commit dhcp
+/etc/init.d/dnsmasq restart
+```
+
+把 `路由器IP` 换成实际 LAN 地址，设备断开重连后生效。
+
+### Q9：重启后内核消失？
+
+内核装在 `/tmp` 内存位置时会这样。重新点「安装/更新内核」，或在基础设置里把安装位置改到内置存储。
+
+### Q10：和旧版插件冲突吗？
+
+会。安装包内置 `Conflicts` 声明，检测到 `luci-app-adguardhome` 时会拒绝安装。请先卸载旧插件和 `luci-i18n-adguardhome-zh-cn`，确认旧服务已停止后再安装。
+
+### Q11：卸载后 DNS 会恢复吗？
+
+会。正常停止或卸载时只写回接管前记录的 DNSMasq 端口、`noresolv`、`resolvfile` 和 `server`，不会写入公共 DNS。`install.sh --uninstall` 卸载并恢复 DNS、保留配置与内核；`--purge` 才会删除配置、内核与统计。
+
+更多排查与验证步骤见 [安装与使用说明](docs/安装与使用说明.md)。
 
 ---
 
