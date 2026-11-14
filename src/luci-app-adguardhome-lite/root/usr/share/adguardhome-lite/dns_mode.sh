@@ -140,7 +140,7 @@ cancel_dns_mode_apply() {
     return 1
 }
 
-# 接管 53 端口模式：OpenClash 的 DNS 劫持会把设备的 53 查询直接拽到 DNSMasq（1745），
+# 接管 53 端口模式：Clash 的 DNS 劫持会把设备的 53 查询直接拽到 DNSMasq（1745），
 # 从而绕过 AdGuard Home。这里在它的 dstnat 规则之前（priority -101）再加一条
 # 重定向，把局域网设备的 DNS 查询统一收回路由器 53 端口，交给 AdGuard Home 过滤。
 AGH_NFT_FILE="/etc/nftables.d/30-adguardhome-lite-dns.nft"
@@ -178,7 +178,7 @@ agh_nft_rule_present() {
 
 # 排除规则的 nft 片段：命中的查询直接交给 DNSMasq（接管模式下固定 1745），
 # 不进入 AdGuard Home。问路由器本机的查询重定向给 DNSMasq，其余查询直接放行，
-# 既不会被 OpenClash 的 DNS 劫持带走，也不会把排除变成另一种全局劫持。
+# 既不会被 Clash 的 DNS 劫持带走，也不会把排除变成另一种全局劫持。
 agh_nft_bypass_lines() {
     _lines=""
 
@@ -237,7 +237,7 @@ agh_nft_ensure() {
 
     _wan="$(agh_nft_wan_iface)"
     _bypass="$(agh_nft_bypass_lines)"
-    _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 OpenClash 的 DNS 劫持绕过。
+    _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 Clash 的 DNS 劫持绕过。
 chain agh_dns_redirect {
     type nat hook prerouting priority -101; policy accept;
 ${_bypass}
@@ -276,7 +276,7 @@ ${_bypass}
     sleep 1
     agh_nft_reload
     if ! agh_nft_rule_present; then
-        log_msg "DNS 重定向规则未生效：OpenClash 的劫持可能仍会绕过 AdGuard Home，请检查防火墙状态。"
+        log_msg "DNS 重定向规则未生效：Clash 的劫持可能仍会绕过 AdGuard Home，请检查防火墙状态。"
     fi
 }
 
@@ -318,7 +318,7 @@ mode_is_applied() {
         clashfirst)
             grep -q "^  port: $dnsport$" "$configpath" || return 1
             [ "$(dnsmasq_port)" = "53" ] || return 1
-            # 未安装 OpenClash 时无法自动写上游，只要端口正确就视为已应用
+            # 未安装 Clash 时无法自动写上游，只要端口正确就视为已应用
             if uci -q get openclash.config >/dev/null 2>&1; then
                 [ -n "$(get_uci "$CONF.main.oc_agh_sid")" ] || return 1
             fi
@@ -332,8 +332,8 @@ mode_is_applied() {
 mode_name() {
     case "$dns_mode" in
         takeover) echo "接管 53 端口模式（DNSMasq 移至 1745）" ;;
-        openclash) echo "OpenClash 串联模式（已下线）" ;;
-        clashfirst) echo "OpenClash 前置模式（Clash 7874 → AdGuard Home 5335 → 真实 DNS）" ;;
+        openclash) echo "Clash 串联模式（已下线）" ;;
+        clashfirst) echo "Clash 前置模式（Clash 7874 → AdGuard Home 5335 → 真实 DNS）" ;;
         none) echo "仅面板模式（不接管 DNS）" ;;
         *) echo "DNSMasq 上游模式（AdGuard Home 监听 5333）" ;;
     esac
@@ -345,10 +345,10 @@ apply_mode() {
         *) dns_mode="upstream" ;;
     esac
 
-    # 「OpenClash 串联」已下线：OpenClash 写入 dnsmasq 的默认上游排在 conf-dir 前面，
+    # 「Clash 串联」已下线：Clash 写入 dnsmasq 的默认上游排在 conf-dir 前面，
     # strict-order 下查询会被 Clash 先应答，AdGuard Home 实际收不到查询。
     if [ "$dns_mode" = "openclash" ]; then
-        log_msg "「OpenClash 串联」模式已下线（过滤会被 Clash 抢先应答），已切换为「接管 53 端口」。"
+        log_msg "「Clash 串联」模式已下线（过滤会被 Clash 抢先应答），已切换为「接管 53 端口」。"
         openclash_forward_del
         uci -q set "$CONF.main.dns_mode=takeover"
         uci -q commit "$CONF" 2>/dev/null
@@ -380,7 +380,7 @@ apply_mode() {
         return 0
     fi
 
-    # 从「OpenClash 前置」切到其它模式时，必须先把 Clash 上游还原，
+    # 从「Clash 前置」切到其它模式时，必须先把 Clash 上游还原，
     # 否则 Clash 仍指向 AdGuard Home，而 AdGuard Home 又转给 Clash，形成查询环。
     if [ "$mode_applied" = "clashfirst" ] && [ "$dns_mode" != "clashfirst" ]; then
         clashfirst_openclash_restore
@@ -388,7 +388,7 @@ apply_mode() {
     fi
 
     # 先恢复原始状态，再基于原始状态应用新模式，保证来回切换不叠加。
-    # OpenClash 串联模式不长期接管 DNSMasq 设置，因此不保存/恢复原始值。
+    # Clash 串联模式不长期接管 DNSMasq 设置，因此不保存/恢复原始值。
     if [ "$dns_mode" = "openclash" ]; then
         [ "$mode_applied" = "openclash" ] || restore_original
     else
@@ -408,10 +408,27 @@ apply_mode() {
                 cancel_dns_mode_apply "无法将 DNSMasq 端口写为 53，已取消本次 DNS 接管。"
                 return 1
             fi
+            # 保留用户自定义的域名转发（server=/domain/ip），只把默认上游换成本机 AGH，
+            # 避免像以前一样删掉所有 server 规则，影响其它服务或企业内部域名。
+            _kept_servers=""
+            for _s in $(get_uci dhcp.@dnsmasq[0].server); do
+                case "$_s" in
+                    "127.0.0.1#53"|"127.0.0.1#5333"|"127.0.0.1#$clash_dns_port"|"/#/127.0.0.1#5333"|"/./127.0.0.1#5333")
+                        continue
+                        ;;
+                esac
+                _kept_servers="$_kept_servers $_s"
+            done
             uci -q delete dhcp.@dnsmasq[0].server
-            uci -q add_list 'dhcp.@dnsmasq[0].server=127.0.0.1#5333'
+            for _s in $_kept_servers; do
+                uci -q add_list "dhcp.@dnsmasq[0].server=$_s"
+            done
+            if dnsmasq_hash_rule_supported; then
+                uci -q add_list 'dhcp.@dnsmasq[0].server=/#/127.0.0.1#5333'
+            else
+                uci -q add_list 'dhcp.@dnsmasq[0].server=/./127.0.0.1#5333'
+            fi
             uci -q set dhcp.@dnsmasq[0].noresolv=1
-            uci -q delete dhcp.@dnsmasq[0].resolvfile
             ;;
         takeover)
             if ! set_dnsmasq_port 1745; then
@@ -420,10 +437,10 @@ apply_mode() {
             fi
             ;;
         openclash)
-            # 保留 OpenClash 的 53 劫持，但 DNSMasq 必须留在 53：
-            # 这样即使 OpenClash 重启/更新导致劫持规则消失，客户端仍有 DNS。
+            # 保留 Clash 的 53 劫持，但 DNSMasq 必须留在 53：
+            # 这样即使 Clash 重启/更新导致劫持规则消失，客户端仍有 DNS。
             if ! openclash_forward_add; then
-                log_msg "无法写入 DNSMasq 转发规则，已取消 OpenClash 串联模式。"
+                log_msg "无法写入 DNSMasq 转发规则，已取消 Clash 串联模式。"
                 restore_original
                 uci -q set "$CONF.main.mode_applied=none"
                 uci -q commit "$CONF" 2>/dev/null
@@ -439,10 +456,10 @@ apply_mode() {
             _oc_rc=0
             clashfirst_openclash_apply || _oc_rc=$?
             case "$_oc_rc" in
-                0) log_msg "已将 OpenClash 自定义上游 DNS 设为 127.0.0.1:$dnsport" ;;
-                2) log_msg "未检测到 OpenClash：请手动把 Clash 上游 DNS 设为 127.0.0.1:$dnsport" ;;
-                3) log_msg "当前 OpenClash 不支持自定义上游：请手动把上游 DNS 设为 127.0.0.1:$dnsport" ;;
-                *) log_msg "写入 OpenClash 上游失败：请手动把上游 DNS 设为 127.0.0.1:$dnsport" ;;
+                0) log_msg "已将 Clash 自定义上游 DNS 设为 127.0.0.1:$dnsport" ;;
+                2) log_msg "未检测到 Clash：请手动把 Clash 上游 DNS 设为 127.0.0.1:$dnsport" ;;
+                3) log_msg "当前 Clash 不支持自定义上游：请手动把上游 DNS 设为 127.0.0.1:$dnsport" ;;
+                *) log_msg "写入 Clash 上游失败：请手动把上游 DNS 设为 127.0.0.1:$dnsport" ;;
             esac
 
             # 前置模式不改 DNSMasq 转发，只需确保它留在 53
@@ -462,7 +479,7 @@ apply_mode() {
 }
 
 # 保证 DNSMasq 始终监听 53。
-# 说明：DNSMasq 一旦跟随 OpenClash 的劫持端口（例如 53 → 7874），
+# 说明：DNSMasq 一旦跟随 Clash 的劫持端口（例如 53 → 7874），
 # 就会与 Clash 抢 7874 导致 DNSMasq 启动失败、全网断 DNS。
 # 因此这里只允许 DNSMasq 留在 53，不再跟随任何劫持端口。
 ensure_safe_dnsmasq_layout() {
@@ -479,14 +496,14 @@ ensure_safe_dnsmasq_layout() {
     fi
 
     if [ -z "$_hj" ]; then
-        log_msg "未检测到 OpenClash DNS 劫持，DNSMasq 转发规则生效（53 → AdGuard Home）。"
+        log_msg "未检测到 Clash DNS 劫持，DNSMasq 转发规则生效（53 → AdGuard Home）。"
     elif [ "$_hj" = "53" ] || [ "$_hj" = "$dnsport" ]; then
-        log_msg "OpenClash 劫持目标为 $_hj，链路正常。"
+        log_msg "Clash 劫持目标为 $_hj，链路正常。"
     else
         _bp="1"
-        log_msg "OpenClash 把 53 直接劫持到 $_hj，查询不再经过 DNSMasq，AdGuard Home 会被绕过。"
+        log_msg "Clash 把 53 直接劫持到 $_hj，查询不再经过 DNSMasq，AdGuard Home 会被绕过。"
         if [ "$_hj" = "$clash_dns_port" ]; then
-            log_msg "建议改用「OpenClash 前置」模式：让 Clash 把上游 DNS 交给 AdGuard Home。"
+            log_msg "建议改用「Clash 前置」模式：让 Clash 把上游 DNS 交给 AdGuard Home。"
         fi
     fi
 
@@ -494,14 +511,14 @@ ensure_safe_dnsmasq_layout() {
     uci -q commit "$CONF" 2>/dev/null
 }
 
-# OpenClash 前置模式：检查 OpenClash 的 DNS 劫持是否开启，
+# Clash 前置模式：检查 Clash 的 DNS 劫持是否开启，
 # 未开启时客户端查询不会经过 Clash，AdGuard Home 自然收不到查询。
 ensure_clashfirst_chain() {
     _rd="$(get_uci openclash.config.enable_redirect_dns)"
     _bp="0"
     if [ -z "$_rd" ] || [ "$_rd" = "0" ]; then
         _bp="1"
-        log_msg "OpenClash DNS 劫持未开启：请在 OpenClash 中开启 DNS 劫持，否则查询会绕过 AdGuard Home。"
+        log_msg "Clash DNS 劫持未开启：请在 Clash 中开启 DNS 劫持，否则查询会绕过 AdGuard Home。"
     fi
 
     uci -q set "$CONF.main.agh_bypassed=$_bp"
@@ -578,7 +595,7 @@ revert_mode() {
 
     # 保证 53 端口始终有 DNS 服务：
     # - DNSMasq 必须留在 53（有劫持时也不再跟随劫持端口）；
-    # - 如果 OpenClash 已停止，53 仍由 DNSMasq 提供服务，避免客户端无 DNS。
+    # - 如果 Clash 已停止，53 仍由 DNSMasq 提供服务，避免客户端无 DNS。
     ensure_safe_dnsmasq_layout
 
     # 关闭插件后不再有“被绕过”状态，避免面板残留提示
@@ -586,7 +603,7 @@ revert_mode() {
     uci -q commit "$CONF" 2>/dev/null
 
     if [ "$_applied" = "clashfirst" ]; then
-        # 恢复 OpenClash 上游后需要重载，否则 Clash 仍指向已停止的 5335
+        # 恢复 Clash 上游后需要重载，否则 Clash 仍指向已停止的 5335
         clashfirst_openclash_refresh &
     fi
 
@@ -597,7 +614,7 @@ revert_mode() {
         # 恢复后如果上游指向已停止的本地端口，自动回退到 WAN DNS，避免断网
         repair_dnsmasq_upstream
         if ! nslookup www.baidu.com 127.0.0.1 >/dev/null 2>&1; then
-            log_msg "提示：DNSMasq 解析仍失败，请检查 OpenClash 运行状态或 WAN DNS。"
+            log_msg "提示：DNSMasq 解析仍失败，请检查 Clash 运行状态或 WAN DNS。"
         fi
         log_msg "已恢复 DNSMasq 原始设置"
     fi

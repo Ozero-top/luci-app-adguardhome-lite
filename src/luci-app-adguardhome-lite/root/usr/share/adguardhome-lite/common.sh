@@ -35,10 +35,18 @@ load_conf() {
     config_get github_proxy "main" github_proxy "gh-proxy.org"
     config_get adminuser "main" adminuser "admin"
     config_get adminpass "main" adminpass "admin123"
-    config_get adult_block "main" adult_block "0"
+    config_get cache_enabled "main" cache_enabled ""
+    config_get cache_size_mb "main" cache_size_mb ""
+    config_get cache_ttl_min "main" cache_ttl_min ""
+    config_get cache_ttl_max "main" cache_ttl_max ""
+    config_get cache_optimistic "main" cache_optimistic ""
+    config_get upstream_source "main" upstream_source "auto"
+    config_get upstream_custom "main" upstream_custom ""
+    config_get dns_crypto "main" dns_crypto "off"
+    config_get dns_crypto_custom "main" dns_crypto_custom ""
     config_get mode_applied "main" mode_applied "none"
 
-    # OpenClash 的 DNS 端口（默认 7874），用于串联模式的上游
+    # Clash 的 DNS 端口（默认 7874），用于串联模式的上游
     clash_dns_port="$(uci -q get openclash.config.dns_port 2>/dev/null)"
     case "$clash_dns_port" in
         ''|*[!0-9]*) clash_dns_port="7874" ;;
@@ -48,6 +56,17 @@ load_conf() {
         takeover) dnsport="53" ;;
         clashfirst) dnsport="5335" ;;
         *) dnsport="5333" ;;
+    esac
+}
+
+# 加密上游地址：预设值或用户自定义；关闭时返回空
+dns_crypto_url() {
+    case "$dns_crypto" in
+        alidns) echo "https://dns.alidns.com/dns-query" ;;
+        dnspod) echo "https://doh.pub/dns-query" ;;
+        cloudflare) echo "https://cloudflare-dns.com/dns-query" ;;
+        custom) echo "$dns_crypto_custom" ;;
+        *) echo "" ;;
     esac
 }
 
@@ -102,7 +121,7 @@ bypass_clients() {
     BYPASS_V6="${BYPASS_V6# }"
 }
 
-# 解析 IPv4 地址；可指定公共 DNS，用于绕过 OpenClash/Clash 等 fake-IP DNS
+# 解析 IPv4 地址；可指定公共 DNS，用于绕过 Clash 等 fake-IP DNS
 resolve_ipv4() {
     _rhost="$1"
     _rdns="$2"
@@ -118,7 +137,7 @@ resolve_ipv4() {
 
 # 下载文件；OpenWrt 上按可用性自动选择下载器
 # 如果检测到 fake-IP DNS（198.18.0.0/16 等），使用 curl --resolve 指定真实 IP，
-# 避免 OpenClash/Clash 的 fake-IP 路由异常导致下载超时。
+# 避免 Clash 的 fake-IP 路由异常导致下载超时。
 download_file() {
     _url="$1"
     _out="$2"
@@ -300,7 +319,7 @@ detect_upstream_dns() {
     echo "223.5.5.5 119.29.29.29"
 }
 
-# “OpenClash 前置”模式使用的真实上游：AdGuard Home 位于 Clash 之后，
+# “Clash 前置”模式使用的真实上游：AdGuard Home 位于 Clash 之后，
 # 上游必须是真实 DNS，绝不能是 Clash（7874）或本机 53，否则会形成查询环。
 detect_real_upstream_dns() {
     _wan_dns="$(wan_dns_servers)"
@@ -312,12 +331,12 @@ detect_real_upstream_dns() {
     echo "223.5.5.5 119.29.29.29"
 }
 
-# OpenClash 是否仍在劫持 53 端口（返回重定向目标端口）
+# Clash 是否仍在劫持 53 端口（返回重定向目标端口）
 # 兼容两种规则写法：redirect to :7874 和 dnat [ip] to 127.0.0.1:7874
 openclash_hijack_port() {
     have_cmd nft || return 0
 
-    _oc_line=$(nft list chain inet fw4 dstnat 2>/dev/null | grep 'OpenClash DNS Hijack' | head -n 1)
+    _oc_line=$(nft list chain inet fw4 dstnat 2>/dev/null | grep 'Clash DNS Hijack' | head -n 1)
     [ -n "$_oc_line" ] || return 0
 
     _oc_port=$(echo "$_oc_line" | sed -n 's/.*redirect to :\([0-9][0-9]*\).*/\1/p')
@@ -328,7 +347,7 @@ openclash_hijack_port() {
 }
 
 # DNSMasq 实际读取的 conf-dir：优先从 OpenWrt 生成的临时配置解析，
-# 回退到 /tmp/dnsmasq.d（与 OpenClash 使用的位置一致）。
+# 回退到 /tmp/dnsmasq.d（与 Clash 使用的位置一致）。
 dnsmasq_confdir() {
     _dcd=""
     for _dcf in /tmp/etc/dnsmasq.conf.*; do
@@ -358,7 +377,7 @@ dnsmasq_hash_rule_supported() {
     return 1
 }
 
-# OpenClash 串联模式：在 DNSMasq 的 conf-dir 写入带标记的默认转发规则，
+# Clash 串联模式：在 DNSMasq 的 conf-dir 写入带标记的默认转发规则，
 # 让 DNSMasq 把域名查询交给 AdGuard Home。
 # 不再写 /etc/dnsmasq.conf：OpenWrt 上该文件不会被 DNSMasq 读取。
 OC_CONF="/etc/dnsmasq.conf"
@@ -418,7 +437,36 @@ yaml_get_list() {
     [ -f "$_file" ] || return 1
 
     awk -v k="$_key" '
-        $0 ~ "^  " k ":" { inlist = 1; next }
+        $0 ~ "^  " k ":" {
+            line = $0
+            sub("^  " k ":[[:space:]]*", "", line)
+            sub(/[[:space:]]+#.*$/, "", line)
+
+            # 行内写法：bootstrap_dns: [1.1.1.1, 8.8.8.8] / []
+            if (line ~ /^\[/) {
+                sub(/^\[/, "", line)
+                sub(/\][[:space:]]*$/, "", line)
+                if (line !~ /^[[:space:]]*$/) {
+                    n = split(line, parts, ",")
+                    for (i = 1; i <= n; i++) {
+                        v = parts[i]
+                        gsub(/^[[:space:]"]+|[[:space:]"]+$/, "", v)
+                        if (v != "") print v
+                    }
+                }
+                exit
+            }
+
+            # 单行标量写法
+            if (line != "") {
+                gsub(/"/, "", line)
+                print line
+                exit
+            }
+
+            inlist = 1
+            next
+        }
         inlist == 1 && /^    - / { sub(/^    - /, ""); print; next }
         { if (inlist == 1) inlist = 0 }
     ' "$_file" | tr '\n' ' ' | sed 's/[[:space:]]*$//'
@@ -482,6 +530,43 @@ yaml_fix_ratelimit_whitelist() {
     ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
 }
 
+# 读取 YAML 中某个两空格缩进的标量
+yaml_get_scalar() {
+    _file="$1"
+    _key="$2"
+    [ -f "$_file" ] || return 1
+
+    awk -v k="$_key" '
+        $0 ~ "^  " k ":" {
+            line = $0
+            sub("^  " k ":[[:space:]]*", "", line)
+            sub(/[[:space:]]+#.*$/, "", line)
+            gsub(/"/, "", line)
+            sub(/[[:space:]]+$/, "", line)
+            print line
+            exit
+        }
+    ' "$_file"
+}
+
+# 读取 YAML 中顶格（0 缩进）的标量，例如 http_proxy
+yaml_get_root_scalar() {
+    _file="$1"
+    _key="$2"
+    [ -f "$_file" ] || return 1
+
+    awk -v k="$_key" '
+        $0 ~ "^" k ":" {
+            line = $0
+            sub("^" k ":[[:space:]]*", "", line)
+            gsub(/"/, "", line)
+            sub(/[[:space:]]+$/, "", line)
+            print line
+            exit
+        }
+    ' "$_file"
+}
+
 # 修改 YAML 中顶格（0 缩进）的标量，例如 http_proxy
 yaml_set_root_scalar() {
     _file="$1"
@@ -495,16 +580,110 @@ yaml_set_root_scalar() {
     ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
 }
 
-###
-# filters 列表的增删（用于可选的成人内容拦截规则）
-###
+# 读取 YAML 缓存配置，输出 enabled|size_mb|ttl_min|ttl_max|optimistic。
+# YAML 缺少 cache_enabled 等字段时返回非 0，避免把空配置误判成外部修改。
+cache_yaml_signature() {
+    _cs_file="$1"
+    [ -s "$_cs_file" ] || return 1
 
-ADULT_FILTER_URL="https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/nsfw.txt"
-ADULT_FILTER_NAME="HaGeZi NSFW（成人内容）"
-ADULT_FILTER_ID="1794300001"
+    _cs_enabled="$(yaml_get_scalar "$_cs_file" "cache_enabled" 2>/dev/null)"
+    case "$_cs_enabled" in
+        true) _cs_enabled=1 ;;
+        false) _cs_enabled=0 ;;
+        *) return 1 ;;
+    esac
 
+    _cs_size=16
+    _cs_raw="$(yaml_get_scalar "$_cs_file" "cache_size" 2>/dev/null)"
+    case "$_cs_raw" in
+        ''|*[!0-9]*) ;;
+        *)
+            _cs_mb=$(( _cs_raw / 1048576 ))
+            [ "$_cs_mb" -ge 1 ] 2>/dev/null && _cs_size="$_cs_mb"
+            ;;
+    esac
+
+    _cs_min=0
+    _cs_raw="$(yaml_get_scalar "$_cs_file" "cache_ttl_min" 2>/dev/null)"
+    case "$_cs_raw" in ''|*[!0-9]*) ;; *) _cs_min="$_cs_raw" ;; esac
+
+    _cs_max=0
+    _cs_raw="$(yaml_get_scalar "$_cs_file" "cache_ttl_max" 2>/dev/null)"
+    case "$_cs_raw" in ''|*[!0-9]*) ;; *) _cs_max="$_cs_raw" ;; esac
+
+    _cs_opt=0
+    _cs_raw="$(yaml_get_scalar "$_cs_file" "cache_optimistic" 2>/dev/null)"
+    case "$_cs_raw" in
+        true) _cs_opt=1 ;;
+        false) _cs_opt=0 ;;
+    esac
+
+    echo "$_cs_enabled|$_cs_size|$_cs_min|$_cs_max|$_cs_opt"
+}
+
+# 老版本升级：UCI 没有缓存选项时，沿用当前 YAML 状态，避免覆盖用户选择。
+migrate_cache_conf() {
+    [ -n "$cache_enabled" ] && return 0
+
+    cache_enabled=1
+    cache_size_mb=16
+    cache_ttl_min=0
+    cache_ttl_max=0
+    cache_optimistic=0
+
+    if [ -s "$configpath" ]; then
+        _mc_raw="$(yaml_get_scalar "$configpath" "cache_enabled" 2>/dev/null)"
+        case "$_mc_raw" in
+            true) cache_enabled=1 ;;
+            false) cache_enabled=0 ;;
+        esac
+
+        _mc_raw="$(yaml_get_scalar "$configpath" "cache_size" 2>/dev/null)"
+        case "$_mc_raw" in
+            ''|*[!0-9]*) ;;
+            *)
+                _mc_mb=$(( _mc_raw / 1048576 ))
+                [ "$_mc_mb" -ge 1 ] 2>/dev/null && cache_size_mb="$_mc_mb"
+                ;;
+        esac
+
+        _mc_raw="$(yaml_get_scalar "$configpath" "cache_ttl_min" 2>/dev/null)"
+        case "$_mc_raw" in
+            ''|*[!0-9]*) ;;
+            *) cache_ttl_min="$_mc_raw" ;;
+        esac
+
+        _mc_raw="$(yaml_get_scalar "$configpath" "cache_ttl_max" 2>/dev/null)"
+        case "$_mc_raw" in
+            ''|*[!0-9]*) ;;
+            *) cache_ttl_max="$_mc_raw" ;;
+        esac
+
+        _mc_raw="$(yaml_get_scalar "$configpath" "cache_optimistic" 2>/dev/null)"
+        case "$_mc_raw" in
+            true) cache_optimistic=1 ;;
+            false) cache_optimistic=0 ;;
+        esac
+    fi
+
+    uci -q set "$CONF.main.cache_enabled=$cache_enabled"
+    uci -q set "$CONF.main.cache_size_mb=$cache_size_mb"
+    uci -q set "$CONF.main.cache_ttl_min=$cache_ttl_min"
+    uci -q set "$CONF.main.cache_ttl_max=$cache_ttl_max"
+    uci -q set "$CONF.main.cache_optimistic=$cache_optimistic"
+    uci -q commit "$CONF" 2>/dev/null
+
+    if [ "$cache_enabled" = "1" ]; then
+        log_msg "已迁移 DNS 缓存配置：开启（${cache_size_mb}MB，TTL ${cache_ttl_min}-${cache_ttl_max}，乐观缓存 ${cache_optimistic}）。"
+    else
+        log_msg "已迁移 DNS 缓存配置：关闭。"
+    fi
+}
+
+###
 # 过滤列表下载走 Clash 的 HTTP 代理：国内直连 GitHub 常被重置，
 # 交给 Clash 代理后 AGH 才能正常更新规则。
+###
 detect_http_proxy() {
     _hp="$(uci -q get openclash.config.http_port 2>/dev/null)"
     case "$_hp" in
@@ -517,83 +696,8 @@ detect_http_proxy() {
     echo ""
 }
 
-# 判断 filters 中是否已存在指定 URL
-yaml_filter_present() {
-    _file="$1"
-    _url="$2"
-    [ -f "$_file" ] || return 1
-    grep -qF "url: $_url" "$_file"
-}
-
-# 在 filters: 列表末尾追加一条规则（已存在则跳过）
-yaml_filter_add() {
-    _file="$1"
-    _url="$2"
-    _name="$3"
-    _id="$4"
-    [ -f "$_file" ] || return 1
-    yaml_filter_present "$_file" "$_url" && return 0
-
-    awk -v url="$_url" -v name="$_name" -v id="$_id" '
-        { line[NR] = $0 }
-        END {
-            start = 0
-            for (i = 1; i <= NR; i++) {
-                if (line[i] ~ /^filters:/) { start = i; break }
-            }
-            if (start == 0) exit 1
-
-            # 找到 filters 段最后一个列表项的最后一行
-            last = start
-            for (i = start + 1; i <= NR; i++) {
-                if (line[i] ~ /^[^ ]/ && line[i] != "") break
-                if (line[i] ~ /^  - / || line[i] ~ /^    [a-z_]+:/) last = i
-            }
-
-            for (i = 1; i <= NR; i++) {
-                print line[i]
-                if (i == last) {
-                    print "  - enabled: true"
-                    print "    url: " url
-                    print "    name: " name
-                    print "    id: " id
-                }
-            }
-        }
-    ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
-}
-
-# 从 filters: 列表中删除指定 URL 的规则（不存在则跳过）
-yaml_filter_remove() {
-    _file="$1"
-    _url="$2"
-    [ -f "$_file" ] || return 0
-    yaml_filter_present "$_file" "$_url" || return 0
-
-    awk -v url="$_url" '
-        { line[NR] = $0 }
-        END {
-            for (i = 1; i <= NR; i++) {
-                if (line[i] ~ /^  - /) {
-                    end = i
-                    for (j = i + 1; j <= NR; j++) {
-                        if (line[j] ~ /^    /) end = j
-                        else break
-                    }
-                    hit = 0
-                    for (j = i; j <= end; j++) {
-                        if (index(line[j], "url: " url) > 0) hit = 1
-                    }
-                    if (hit) { i = end; continue }
-                }
-                print line[i]
-            }
-        }
-    ' "$_file" > "$_file.tmp.$$" && mv -f "$_file.tmp.$$" "$_file"
-}
-
 ###
-# OpenClash 前置（clashfirst）模式：让 Clash 的 DNS 上游只指向 AdGuard Home
+# Clash 前置（clashfirst）模式：让 Clash 的 DNS 上游只指向 AdGuard Home
 ###
 
 clashfirst_disable_upstream() {
@@ -611,13 +715,13 @@ clashfirst_disable_upstream() {
     _oc_disabled="$_oc_disabled $_nds_sid"
 }
 
-# 关闭 OpenClash 原有 nameserver 组，仅保留指向 AdGuard Home 的上游。
-# 返回值：0 成功；2 未安装 OpenClash；3 OpenClash 版本不支持自定义 DNS。
+# 关闭 Clash 原有 nameserver 组，仅保留指向 AdGuard Home 的上游。
+# 返回值：0 成功；2 未安装 Clash；3 Clash 版本不支持自定义 DNS。
 clashfirst_openclash_apply() {
     uci -q get openclash.config >/dev/null 2>&1 || return 2
     uci -q get openclash.config.enable_custom_dns >/dev/null 2>&1 || return 3
 
-    # 清理上一次可能残留的设置（不重启 OpenClash）
+    # 清理上一次可能残留的设置（不重启 Clash）
     clashfirst_openclash_restore >/dev/null 2>&1
 
     _old_cd=$(uci -q get openclash.config.enable_custom_dns)
@@ -630,7 +734,7 @@ clashfirst_openclash_apply() {
     config_foreach clashfirst_disable_upstream dns_servers
 
     _sid=$(uci add openclash dns_servers) || return 1
-    # 注意不要写成 foo='bar'，否则引号会进入 UCI 值，OpenClash 读不到合法值
+    # 注意不要写成 foo='bar'，否则引号会进入 UCI 值，Clash 读不到合法值
     uci -q set "openclash.$_sid.group=nameserver"
     uci -q set "openclash.$_sid.ip=127.0.0.1"
     uci -q set "openclash.$_sid.port=$dnsport"
@@ -650,7 +754,7 @@ clashfirst_openclash_apply() {
     return 0
 }
 
-# 恢复 OpenClash 的原有 DNS 上游设置
+# 恢复 Clash 的原有 DNS 上游设置
 clashfirst_openclash_restore() {
     _r_sid=$(uci -q get "$CONF.main.oc_agh_sid")
     _r_sids=$(uci -q get "$CONF.main.oc_disabled_sids")
@@ -680,16 +784,16 @@ clashfirst_openclash_restore() {
     return 0
 }
 
-# 让 OpenClash 重新生成 DNS 配置使自定义上游生效；仅在 Clash 已运行时重启。
+# 让 Clash 重新生成 DNS 配置使自定义上游生效；仅在 Clash 已运行时重启。
 clashfirst_openclash_refresh() {
-    # OpenClash 的“快速启动”会在配置未变时跳过 yml_change.sh，
+    # Clash 的“快速启动”会在配置未变时跳过 yml_change.sh，
     # 导致自定义上游不生效；无论 Clash 是否在运行，都要先让缓存失效。
     rm -f /tmp/openclash.change /tmp/openclash_tpl_cache
 
     pidof clash >/dev/null 2>&1 || return 0
     [ -x /etc/init.d/openclash ] || return 0
 
-    log_msg "正在重启 OpenClash 以应用自定义上游 DNS..."
+    log_msg "正在重启 Clash 以应用自定义上游 DNS..."
     /etc/init.d/openclash restart >/dev/null 2>&1
     return 0
 }

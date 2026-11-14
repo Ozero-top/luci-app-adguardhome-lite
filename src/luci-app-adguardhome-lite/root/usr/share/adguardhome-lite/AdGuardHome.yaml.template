@@ -64,13 +64,14 @@ dns:
   ratelimit_subnet_len_ipv6: 56
   cache_ttl_max: 0
   cache_ttl_min: 0
-  cache_size: 8388608
-  ratelimit: 20
+  cache_size: 16777216
+  # 接管 53 模式下整个 /24 共用这个 QPS 上限，20 在设备多时容易丢查询
+  ratelimit: 100
   port: 53
   aaaa_disabled: false
   anonymize_client_ip: false
   bootstrap_prefer_ipv6: false
-  cache_enabled: false
+  cache_enabled: true
   cache_optimistic: false
   enable_dnssec: false
   handle_ddr: true

@@ -6,10 +6,13 @@
 
 load_conf
 
-# 「OpenClash 串联」已下线：dnsmasq 会优先采用 OpenClash 写入的默认上游，
+# 老版本升级：UCI 没有缓存选项时，沿用当前 YAML 状态，避免覆盖用户选择。
+migrate_cache_conf
+
+# 「Clash 串联」已下线：dnsmasq 会优先采用 Clash 写入的默认上游，
 # 过滤实际不生效，这里自动迁移到「接管 53 端口」。
 if [ "$dns_mode" = "openclash" ]; then
-    log_msg "「OpenClash 串联」模式已下线，已切换为「接管 53 端口」。"
+    log_msg "「Clash 串联」模式已下线，已切换为「接管 53 端口」。"
     openclash_forward_del
     uci -q set "$CONF.main.dns_mode=takeover"
     uci -q commit "$CONF" 2>/dev/null
@@ -52,75 +55,207 @@ if [ -s "$configpath" ]; then
     _cur_up=$(yaml_get_list "$configpath" "upstream_dns")
     _auto_up=$(uci -q get "$CONF.main.auto_upstream" 2>/dev/null)
     _self_ip=$(uci -q get network.lan.ipaddr 2>/dev/null)
-    case "$dns_mode" in
-        takeover) _target_up="127.0.0.1:1745" ;;
-        openclash) _target_up="127.0.0.1:$clash_dns_port" ;;
-        clashfirst) _target_up="$(detect_real_upstream_dns)" ;;
-        upstream) _target_up="$(detect_upstream_dns)" ;;
-        *) _target_up="127.0.0.1:$(dnsmasq_port)" ;;
-    esac
+    _crypto_up="$(dns_crypto_url)"
 
-    # 兼容旧版本：auto_upstream 缺失时，current 为插件曾写入的默认值也视为可改
-    _is_auto=0
-    [ -n "$_auto_up" ] && [ "$_cur_up" = "$_auto_up" ] && _is_auto=1
-    case "$_cur_up" in
-        "127.0.0.1"|"127.0.0.1:53"|"127.0.0.1:1745"|"127.0.0.1:$clash_dns_port"|"127.0.0.1:5335"|"223.5.5.5 119.29.29.29"|"$_self_ip")
-            _is_auto=1
-            ;;
-    esac
+    # 自定义上游优先：固定使用用户填写的列表，不再按接管方式改写。
+    _custom_up_applied=0
+    if [ "$upstream_source" = "custom" ] && [ -n "$upstream_custom" ]; then
+        _custom_up_applied=1
+        if [ "$_cur_up" != "$upstream_custom" ]; then
+            yaml_set_list "$configpath" "upstream_dns" "$upstream_custom"
+        fi
+        uci -q set "$CONF.main.auto_upstream=$upstream_custom"
+        log_msg "已应用自定义上游 DNS：$upstream_custom"
 
-    if [ "$_is_auto" = "1" ] && [ "$_cur_up" != "$_target_up" ]; then
-        yaml_set_list "$configpath" "upstream_dns" "$_target_up"
-        uci -q set "$CONF.main.auto_upstream=$_target_up"
-        log_msg "已根据 DNS 接管方式调整上游 DNS：$_target_up"
+        # 自定义上游含 DoH/DoT/DoQ 域名时，bootstrap 为空会导致解析失败
+        case " $upstream_custom " in
+            *" https://"*|*" tls://"*|*" quic://"*)
+                _cur_boot=$(yaml_get_list "$configpath" "bootstrap_dns")
+                if [ -z "$_cur_boot" ]; then
+                    yaml_set_list "$configpath" "bootstrap_dns" "223.5.5.5 119.29.29.29"
+                    log_msg "bootstrap DNS 为空，已补充 223.5.5.5、119.29.29.29。"
+                fi
+                ;;
+        esac
+
+        if [ -n "$_crypto_up" ]; then
+            log_msg "已使用自定义上游 DNS，加密预设未应用。"
+        fi
     fi
 
-    # 本地 PTR 解析：只有接管 53 模式才可以指向 DNSMasq（1745），
-    # 其它模式下 DNSMasq 又转发回 AdGuard Home，会造成反向查询环。
+    if [ "$_custom_up_applied" = "0" ]; then
+        case "$dns_mode" in
+            takeover) _target_up="127.0.0.1:1745" ;;
+            openclash) _target_up="127.0.0.1:$clash_dns_port" ;;
+            clashfirst)
+                if [ -n "$_crypto_up" ]; then
+                    _target_up="$_crypto_up"
+                else
+                    _target_up="$(detect_real_upstream_dns)"
+                fi
+                ;;
+            upstream) _target_up="$(detect_upstream_dns)" ;;
+            *) _target_up="127.0.0.1:$(dnsmasq_port)" ;;
+        esac
+
+        # 加密上游只对「AdGuard Home → 真实上游」这一段有效；
+        # 其它模式的上游是本机 DNSMasq/Clash，开启也不会加密出公网的查询。
+        if [ -n "$_crypto_up" ] && [ "$dns_mode" != "clashfirst" ]; then
+            log_msg "加密上游仅在「Clash 前置」模式生效，当前模式已忽略。"
+        fi
+
+        # 兼容旧版本：auto_upstream 缺失时，current 为插件曾写入的默认值也视为可改
+        _is_auto=0
+        [ -n "$_auto_up" ] && [ "$_cur_up" = "$_auto_up" ] && _is_auto=1
+        case "$_cur_up" in
+            "127.0.0.1"|"127.0.0.1:53"|"127.0.0.1:1745"|"127.0.0.1:$clash_dns_port"|"127.0.0.1:5335"|"223.5.5.5 119.29.29.29"|"$_self_ip")
+                _is_auto=1
+                ;;
+        esac
+
+        if [ "$_is_auto" = "1" ] && [ "$_cur_up" != "$_target_up" ]; then
+            yaml_set_list "$configpath" "upstream_dns" "$_target_up"
+            uci -q set "$CONF.main.auto_upstream=$_target_up"
+            log_msg "已根据 DNS 接管方式调整上游 DNS：$_target_up"
+        fi
+
+        # DoH/DoT 上游需要 bootstrap 解析解析器域名。
+        # 只改插件管理的上游；用户手工填写的上游和 bootstrap 保持不动。
+        if [ "$dns_mode" = "clashfirst" ] && [ -n "$_crypto_up" ]; then
+            if [ "$_is_auto" != "1" ]; then
+                log_msg "检测到自定义上游 DNS，加密预设未应用。"
+            else
+                _cur_boot=$(yaml_get_list "$configpath" "bootstrap_dns")
+                if [ -z "$_cur_boot" ]; then
+                    yaml_set_list "$configpath" "bootstrap_dns" "223.5.5.5 119.29.29.29"
+                    log_msg "bootstrap DNS 为空，已补充 223.5.5.5、119.29.29.29。"
+                elif [ "$_cur_boot" != "223.5.5.5 119.29.29.29" ]; then
+                    log_msg "检测到自定义 bootstrap DNS，已保持用户设置。"
+                fi
+                log_msg "已启用加密上游：$_crypto_up"
+            fi
+        fi
+    fi
+
+    # 本地 PTR 解析：只调整插件自己写入的值，用户自定义的反向解析保持不动。
+    # 接管 53 模式才可以指向 DNSMasq（1745），其它模式会形成反向查询环。
     _ptr_up="127.0.0.1:53"
     [ "$dns_mode" = "takeover" ] && _ptr_up="127.0.0.1:1745"
     _cur_ptr=$(yaml_get_list "$configpath" "local_ptr_upstreams")
+    _auto_ptr=$(uci -q get "$CONF.main.auto_ptr" 2>/dev/null)
+    _ptr_owned=0
     case "$_cur_ptr" in
         ""|"127.0.0.1"|"127.0.0.1:53"|"127.0.0.1:1745")
-            if [ "$dns_mode" = "takeover" ]; then
-                yaml_set_scalar "$configpath" "use_private_ptr_resolvers" "true"
-                yaml_set_list "$configpath" "local_ptr_upstreams" "$_ptr_up"
-            else
-                yaml_set_scalar "$configpath" "use_private_ptr_resolvers" "false"
-                yaml_set_list "$configpath" "local_ptr_upstreams" ""
+            _ptr_owned=1
+            ;;
+        *)
+            if [ -n "$_auto_ptr" ] && [ "$_cur_ptr" = "$_auto_ptr" ]; then
+                _ptr_owned=1
             fi
             ;;
     esac
 
-    # 一键化：自动写入适合 Clash fake-IP 的 DNS 参数，
-    # 省得用户再进 AdGuard Home 面板逐项关闭缓存、DNSSEC 等。
-    # 注意不要自动开启安全浏览（safebrowsing）：它依赖 AdGuard 的在线服务，
-    # 国内网络不可达时会拖慢甚至阻塞解析，需要时请用户在面板手动开启。
-    yaml_set_scalar "$configpath" "cache_enabled" "false"
-    yaml_set_scalar "$configpath" "cache_optimistic" "false"
-    yaml_set_scalar "$configpath" "enable_dnssec" "false"
-    yaml_set_scalar "$configpath" "upstream_mode" "parallel"
-    log_msg "已自动应用推荐 DNS 参数：关闭缓存/DNSSEC，并行上游。"
-
-    # 过滤列表下载走 Clash 的 HTTP 代理（检测不到就清空），
-    # 否则国内直连 GitHub 会被重置，成人规则等列表无法更新。
-    _proxy="$(detect_http_proxy)"
-    yaml_set_root_scalar "$configpath" "http_proxy" "$_proxy"
-    if [ -n "$_proxy" ]; then
-        log_msg "过滤列表下载已走 Clash 代理：$_proxy"
+    if [ "$_ptr_owned" = "1" ]; then
+        if [ "$dns_mode" = "takeover" ]; then
+            yaml_set_scalar "$configpath" "use_private_ptr_resolvers" "true"
+            yaml_set_list "$configpath" "local_ptr_upstreams" "$_ptr_up"
+            uci -q set "$CONF.main.auto_ptr=$_ptr_up"
+        else
+            yaml_set_scalar "$configpath" "use_private_ptr_resolvers" "false"
+            yaml_set_list "$configpath" "local_ptr_upstreams" ""
+            uci -q set "$CONF.main.auto_ptr="
+        fi
     else
-        log_msg "未检测到可用的 Clash HTTP 代理，过滤列表将直连下载。"
+        log_msg "检测到自定义反向解析（PTR）配置，已保持用户设置。"
     fi
 
-    # 成人内容拦截（可选）：追加或移除 HaGeZi NSFW 规则
-    _had_adult="0"
-    yaml_filter_present "$configpath" "$ADULT_FILTER_URL" && _had_adult="1"
-    if [ "$adult_block" = "1" ]; then
-        yaml_filter_add "$configpath" "$ADULT_FILTER_URL" "$ADULT_FILTER_NAME" "$ADULT_FILTER_ID"
-        [ "$_had_adult" = "1" ] || log_msg "已启用成人内容拦截（追加 HaGeZi NSFW 规则）。"
+    # DNS 缓存：由插件配置控制，默认开启；老配置已在上方迁移。
+    # 注意不要自动开启安全浏览（safebrowsing）：它依赖 AdGuard 的在线服务，
+    # 国内网络不可达时会拖慢甚至阻塞解析，需要时请用户在面板手动开启。
+    case "$cache_enabled" in 0|1) ;; *) cache_enabled=1 ;; esac
+    case "$cache_optimistic" in 0|1) ;; *) cache_optimistic=0 ;; esac
+    case "$cache_size_mb" in ''|*[!0-9]*) cache_size_mb=16 ;; esac
+    [ "$cache_size_mb" -ge 1 ] 2>/dev/null && [ "$cache_size_mb" -le 256 ] 2>/dev/null || cache_size_mb=16
+    case "$cache_ttl_min" in ''|*[!0-9]*) cache_ttl_min=0 ;; esac
+    [ "$cache_ttl_min" -le 604800 ] 2>/dev/null || cache_ttl_min=604800
+    case "$cache_ttl_max" in ''|*[!0-9]*) cache_ttl_max=0 ;; esac
+    [ "$cache_ttl_max" -le 604800 ] 2>/dev/null || cache_ttl_max=604800
+    if [ "$cache_ttl_max" -gt 0 ] && [ "$cache_ttl_min" -gt "$cache_ttl_max" ]; then
+        cache_ttl_min="$cache_ttl_max"
+    fi
+
+    # 缓存单一配置源：以 AdGuard Home 的 YAML 为准。
+    # 插件 UI 没改过（UCI 与上次写入一致）但 YAML 被 AGH 面板改过时，采纳 YAML；
+    # 否则把插件 UI 的值写入 YAML（保存动作本身就是显式修改）。
+    _cache_sig="$cache_enabled|$cache_size_mb|$cache_ttl_min|$cache_ttl_max|$cache_optimistic"
+    _cache_applied="$(uci -q get "$CONF.main.cache_applied" 2>/dev/null)"
+    _cache_yaml="$(cache_yaml_signature "$configpath" 2>/dev/null)"
+    _cache_adopt=0
+    if [ -n "$_cache_yaml" ]; then
+        if [ -z "$_cache_applied" ]; then
+            # 首次运行或老版本升级：以现有 YAML 为准
+            _cache_adopt=1
+        elif [ "$_cache_sig" = "$_cache_applied" ] && [ "$_cache_yaml" != "$_cache_applied" ]; then
+            # 插件 UI 没改过，但 YAML 被 AGH 面板改过：采纳 YAML
+            _cache_adopt=1
+        fi
+    fi
+    if [ "$_cache_adopt" = "1" ]; then
+        _old_ifs="$IFS"
+        IFS='|'
+        set -- $_cache_yaml
+        IFS="$_old_ifs"
+        cache_enabled="$1"
+        cache_size_mb="$2"
+        cache_ttl_min="$3"
+        cache_ttl_max="$4"
+        cache_optimistic="$5"
+        uci -q set "$CONF.main.cache_enabled=$cache_enabled"
+        uci -q set "$CONF.main.cache_size_mb=$cache_size_mb"
+        uci -q set "$CONF.main.cache_ttl_min=$cache_ttl_min"
+        uci -q set "$CONF.main.cache_ttl_max=$cache_ttl_max"
+        uci -q set "$CONF.main.cache_optimistic=$cache_optimistic"
+        _cache_sig="$_cache_yaml"
+        log_msg "已按 AdGuard Home 现有配置同步缓存设置。"
+    fi
+
+    _cache_bool="false"
+    _opt_bool="false"
+    if [ "$cache_enabled" = "1" ]; then
+        _cache_bool="true"
+        if [ "$cache_optimistic" = "1" ]; then
+            _opt_bool="true"
+        fi
+    fi
+
+    yaml_set_scalar "$configpath" "cache_enabled" "$_cache_bool"
+    yaml_set_scalar "$configpath" "cache_size" "$(( cache_size_mb * 1024 * 1024 ))"
+    yaml_set_scalar "$configpath" "cache_ttl_min" "$cache_ttl_min"
+    yaml_set_scalar "$configpath" "cache_ttl_max" "$cache_ttl_max"
+    yaml_set_scalar "$configpath" "cache_optimistic" "$_opt_bool"
+    uci -q set "$CONF.main.cache_applied=$_cache_sig"
+    uci -q commit "$CONF" 2>/dev/null
+
+    if [ "$_cache_bool" = "true" ]; then
+        log_msg "已应用 DNS 缓存：开启（${cache_size_mb}MB，TTL ${cache_ttl_min}-${cache_ttl_max}，乐观缓存 ${_opt_bool}）。"
     else
-        yaml_filter_remove "$configpath" "$ADULT_FILTER_URL"
-        [ "$_had_adult" = "0" ] || log_msg "已关闭成人内容拦截（移除 NSFW 规则）。"
+        log_msg "已应用 DNS 缓存：关闭。"
+    fi
+
+    # 过滤列表下载代理：只改插件自己写入的值，用户自定义的 http_proxy 保持不动。
+    _proxy="$(detect_http_proxy)"
+    _cur_proxy="$(yaml_get_root_scalar "$configpath" "http_proxy")"
+    _auto_proxy="$(uci -q get "$CONF.main.auto_http_proxy" 2>/dev/null)"
+    if [ -z "$_cur_proxy" ] || { [ -n "$_auto_proxy" ] && [ "$_cur_proxy" = "$_auto_proxy" ]; }; then
+        yaml_set_root_scalar "$configpath" "http_proxy" "$_proxy"
+        uci -q set "$CONF.main.auto_http_proxy=$_proxy"
+        if [ -n "$_proxy" ]; then
+            log_msg "过滤列表下载已走 Clash 代理：$_proxy"
+        else
+            log_msg "未检测到可用的 Clash HTTP 代理，过滤列表将直连下载。"
+        fi
+    else
+        log_msg "检测到自定义 http_proxy，已保持用户设置。"
     fi
 
     # 前置模式下来源全是 127.0.0.1，回环地址必须跳出限速，
@@ -158,8 +293,8 @@ if [ "$enabled" = "1" ]; then
         log_msg "启动命令返回错误码 $_rc，请到“运行日志”查看原因。"
     fi
 
-    # 前置模式下 AdGuard Home 先启动，再让 OpenClash 重载上游，
-    # 避免重启 OpenClash 时 5335 还没有监听导致 DNS 中断。
+    # 前置模式下 AdGuard Home 先启动，再让 Clash 重载上游，
+    # 避免重启 Clash 时 5335 还没有监听导致 DNS 中断。
     if [ "$dns_mode" = "clashfirst" ]; then
         clashfirst_openclash_refresh
     fi

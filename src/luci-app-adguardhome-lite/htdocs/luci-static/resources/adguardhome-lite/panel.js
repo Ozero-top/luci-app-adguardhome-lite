@@ -8,11 +8,18 @@
 	var CFG = window.AGH || {};
 	var U = CFG.urls || {};
 	var TOKEN = CFG.token || '';
+	var ADULT_FILTER_URL = 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/nsfw.txt';
+	var ADULT_FILTER_NAME = 'HaGeZi NSFW（成人内容）';
 
 	var state = {
 		status: null,
 		settings: null,
+		filters: [],
 		yamlLoaded: false,
+		settingsSubtab: 'svc',
+		logSubtab: 'sys',
+		rulesDirty: false,
+		stepsCollapsed: null,
 		busy: false,
 		passShown: false,
 		openclash: false,
@@ -24,6 +31,20 @@
 
 	function $(id) {
 		return document.getElementById(id);
+	}
+
+	// 开关旁边的状态文字，可按开关自定义开/关文案
+	function updateSwitchStates() {
+		var nodes = document.querySelectorAll('.agh-switch-state');
+		for (var i = 0; i < nodes.length; i++) {
+			var el = nodes[i];
+			var input = $(el.getAttribute('data-for'));
+			var on = !!(input && input.checked);
+			el.textContent = on
+				? (el.getAttribute('data-on') || '已开启')
+				: (el.getAttribute('data-off') || '已关闭');
+			el.classList.toggle('is-on', on);
+		}
 	}
 
 	function esc(value) {
@@ -147,17 +168,21 @@
 
 	function modeLabel(mode) {
 		if (mode === 'takeover') return '接管 53 端口';
-		if (mode === 'openclash') return 'OpenClash 串联（已下线）';
-		if (mode === 'clashfirst') return 'OpenClash 前置（Clash → AGH → 真实 DNS）';
+		if (mode === 'openclash') return 'Clash 串联（已下线）';
+		if (mode === 'clashfirst') return 'Clash 前置（Clash → AGH → 真实 DNS）';
 		if (mode === 'none') return '仅面板（不接管 DNS）';
 		return 'DNSMasq 上游';
 	}
 
 	function modeChain(d) {
 		var cdp = d.clash_dns_port || '7874';
-		if (d.dns_mode === 'takeover') return '客户端 → 53 AdGuard Home → 1745 DNSMasq → Clash / WAN DNS';
+		if (d.dns_mode === 'takeover') {
+			return d.openclash_running
+				? '客户端 → 53 AdGuard Home → 1745 DNSMasq → Clash / WAN DNS'
+				: '客户端 → 53 AdGuard Home → 1745 DNSMasq → WAN DNS';
+		}
 		if (d.dns_mode === 'openclash') return '客户端 → 53 DNSMasq → 5333 AdGuard Home → ' + cdp + ' Clash DNS';
-		if (d.dns_mode === 'clashfirst') return '客户端 → OpenClash 劫持 → ' + cdp + ' Clash DNS → 5335 AdGuard Home → 真实 DNS';
+		if (d.dns_mode === 'clashfirst') return '客户端 → Clash 劫持 → ' + cdp + ' Clash DNS → 5335 AdGuard Home → 真实 DNS';
 		if (d.dns_mode === 'none') return '不接管 DNS，仅保留管理面板';
 		return '客户端 → 53 DNSMasq → 5333 AdGuard Home → 自动选择上游';
 	}
@@ -258,22 +283,29 @@
 			['内核版本', d.core ? '<span class="agh-ok">' + esc(d.version || '已安装') + '</span>' : '<span class="agh-bad">未安装</span>'],
 			['DNS 接管', esc(modeLabel(d.dns_mode)) + ((d.mode_applied && d.mode_applied !== d.dns_mode) ? ' <span class="agh-warn">（待应用）</span>' : '')],
 			['当前链路', '<span class="agh-path">' + esc(modeChain(d)) + '</span>'],
-			['更新通道', esc(channelLabel(d.channel))],
-			['GitHub 反代', d.channel === 'beta' ? '<span class="agh-hint">测试版不使用</span>' : esc(proxyLabel(d.github_proxy))],
+			['更新通道', esc(channelLabel(d.channel))]
+		];
+
+		// GitHub 反代只在内核安装/更新时有用，服务运行中不显示，保持状态卡片两行对齐
+		if (!d.running) {
+			rows.push(['GitHub 反代', d.channel === 'beta' ? '<span class="agh-hint">测试版不使用</span>' : esc(proxyLabel(d.github_proxy))]);
+		}
+
+		rows.push(
 			['面板地址', '<a href="' + esc(panel) + '" target="_blank" rel="noopener">' + esc(panel.replace(/^http:\/\//, '')) + '</a>'],
 			['管理员', esc(d.admin_user || 'admin')],
 			['面板密码', passHtml],
 			['配置文件', d.config_exists ? '<span class="agh-ok">已生成</span>' : '<span class="agh-warn">未生成</span>'],
 			['工作目录', '<span class="agh-path">' + esc(d.workdir || '') + '</span>']
-		];
+		);
 
 		if (d.dns_mode === 'takeover' && d.openclash_hijack && !d.dns_redirect) {
-			rows.push(['配置建议', '<span class="agh-warn">检测到 OpenClash DNS 劫持，但把查询收回 53 的规则没有生效，查询可能绕过 AdGuard Home。请在「基础设置」重新保存一次「接管 53 端口」，或检查防火墙状态。</span>']);
+			rows.push(['配置建议', '<span class="agh-warn">检测到 Clash DNS 劫持，但把查询收回 53 的规则没有生效，查询可能绕过 AdGuard Home。请在「基础设置」重新保存一次「接管 53 端口」，或检查防火墙状态。</span>']);
 		}
 		if (d.dns_mode === 'openclash' && d.openclash_hijack_port &&
 			d.openclash_hijack_port !== '53' && d.openclash_hijack_port !== String(d.dns_port)) {
-			rows.push(['配置建议', '<span class="agh-warn">OpenClash 把 53 直接劫持到 ' + esc(d.openclash_hijack_port) +
-				'，查询不经过 DNSMasq，AdGuard Home 被绕过。请改用「OpenClash 前置」。</span>']);
+			rows.push(['配置建议', '<span class="agh-warn">Clash 把 53 直接劫持到 ' + esc(d.openclash_hijack_port) +
+				'，查询不经过 DNSMasq，AdGuard Home 被绕过。请改用「Clash 前置」。</span>']);
 		}
 		if (d.dns_mode === 'openclash' && !d.openclash_running) {
 			rows.push(['配置建议', '<span class="agh-warn">Clash 内核未运行，AdGuard Home 的上游 ' + esc(d.clash_dns_port || '7874') + ' 不可用，DNS 会解析失败。</span>']);
@@ -282,9 +314,9 @@
 			if (!d.openclash_running) {
 				rows.push(['配置建议', '<span class="agh-warn">Clash 内核未运行，前置链路无法生效。</span>']);
 			} else if (!d.openclash_redirect || d.openclash_redirect === '0') {
-				rows.push(['配置建议', '<span class="agh-warn">OpenClash 的 DNS 劫持未开启，客户端查询会绕过 AdGuard Home。</span>']);
+				rows.push(['配置建议', '<span class="agh-warn">Clash 的 DNS 劫持未开启，客户端查询会绕过 AdGuard Home。</span>']);
 			} else if (!d.openclash_upstream_agh) {
-				rows.push(['配置建议', '<span class="agh-warn">未检测到指向 127.0.0.1:' + String(d.dns_port) + ' 的 OpenClash 上游，可保存一次设置或重启 OpenClash 使其生效。</span>']);
+				rows.push(['配置建议', '<span class="agh-warn">未检测到指向 127.0.0.1:' + String(d.dns_port) + ' 的 Clash 上游，可保存一次设置或重启 Clash 使其生效。</span>']);
 			}
 		}
 
@@ -297,11 +329,31 @@
 
 		attachPasswordActions(pass);
 		updateSteps(d);
+		applyStepsVisibility(d);
 
 		if (d.update_running && !state.updateTimer) {
 			showProgress();
 			startProgressPoll();
 		}
+	}
+
+	// 初始化配置：收起时只保留「打开 AdGuard Home 面板」；
+	// 未安装内核或服务未运行时强制展开，正常运行默认收起
+	function applyStepsVisibility(d) {
+		var steps = document.querySelectorAll('#agh-steps .agh-step-init');
+		var btn = $('agh-steps-toggle');
+		if (!steps.length) return;
+		if (d) {
+			if (!d.core || !d.running) {
+				state.stepsCollapsed = false;
+			} else if (state.stepsCollapsed === null) {
+				state.stepsCollapsed = true;
+			}
+		}
+		for (var i = 0; i < steps.length; i++) {
+			steps[i].hidden = !!state.stepsCollapsed;
+		}
+		if (btn) btn.textContent = state.stepsCollapsed ? '展开步骤' : '收起';
 	}
 
 	function updateSteps(d) {
@@ -382,7 +434,7 @@
 	}
 
 	// 统计随 /status 一起返回，这里只负责渲染，避免额外请求
-	function renderStats(d) {
+	function renderStats(d, status) {
 		var hint = $('agh-stats-hint');
 		var keys = {
 			queries: 'agh-stat-queries',
@@ -395,7 +447,11 @@
 				var el = $(keys[k]);
 				if (el) el.textContent = '-';
 			});
-			if (hint) hint.textContent = (d && d.error) ? d.error : '统计读取失败。';
+			if (hint) {
+				hint.textContent = (status && !status.running)
+					? '服务未运行，暂无可统计。'
+					: ((d && d.error) ? d.error : '统计读取失败。');
+			}
 			return;
 		}
 		Object.keys(keys).forEach(function (k) {
@@ -431,7 +487,7 @@
 			var d = await apiGet(U.status);
 			state.status = d;
 			renderStatus();
-			if (d && d.stats) renderStats(d.stats);
+			if (d && d.stats) renderStats(d.stats, d);
 			if (d.action_running && !state.busy) {
 				state.busy = true;
 				pollAction(null);
@@ -439,6 +495,220 @@
 		} catch (err) {
 			if (!silent) handleApiError(err);
 		}
+	}
+
+	async function clearStats() {
+		if (!window.confirm('将清空 AdGuard Home 的 DNS 查询与拦截统计，确定继续？')) return;
+		var btn = $('agh-stats-clear');
+		if (btn) btn.disabled = true;
+		try {
+			await apiPost(U.statsClear, {});
+			showToast('统计数据已清空', 'ok');
+		} catch (err) {
+			handleApiError(err, $('agh-stats-hint'));
+		} finally {
+			if (btn) btn.disabled = false;
+			refreshStatus(true);
+		}
+	}
+
+	function setFilterFlags(d) {
+		var map = {
+			filtering_enabled: 'agh-filter-enabled',
+			safesearch: 'agh-filter-safesearch',
+			safebrowsing: 'agh-filter-safebrowsing'
+		};
+		for (var k in map) {
+			if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
+			var el = $(map[k]);
+			if (el) el.checked = !!d[k];
+		}
+		var rules = $('agh-filter-rules');
+		// 用户正在编辑自定义规则时，刷新订阅列表不要覆盖文本域
+		if (rules && !state.rulesDirty) rules.value = (d.user_rules || []).join('\n');
+
+		// 成人内容拦截开关以 NSFW 订阅是否存在且启用为准
+		var adultEl = $('agh-filter-adult');
+		if (adultEl) {
+			var list = d.filters || [];
+			var nsfw = null;
+			for (var i = 0; i < list.length; i++) {
+				if (list[i].url === ADULT_FILTER_URL && !list[i].whitelist) { nsfw = list[i]; break; }
+			}
+			adultEl.checked = !!(nsfw && nsfw.enabled);
+		}
+		updateSwitchStates();
+	}
+
+	// 成人内容拦截：新增/启用或移除 HaGeZi NSFW 订阅，由接口同步 UCI 状态
+	function toggleAdultFilter(on) {
+		var found = null;
+		var list = state.filters || [];
+		for (var i = 0; i < list.length; i++) {
+			if (list[i].url === ADULT_FILTER_URL && !list[i].whitelist) { found = list[i]; break; }
+		}
+		if (on) {
+			if (found && found.enabled) return;
+			if (found) {
+				return filtersAction({
+					action: 'toggle',
+					url: ADULT_FILTER_URL,
+					name: found.name || ADULT_FILTER_NAME,
+					whitelist: '0',
+					enabled: '1'
+				});
+			}
+			return filtersAction({
+				action: 'add',
+				name: ADULT_FILTER_NAME,
+				url: ADULT_FILTER_URL,
+				whitelist: '0'
+			});
+		}
+		if (!found) return;
+		return filtersAction({ action: 'remove', url: ADULT_FILTER_URL, whitelist: '0' });
+	}
+
+	function renderFilters(d) {
+		var list = $('agh-filter-list');
+		if (!list) return;
+		var filters = (d && d.filters) || [];
+		if (!filters.length) {
+			list.innerHTML = '<div class="agh-empty">还没有订阅规则</div>';
+			return;
+		}
+
+		var html = '';
+		for (var i = 0; i < filters.length; i++) {
+			var f = filters[i];
+			var wl = f.whitelist ? '1' : '0';
+			var tag = f.whitelist ? ' <span class="agh-rule-tag">白名单</span>' : '';
+			html += '<div class="agh-rule" data-url="' + esc(f.url) + '" data-name="' + esc(f.name || f.url) + '" data-whitelist="' + wl + '">' +
+				'<input type="checkbox" class="agh-filter-toggle" ' + (f.enabled ? 'checked' : '') + '>' +
+				'<span class="agh-rule-name">' + esc(f.name || f.url) + tag +
+				'<br><span class="agh-rule-meta">' + esc(f.url) + '　' + (f.rules_count || 0) + ' 条</span></span>' +
+				'<button type="button" class="agh-ghost-btn agh-small-btn agh-filter-remove">删除</button>' +
+				'</div>';
+		}
+		list.innerHTML = html;
+
+		Array.prototype.slice.call(list.querySelectorAll('.agh-filter-toggle')).forEach(function (el) {
+			el.onchange = function () {
+				var row = el.closest('.agh-rule');
+				filtersAction({
+					action: 'toggle',
+					url: row.getAttribute('data-url'),
+					name: row.getAttribute('data-name'),
+					whitelist: row.getAttribute('data-whitelist'),
+					enabled: el.checked ? '1' : '0'
+				});
+			};
+		});
+		Array.prototype.slice.call(list.querySelectorAll('.agh-filter-remove')).forEach(function (el) {
+			el.onclick = function () {
+				var row = el.closest('.agh-rule');
+				if (!window.confirm('删除规则列表「' + row.getAttribute('data-name') + '」？')) return;
+				filtersAction({
+					action: 'remove',
+					url: row.getAttribute('data-url'),
+					whitelist: row.getAttribute('data-whitelist')
+				});
+			};
+		});
+	}
+
+	async function loadFilters(silent) {
+		var msg = $('agh-filters-msg');
+		var list = $('agh-filter-list');
+		if (!silent && list && !list.querySelector('.agh-rule')) list.innerHTML = '<div class="agh-empty">读取中...</div>';
+		try {
+			var d = await apiGet(U.filters);
+			if (!d.ok) throw new Error(d.error || '读取失败');
+			state.filters = d.filters || [];
+			setFilterFlags(d);
+			renderFilters(d);
+			setMsg(msg, '', '');
+		} catch (err) {
+			if (silent) return;
+			handleApiError(err, msg);
+			if (list) list.innerHTML = '<div class="agh-empty">读取失败</div>';
+		}
+	}
+
+	async function filtersAction(data) {
+		var msg = $('agh-filters-msg');
+		try {
+			await apiPost(U.filtersSave, data);
+			showToast('已生效', 'ok');
+			await loadFilters();
+			return true;
+		} catch (err) {
+			handleApiError(err, msg);
+			// 操作失败时按服务端真实状态复位开关与列表，避免滑块显示与实际不一致
+			await loadFilters(true);
+			return false;
+		}
+	}
+
+	function bindFilterSwitch(id, feature) {
+		var el = $(id);
+		if (!el) return;
+		el.onchange = function () {
+			filtersAction({ action: 'feature', feature: feature, value: el.checked ? '1' : '0' });
+		};
+	}
+
+	function renderQueryLog(items) {
+		var el = $('agh-querylog-list');
+		if (!el) return;
+		if (!items || !items.length) {
+			el.innerHTML = '<div class="agh-empty">暂无查询记录</div>';
+			return;
+		}
+
+		var html = '';
+		for (var i = 0; i < items.length; i++) {
+			var it = items[i];
+			var t = String(it.time || '').replace('T', ' ').slice(5, 19);
+			var reason = String(it.reason || '');
+			var blocked = reason.indexOf('Filtered') >= 0 || reason.indexOf('Blocked') >= 0;
+			var label = blocked ? '已拦截' : '已放行';
+			html += '<div class="agh-log-row">' +
+				'<span class="agh-rule-meta">' + esc(t) + '</span>' +
+				'<span class="agh-rule-meta agh-log-client">' + esc(it.client || '') + '</span>' +
+				'<span class="agh-log-domain">' + esc(it.domain || '') + '</span>' +
+				'<span class="' + (blocked ? 'agh-log-block' : 'agh-log-ok') + '">' +
+				esc(label) + '</span>' +
+				'</div>';
+		}
+		el.innerHTML = html;
+	}
+
+	async function loadQueryLog() {
+		var el = $('agh-querylog-list');
+		try {
+			var d = await apiGet(U.querylog);
+			if (!d.ok) throw new Error(d.error || '读取失败');
+			renderQueryLog(d.data || []);
+		} catch (err) {
+			if (el) el.innerHTML = '<div class="agh-empty">' + esc(err.message || '读取失败') + '</div>';
+		}
+	}
+
+	function setSelectDays(id, days, fallback) {
+		var sel = $(id);
+		if (!sel) return;
+		var value = String(days || fallback || 30);
+		var has = Array.prototype.slice.call(sel.options).some(function (opt) {
+			return opt.value === value;
+		});
+		if (!has) {
+			var extra = document.createElement('option');
+			extra.value = value;
+			extra.textContent = value + ' 天（当前）';
+			sel.appendChild(extra);
+		}
+		setSelectValue(id, value);
 	}
 
 	function pollAction(onDone) {
@@ -633,6 +903,84 @@
 		updateBypassIfaceLabel();
 	}
 
+	function applyUpstreamLocks() {
+		var src = $('agh-set-upstream-source');
+		var custom = $('agh-set-upstream-custom');
+		var on = !!(src && src.value === 'custom');
+		if (custom) {
+			custom.disabled = !on;
+			var field = custom.closest ? custom.closest('.agh-field') : null;
+			if (field) field.classList.toggle('is-locked', !on);
+		}
+
+		// 接管 53 模式下 AGH 的上游就是本机 DNSMasq(1745)，
+		// 换成公网上游会丢掉路由器/DHCP 主机名的本地解析，必须提示。
+		var note = $('agh-upstream-lan-note');
+		if (note) {
+			var modeEl = $('agh-set-dns-mode');
+			var show = on && modeEl && modeEl.value === 'takeover';
+			note.hidden = !show;
+			note.textContent = show
+				? '当前是「接管 53 端口」：自定义上游会绕过本机 DNSMasq(1745)，路由器与 DHCP 主机名（如 xxx.lan）将无法解析。需要保留本地解析时，请在列表末尾加上 127.0.0.1:1745。'
+				: '';
+		}
+	}
+
+	function applyCacheLocks() {
+		var enabled = $('agh-set-cache-enabled');
+		var on = !!(enabled && enabled.checked);
+		var fields = $('agh-cache-fields');
+		if (fields) {
+			fields.classList.toggle('is-locked', !on);
+			Array.prototype.slice.call(fields.querySelectorAll('input, select')).forEach(function (el) {
+				el.disabled = !on;
+			});
+		}
+		var optimistic = $('agh-set-cache-optimistic');
+		if (optimistic) optimistic.disabled = !on;
+	}
+
+	function applyCryptoLocks() {
+		var sel = $('agh-set-dns-crypto');
+		var value = sel ? sel.value : 'off';
+		var customWrap = $('agh-crypto-custom-wrap');
+		if (customWrap) customWrap.hidden = value !== 'custom';
+
+		var modeEl = $('agh-set-dns-mode');
+		var mode = modeEl ? modeEl.value : '';
+		var on = mode === 'clashfirst';
+		var fields = $('agh-crypto-fields');
+		if (fields) {
+			fields.classList.toggle('is-locked', !on);
+			Array.prototype.slice.call(fields.querySelectorAll('input, select, button')).forEach(function (el) {
+				el.disabled = !on;
+			});
+		}
+
+		var note = $('agh-crypto-mode-note');
+		if (!note) return;
+		// 自定义上游时右列已经有输入框，再叠加提示会显得拥挤，直接不显示
+		var text = '';
+		if (value !== 'custom') {
+			if (!on) {
+				text = '当前 DNS 接管方式不是「Clash 前置」，加密上游不可修改；切换到「Clash 前置」后才能开启。';
+			} else if (value !== 'off' && state.cryptoBlocked) {
+				text = '检测到自定义上游 DNS，加密预设不会生效；请在「DNS 解析 → 上游 DNS」把来源改回「自动」。';
+			} else if (value !== 'off') {
+				text = '当前为「Clash 前置」模式，保存后加密上游生效。';
+			}
+		}
+		note.textContent = text;
+		note.style.display = text ? '' : 'none';
+
+		// 锁定时保存按钮一并禁用，避免点了没有反应
+		var saveBtn = $('agh-save-crypto-btn');
+		if (saveBtn) {
+			saveBtn.disabled = !on;
+			saveBtn.title = on ? '' : '当前接管方式不是「Clash 前置」，无法保存加密上游';
+		}
+	}
+
 	function applyModeLocks(mode) {
 		var takeover = mode === 'takeover';
 		var group = $('agh-bypass-group');
@@ -653,21 +1001,23 @@
 		if (clashOption) {
 			clashOption.disabled = !state.openclash;
 			clashOption.textContent = state.openclash
-				? 'OpenClash 前置（Clash 7874 → AGH 5335 → 真实 DNS）'
-				: 'OpenClash 前置（未安装 OpenClash，不可用）';
+				? 'Clash 前置（Clash 7874 → AGH 5335 → 真实 DNS）'
+				: 'Clash 前置（未安装 Clash，不可用）';
 		}
 
 		var modeNote = $('agh-dns-mode-note');
 		if (modeNote) {
 			var text = '';
 			if (state.openclash && mode === 'upstream') {
-				text = '检测到 OpenClash：该模式会改写 DNSMasq 上游，重启 OpenClash 后可能被覆盖，建议改用「接管 53 端口」。';
+				text = '检测到 Clash：该模式会改写 DNSMasq 上游，重启 Clash 后可能被覆盖，建议改用「接管 53 端口」。';
 			} else if (!state.openclash && mode === 'clashfirst') {
-				text = 'OpenClash 未安装，「OpenClash 前置」模式不会生效，请改用「接管 53 端口」。';
+				text = 'Clash 未安装，「Clash 前置」模式不会生效，请改用「接管 53 端口」。';
 			}
 			modeNote.textContent = text;
 			modeNote.style.display = text ? '' : 'none';
 		}
+		applyUpstreamLocks();
+		applyCryptoLocks();
 	}
 
 	async function loadSettings() {
@@ -685,8 +1035,44 @@
 			setSelectValue('agh-set-workdir', d.workdir);
 			setSelectValue('agh-set-channel', d.channel);
 			setSelectValue('agh-set-github-proxy', d.github_proxy);
-			var adult = $('agh-set-adult');
-			if (adult) adult.checked = !!d.adult_block;
+			var cacheEnabled = $('agh-set-cache-enabled');
+			if (cacheEnabled) cacheEnabled.checked = !!d.cache_enabled;
+			var cacheSize = $('agh-set-cache-size');
+			if (cacheSize) {
+				var sizeValue = String(d.cache_size_mb || 16);
+				var hasSize = Array.prototype.slice.call(cacheSize.options).some(function (opt) {
+					return opt.value === sizeValue;
+				});
+				if (!hasSize) {
+					var extra = document.createElement('option');
+					extra.value = sizeValue;
+					extra.textContent = sizeValue + ' MB（当前）';
+					cacheSize.appendChild(extra);
+				}
+				setSelectValue('agh-set-cache-size', sizeValue);
+			}
+			var cacheTtlMin = $('agh-set-cache-ttl-min');
+			if (cacheTtlMin) cacheTtlMin.value = (d.cache_ttl_min != null ? d.cache_ttl_min : 0);
+			var cacheTtlMax = $('agh-set-cache-ttl-max');
+			if (cacheTtlMax) cacheTtlMax.value = (d.cache_ttl_max != null ? d.cache_ttl_max : 0);
+			var cacheOptimistic = $('agh-set-cache-optimistic');
+			if (cacheOptimistic) cacheOptimistic.checked = !!d.cache_optimistic;
+			applyCacheLocks();
+			var upSource = $('agh-set-upstream-source');
+			if (upSource) setSelectValue('agh-set-upstream-source', d.upstream_source || 'auto');
+			var upCustom = $('agh-set-upstream-custom');
+			if (upCustom) upCustom.value = (d.upstream_custom || '').split(' ').filter(Boolean).join('\n');
+			var upCurrent = $('agh-upstream-current');
+			if (upCurrent) upCurrent.textContent = d.upstream_current || '—';
+			applyUpstreamLocks();
+			setSelectDays('agh-set-stats-days', d.stats_retention_days, 30);
+			setSelectDays('agh-set-querylog-days', d.querylog_retention_days, 30);
+			var cryptoSelect = $('agh-set-dns-crypto');
+			if (cryptoSelect) setSelectValue('agh-set-dns-crypto', d.dns_crypto || 'off');
+			var cryptoCustom = $('agh-set-dns-crypto-custom');
+			if (cryptoCustom) cryptoCustom.value = d.dns_crypto_custom || '';
+			state.cryptoBlocked = !!d.crypto_blocked;
+			applyCryptoLocks();
 			renderBypassIfaces(d.devices, d.bypass_ifaces);
 			var bypassClients = $('agh-set-bypass-clients');
 			if (bypassClients) bypassClients.value = d.bypass_clients || '';
@@ -695,6 +1081,11 @@
 			var path = $('agh-yaml-path');
 			if (path && d.config_path) path.textContent = d.config_path;
 			setMsg(msgEl, '', '');
+			var cacheMsg = $('agh-cache-msg');
+			if (cacheMsg) setMsg(cacheMsg, '', '');
+			var cryptoMsg = $('agh-crypto-msg');
+			if (cryptoMsg) setMsg(cryptoMsg, '', '');
+			updateSwitchStates();
 		} catch (err) {
 			handleApiError(err, msgEl);
 		}
@@ -702,8 +1093,15 @@
 
 	async function saveSettings(event) {
 		event.preventDefault();
-		var msgEl = $('agh-settings-msg');
-		var btn = $('agh-save-settings-btn');
+		var fromCacheForm = event.target && event.target.id === 'agh-cache-form';
+		var fromCryptoForm = event.target && event.target.id === 'agh-crypto-form';
+		var fromUpstreamForm = event.target && event.target.id === 'agh-upstream-form';
+		var msgEl = fromCacheForm ? $('agh-cache-msg')
+			: (fromCryptoForm ? $('agh-crypto-msg')
+				: (fromUpstreamForm ? $('agh-upstream-msg') : $('agh-settings-msg')));
+		var btn = fromCacheForm ? $('agh-save-cache-btn')
+			: (fromCryptoForm ? $('agh-save-crypto-btn')
+				: (fromUpstreamForm ? $('agh-save-upstream-btn') : $('agh-save-settings-btn')));
 		var port = $('agh-set-webport');
 		var portValue = port ? port.value.trim() : '';
 		var n = Number(portValue);
@@ -717,6 +1115,65 @@
 			return;
 		}
 
+		var cacheEnabled = !$('agh-set-cache-enabled') || $('agh-set-cache-enabled').checked;
+		var cacheSizeRaw = $('agh-set-cache-size') ? $('agh-set-cache-size').value : '16';
+		var cacheSize = Number(cacheSizeRaw);
+		if (!cacheSizeRaw || !Number.isInteger(cacheSize) || cacheSize < 1 || cacheSize > 256) {
+			setMsg(msgEl, '缓存大小必须是 1-256MB 之间的整数。', 'bad');
+			return;
+		}
+		var ttlMinRaw = $('agh-set-cache-ttl-min') ? $('agh-set-cache-ttl-min').value.trim() : '60';
+		var ttlMaxRaw = $('agh-set-cache-ttl-max') ? $('agh-set-cache-ttl-max').value.trim() : '0';
+		var ttlMin = Number(ttlMinRaw);
+		var ttlMax = Number(ttlMaxRaw);
+		if (ttlMinRaw === '' || !Number.isInteger(ttlMin) || ttlMin < 0 || ttlMin > 604800) {
+			setMsg(msgEl, '最小 TTL 必须是 0-604800 秒之间的整数。', 'bad');
+			return;
+		}
+		if (ttlMaxRaw === '' || !Number.isInteger(ttlMax) || ttlMax < 0 || ttlMax > 604800) {
+			setMsg(msgEl, '最大 TTL 必须是 0-604800 秒之间的整数。', 'bad');
+			return;
+		}
+		if (ttlMax > 0 && ttlMin > ttlMax) {
+			setMsg(msgEl, '最小 TTL 不能大于最大 TTL；最大 TTL 为 0 表示不限制。', 'bad');
+			return;
+		}
+
+		var dnsCrypto = $('agh-set-dns-crypto') ? $('agh-set-dns-crypto').value : 'off';
+		var dnsCryptoCustom = $('agh-set-dns-crypto-custom') ? $('agh-set-dns-crypto-custom').value.trim() : '';
+		if (['off', 'alidns', 'dnspod', 'cloudflare', 'custom'].indexOf(dnsCrypto) < 0) {
+			setMsg(msgEl, '加密上游参数不正确。', 'bad');
+			return;
+		}
+		if (dnsCrypto === 'custom') {
+			if (!dnsCryptoCustom) {
+				setMsg(msgEl, '请填写自定义加密上游地址。', 'bad');
+				return;
+			}
+			if (!/^(https:\/\/|tls:\/\/|quic:\/\/|sdns:\/\/)\S+$/.test(dnsCryptoCustom)) {
+				setMsg(msgEl, '自定义加密上游需以 https://、tls://、quic:// 或 sdns:// 开头，且不能包含空格。', 'bad');
+				return;
+			}
+		}
+
+		var upSource = $('agh-set-upstream-source') ? $('agh-set-upstream-source').value : 'auto';
+		var upRaw = $('agh-set-upstream-custom') ? $('agh-set-upstream-custom').value : '';
+		var upItems = upRaw.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+		if (upSource === 'custom') {
+			if (!upItems.length) {
+				setMsg(msgEl, '请填写自定义上游 DNS，或把来源改回「自动」。', 'bad');
+				return;
+			}
+			for (var ui = 0; ui < upItems.length; ui++) {
+				var addr = upItems[ui].replace(/^\[[^\]]*\]/, '');
+				var valid = /^(https:\/\/|tls:\/\/|quic:\/\/|sdns:\/\/)\S+$/.test(addr) || /^[A-Za-z0-9._:-]+$/.test(addr);
+				if (!valid) {
+					setMsg(msgEl, '上游 DNS 格式不正确：' + upItems[ui], 'bad');
+					return;
+				}
+			}
+		}
+
 		var data = {
 			enabled: $('agh-set-enabled').checked ? '1' : '0',
 			dns_mode: $('agh-set-dns-mode').value,
@@ -725,7 +1182,15 @@
 			workdir: $('agh-set-workdir').value,
 			channel: $('agh-set-channel').value,
 			github_proxy: $('agh-set-github-proxy').value,
-			adult_block: ($('agh-set-adult') && $('agh-set-adult').checked) ? '1' : '0',
+			cache_enabled: cacheEnabled ? '1' : '0',
+			cache_size_mb: String(cacheSize),
+			cache_ttl_min: String(ttlMin),
+			cache_ttl_max: String(ttlMax),
+			cache_optimistic: (cacheEnabled && $('agh-set-cache-optimistic') && $('agh-set-cache-optimistic').checked) ? '1' : '0',
+			dns_crypto: dnsCrypto,
+			dns_crypto_custom: dnsCryptoCustom,
+			upstream_source: upSource,
+			upstream_custom: upItems.join(' '),
 			bypass_ifaces: pickedBypassIfaces(),
 			bypass_clients: $('agh-set-bypass-clients') ? $('agh-set-bypass-clients').value.trim() : ''
 		};
@@ -743,6 +1208,7 @@
 			});
 		} catch (err) {
 			if (btn) btn.disabled = false;
+			applyCryptoLocks();
 			handleApiError(err, msgEl);
 		}
 	}
@@ -890,16 +1356,40 @@
 		}
 	}
 
+	function switchSettingsTab(name) {
+		var valid = ['svc', 'upstream', 'filters'];
+		if (valid.indexOf(name) < 0) name = 'svc';
+		var tabs = document.querySelectorAll('#agh-settings-tabs .agh-subtab');
+		for (var i = 0; i < tabs.length; i++) {
+			tabs[i].classList.toggle('is-active', tabs[i].getAttribute('data-subtab') === name);
+		}
+		var cards = document.querySelectorAll('#agh-tab-settings .agh-card[data-subpanel]');
+		for (var j = 0; j < cards.length; j++) {
+			cards[j].classList.toggle('is-active', cards[j].getAttribute('data-subpanel') === name);
+		}
+		state.settingsSubtab = name;
+		if (name === 'filters') loadFilters();
+	}
+
+	function switchLogTab(name) {
+		var valid = ['sys', 'query'];
+		if (valid.indexOf(name) < 0) name = 'sys';
+		var tabs = document.querySelectorAll('#agh-logs-tabs .agh-subtab');
+		for (var i = 0; i < tabs.length; i++) {
+			tabs[i].classList.toggle('is-active', tabs[i].getAttribute('data-logtab') === name);
+		}
+		var cards = document.querySelectorAll('#agh-tab-logs .agh-card[data-logpanel]');
+		for (var j = 0; j < cards.length; j++) {
+			cards[j].classList.toggle('is-active', cards[j].getAttribute('data-logpanel') === name);
+		}
+		state.logSubtab = name;
+		if (name === 'query') loadQueryLog();
+		else loadLogs();
+	}
+
 	function switchTab(name, updateHash) {
 		var valid = ['overview', 'settings', 'advanced', 'logs', 'guide'];
 		if (valid.indexOf(name) < 0) name = 'overview';
-		var meta = {
-			overview: ['概览', '服务状态与三步配置'],
-			settings: ['基础设置', '服务、DNS、内核与面板密码'],
-			advanced: ['高级配置', '直接编辑 AdGuardHome.yaml'],
-			logs: ['运行日志', '系统与服务日志'],
-			guide: ['使用引导', '安装、配置与故障排查']
-		};
 
 		var tabs = document.querySelectorAll('.agh-tab');
 		for (var i = 0; i < tabs.length; i++) {
@@ -909,14 +1399,11 @@
 		for (var j = 0; j < panels.length; j++) {
 			panels[j].classList.toggle('is-active', panels[j].id === 'agh-tab-' + name);
 		}
-		var title = $('agh-page-title');
-		var subtitle = $('agh-page-subtitle');
-		if (title) title.textContent = meta[name][0];
-		if (subtitle) subtitle.textContent = meta[name][1];
 
 		if (name === 'settings' && !state.settings) loadSettings();
+		if (name === 'settings') switchSettingsTab(state.settingsSubtab || 'svc');
 		if (name === 'advanced' && !state.yamlLoaded) loadYaml();
-		if (name === 'logs') loadLogs();
+		if (name === 'logs') switchLogTab(state.logSubtab || 'sys');
 
 		if (updateHash !== false && window.history && window.history.replaceState) {
 			window.history.replaceState(null, '', '#' + name);
@@ -936,8 +1423,21 @@
 				switchTab(this.getAttribute('data-goto'));
 			};
 		}
+		var subTabs = document.querySelectorAll('#agh-settings-tabs .agh-subtab');
+		for (var k = 0; k < subTabs.length; k++) {
+			subTabs[k].onclick = function () {
+				switchSettingsTab(this.getAttribute('data-subtab'));
+			};
+		}
+		var logTabs = document.querySelectorAll('#agh-logs-tabs .agh-subtab');
+		for (var m = 0; m < logTabs.length; m++) {
+			logTabs[m].onclick = function () {
+				switchLogTab(this.getAttribute('data-logtab'));
+			};
+		}
 
 		if ($('agh-refresh-status')) $('agh-refresh-status').onclick = function () { refreshStatus(); };
+		if ($('agh-stats-clear')) $('agh-stats-clear').onclick = clearStats;
 		if ($('agh-install-btn')) $('agh-install-btn').onclick = installCore;
 		if ($('agh-enable-btn')) $('agh-enable-btn').onclick = function () {
 			postService('bootstrap', '将启动 AdGuard Home 并接管路由器 DNS。确定继续？');
@@ -949,8 +1449,79 @@
 		if ($('agh-restart-btn')) $('agh-restart-btn').onclick = function () {
 			postService('restart', '将重启 AdGuard Home 服务。确定继续？');
 		};
+		if ($('agh-steps-toggle')) $('agh-steps-toggle').onclick = function () {
+			state.stepsCollapsed = !state.stepsCollapsed;
+			applyStepsVisibility(state.status);
+		};
 
 		if ($('agh-settings-form')) $('agh-settings-form').onsubmit = saveSettings;
+		if ($('agh-cache-form')) $('agh-cache-form').onsubmit = saveSettings;
+		if ($('agh-upstream-form')) $('agh-upstream-form').onsubmit = saveSettings;
+		if ($('agh-crypto-form')) $('agh-crypto-form').onsubmit = saveSettings;
+
+		bindFilterSwitch('agh-filter-enabled', 'filtering');
+		bindFilterSwitch('agh-filter-safesearch', 'safesearch');
+		bindFilterSwitch('agh-filter-safebrowsing', 'safebrowsing');
+
+		if ($('agh-filter-adult')) {
+			$('agh-filter-adult').onchange = function () {
+				toggleAdultFilter(this.checked);
+			};
+		}
+
+		if ($('agh-filter-add-form')) {
+			$('agh-filter-add-form').onsubmit = function (e) {
+				e.preventDefault();
+				var url = ($('agh-filter-url') ? $('agh-filter-url').value : '').trim();
+				if (!url) {
+					setMsg($('agh-filters-msg'), '请填写订阅地址。', 'bad');
+					return;
+				}
+				filtersAction({
+					action: 'add',
+					name: ($('agh-filter-name') ? $('agh-filter-name').value : '').trim(),
+					url: url,
+					whitelist: ($('agh-filter-whitelist') && $('agh-filter-whitelist').value === '1') ? '1' : '0'
+				});
+			};
+		}
+		if ($('agh-filter-rules-form')) {
+			$('agh-filter-rules-form').onsubmit = async function (e) {
+				e.preventDefault();
+				var ok = await filtersAction({ action: 'rules', rules: $('agh-filter-rules') ? $('agh-filter-rules').value : '' });
+				if (ok) state.rulesDirty = false;
+			};
+		}
+		if ($('agh-filter-rules')) {
+			$('agh-filter-rules').oninput = function () {
+				state.rulesDirty = true;
+			};
+		}
+		if ($('agh-retention-form')) {
+			$('agh-retention-form').onsubmit = async function (e) {
+				e.preventDefault();
+				var msg = $('agh-retention-msg');
+				var btn = $('agh-save-retention-btn');
+				if (btn) btn.disabled = true;
+				try {
+					await apiPost(U.retention, {
+						days: $('agh-set-stats-days') ? $('agh-set-stats-days').value : '30',
+						query_days: $('agh-set-querylog-days') ? $('agh-set-querylog-days').value : '30'
+					});
+					showToast('保留周期已保存，正在应用...', 'ok');
+					pollAction(function () {
+						if (btn) btn.disabled = false;
+					});
+				} catch (err) {
+					if (btn) btn.disabled = false;
+					handleApiError(err, msg);
+				}
+			};
+		}
+		if ($('agh-querylog-refresh')) $('agh-querylog-refresh').onclick = loadQueryLog;
+		if ($('agh-set-cache-enabled')) $('agh-set-cache-enabled').onchange = applyCacheLocks;
+		if ($('agh-set-upstream-source')) $('agh-set-upstream-source').onchange = applyUpstreamLocks;
+		if ($('agh-set-dns-crypto')) $('agh-set-dns-crypto').onchange = applyCryptoLocks;
 		if ($('agh-set-dns-mode')) {
 			$('agh-set-dns-mode').onchange = function () {
 				applyModeLocks(this.value);
@@ -986,7 +1557,7 @@
 				}
 				if (this.checked) {
 					state.logTimer = setInterval(function () {
-						if ($('agh-tab-logs')) loadLogs();
+						if ($('agh-tab-logs') && state.logSubtab === 'sys') loadLogs();
 					}, 5000);
 				}
 			};
@@ -995,10 +1566,15 @@
 		window.addEventListener('hashchange', function () {
 			switchTab((window.location.hash || '#overview').replace('#', ''), false);
 		});
+
+		document.addEventListener('change', function (e) {
+			if (e.target && e.target.type === 'checkbox') updateSwitchStates();
+		});
 	}
 
 	function init() {
 		initEvents();
+		updateSwitchStates();
 		var hash = (window.location.hash || '#overview').replace('#', '');
 		if (!hash) hash = 'overview';
 		switchTab(hash, false);
