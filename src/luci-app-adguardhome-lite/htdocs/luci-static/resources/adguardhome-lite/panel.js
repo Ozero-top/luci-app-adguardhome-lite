@@ -506,6 +506,7 @@
 	function setFilterFlags(d) {
 		var map = {
 			filtering_enabled: 'agh-filter-enabled',
+			parental: 'agh-filter-parental',
 			safesearch: 'agh-filter-safesearch',
 			safebrowsing: 'agh-filter-safebrowsing'
 		};
@@ -647,6 +648,34 @@
 		el.onchange = function () {
 			filtersAction({ action: 'feature', feature: feature, value: el.checked ? '1' : '0' });
 		};
+	}
+
+	// 按设备内存档位自动启停黑名单订阅
+	function bindMemoryTrim() {
+		var wrap = $('agh-memory-trim');
+		if (!wrap) return;
+		var msg = $('agh-memory-trim-msg');
+		Array.prototype.slice.call(wrap.querySelectorAll('button')).forEach(function (btn) {
+			btn.onclick = async function () {
+				var tier = btn.getAttribute('data-tier');
+				var label = tier === '512' ? '512MB' : (tier === '1024' ? '1GB' : '2GB 及以上');
+				if (!window.confirm('按 ' + label + ' 重新启停黑名单订阅？')) return;
+				Array.prototype.slice.call(wrap.querySelectorAll('button')).forEach(function (b) {
+					b.classList.toggle('is-active', b === btn);
+				});
+				if (msg) msg.textContent = '正在调整...';
+				try {
+					var d = await apiPost(U.filtersSave, { action: 'trim', tier: tier });
+					if (msg) msg.textContent = label + '：已调整 ' + (d.changed || 0) + ' 个列表，保留 ' + (d.kept || 0) + ' 条规则';
+					showToast('已应用', 'ok');
+					await loadFilters();
+				} catch (err) {
+					if (msg) msg.textContent = '';
+					handleApiError(err, msg);
+					await loadFilters(true);
+				}
+			};
+		});
 	}
 
 	function renderQueryLog(items) {
@@ -1451,8 +1480,10 @@
 		if ($('agh-crypto-form')) $('agh-crypto-form').onsubmit = saveSettings;
 
 		bindFilterSwitch('agh-filter-enabled', 'filtering');
+		bindFilterSwitch('agh-filter-parental', 'parental');
 		bindFilterSwitch('agh-filter-safesearch', 'safesearch');
 		bindFilterSwitch('agh-filter-safebrowsing', 'safebrowsing');
+		bindMemoryTrim();
 
 		if ($('agh-filter-adult')) {
 			$('agh-filter-adult').onchange = function () {

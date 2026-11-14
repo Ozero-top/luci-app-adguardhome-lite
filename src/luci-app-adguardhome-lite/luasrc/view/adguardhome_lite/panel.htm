@@ -8,7 +8,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>AdGuard Home 助手</title>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261114t">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261115f">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -416,7 +416,7 @@
 				</div>
 				<p class="agh-hint">直接管理过滤开关、订阅列表和自定义规则，修改后立即生效，不需要重启。</p>
 
-				<div class="agh-form-grid">
+				<div class="agh-form-grid agh-form-grid-5">
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
 							<label for="agh-filter-enabled">过滤规则生效</label>
@@ -432,6 +432,14 @@
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-adult"><span></span></label>
 						</div>
 						<p class="agh-hint">追加或移除 HaGeZi NSFW 订阅，命中计入「已拦截」。</p>
+					</div>
+					<div class="agh-field agh-field-switch agh-field-switch-stack">
+						<div class="agh-switch-head">
+							<label for="agh-filter-parental">家长控制</label>
+							<span class="agh-switch-state" data-for="agh-filter-parental">已关闭</span>
+							<label class="agh-switch"><input type="checkbox" id="agh-filter-parental"><span></span></label>
+						</div>
+						<p class="agh-hint">启用 AdGuard Home 内置的家长控制，命中计入「成人内容（家长控制）」统计。</p>
 					</div>
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
@@ -452,6 +460,17 @@
 				</div>
 
 				<h4 class="agh-subhead">订阅 / 规则列表</h4>
+				<div class="agh-memory-trim">
+					<span class="agh-hint">按设备内存精简规则：</span>
+					<div class="agh-seg" id="agh-memory-trim">
+						<button type="button" data-tier="512">512MB</button>
+						<button type="button" data-tier="1024">1GB</button>
+						<button type="button" data-tier="2048">2GB 及以上</button>
+					</div>
+					<span id="agh-memory-trim-msg" class="agh-hint"></span>
+				</div>
+				<p class="agh-hint">按档位自动启停黑名单订阅：512MB 只保留小列表，1GB 保留中等规模，2GB 及以上启用全部；白名单与自定义规则不受影响。</p>
+
 				<div id="agh-filter-list" class="agh-rule-list"><div class="agh-empty">读取中...</div></div>
 
 				<h4 class="agh-subhead">添加订阅</h4>
@@ -691,7 +710,7 @@
 				<ul class="agh-tips">
 					<li><b>基础设置 → 插件配置：</b>启用/停止服务、DNS 接管方式、管理面板端口、内核安装位置与更新通道、GitHub 反代、数据工作目录、不参与接管的接口 / 客户端；下方同时提供面板密码修改和统计与日志保留（按天设置，保存后重启生效）。</li>
 					<li><b>基础设置 → DNS 解析：</b>上游 DNS 可选“自动（按接管方式）”或“自定义”；自定义支持 IP、<code>tls://</code>、<code>https://</code>、<code>quic://</code> 以及 <code>[/域名/]IP</code> 条件转发。DNS 缓存可设 8～128MB、最小/最大 TTL 和乐观缓存；加密上游（DoH/DoT/DoQ）只在“Clash 前置”模式生效。</li>
-					<li><b>基础设置 → 过滤规则：</b>总开关控制全部订阅与自定义规则是否生效；成人内容拦截（HaGeZi NSFW）、安全搜索、浏览安全可一键启停；订阅支持添加、启停、删除，列表类型选“白名单（放行）”即作为白名单使用；自定义规则支持 <code>@@</code> 白名单语法。以上修改立即生效，不需要重启。</li>
+					<li><b>基础设置 → 过滤规则：</b>总开关控制全部订阅与自定义规则是否生效；成人内容拦截（HaGeZi NSFW）、家长控制、安全搜索、浏览安全可一键启停；订阅支持添加、启停、删除，列表类型选“白名单（放行）”即作为白名单使用；自定义规则支持 <code>@@</code> 白名单语法。以上修改立即生效，不需要重启。</li>
 					<li><b>运行日志：</b>查看系统日志中的 AdGuard 记录、内核安装日志和最近一次服务操作日志，支持自动刷新与下载；“查询日志”子页显示最近 20 条查询与拦截结果。</li>
 					<li><b>高级配置：</b>直接编辑 <code>/etc/AdGuardHome.yaml</code>，保存前自动执行 <code>--check-config</code>，校验失败不覆盖原文件，并保留 <code>.bak</code> 备份。</li>
 					<li><b>概览：</b>过滤统计（DNS 查询、已拦截、恶意/钓鱼、成人内容）直接取自 AdGuard Home 统计接口，可用“清空统计”重置；服务停止时数值显示“-”。</li>
@@ -705,7 +724,7 @@
 				</div>
 				<ul class="agh-tips">
 					<li><b>客户端设置：</b>“设置 → 客户端设置”，给设备命名、按设备单独指定上游或过滤规则。</li>
-					<li><b>家长控制：</b>“设置 → 常规设置 → 附加过滤器”，插件不单独提供开关；概览里的“成人内容（家长控制）”统计的就是这一项。</li>
+					<li><b>家长控制：</b>「基础设置 → 过滤规则」已有开关，也可在“设置 → 常规设置 → 附加过滤器”调整；命中计入概览里的“成人内容（家长控制）”。</li>
 					<li><b>阻止服务：</b>“设置 → 常规设置”，可整块屏蔽抖音、游戏平台等服务。</li>
 					<li><b>DNSSEC、fallback、上游模式：</b>“设置 → DNS 设置”；插件只在首次生成配置时写入默认值，之后以面板为准。</li>
 					<li><b>详细统计：</b>“仪表盘”和“查询日志”，可按时间、客户端、域名筛选，比插件概览更细。</li>
@@ -759,6 +778,6 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261114af"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261115b"></script>
 </body>
 </html>

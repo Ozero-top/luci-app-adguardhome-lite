@@ -584,8 +584,57 @@ code {
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* 过滤规则开关固定五列，单行排列 */
+.agh-form-grid.agh-form-grid-5 {
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 8px;
+}
+
+/* 五列时压缩卡片内边距，标题不换行 */
+.agh-form-grid-5 .agh-field-switch-stack {
+	padding: 10px;
+	gap: 4px;
+}
+
+.agh-form-grid-5 .agh-switch-head {
+	gap: 6px;
+}
+
+.agh-form-grid-5 .agh-switch-head label {
+	font-size: 12.5px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.agh-form-grid-5 .agh-switch-state {
+	font-size: 10.5px;
+	padding: 1px 6px;
+}
+
+.agh-form-grid-5 .agh-switch {
+	transform: scale(0.92);
+	transform-origin: right center;
+	flex: none;
+}
+
+.agh-form-grid-5 .agh-hint {
+	font-size: 12px;
+	line-height: 1.55;
+	word-break: break-word;
+}
+
 @media (max-width: 1200px) {
 	.agh-form-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.agh-form-grid.agh-form-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 800px) {
+	.agh-form-grid.agh-form-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 460px) {
+	.agh-form-grid.agh-form-grid-5 { grid-template-columns: 1fr; }
 }
 
 /* 当前 DNS 模式下不生效的设置整体置灰 */
@@ -762,10 +811,11 @@ code {
 	border-color: #cdddc2;
 }
 
-/* 过滤开关卡片：标题行放开关，说明另起一行，四张卡片高度一致 */
+/* 过滤开关卡片：标题行放开关，说明紧贴标题，四张卡片高度一致 */
 .agh-field-switch-stack {
 	flex-direction: column;
 	align-items: stretch;
+	justify-content: flex-start;
 	gap: 6px;
 }
 
@@ -1008,6 +1058,41 @@ code {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+}
+
+/* 按内存精简规则的分段按钮 */
+.agh-memory-trim {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 12px;
+}
+
+.agh-seg {
+	display: inline-flex;
+	border: 1px solid var(--agh-border);
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.agh-seg button {
+	border: 0;
+	background: var(--agh-surface-2);
+	color: var(--agh-text);
+	padding: 5px 12px;
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.agh-seg button + button {
+	border-left: 1px solid var(--agh-border);
+}
+
+.agh-seg button.is-active {
+	background: var(--agh-primary-soft);
+	color: var(--agh-primary);
+	font-weight: 700;
 }
 
 .agh-rule {
