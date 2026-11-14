@@ -47,7 +47,7 @@ start_service() {
             _wi=$(( _wi + 1 ))
         done
         if ! port_listening "$clash_dns_port"; then
-            log_msg "等待 Clash DNS（$clash_dns_port）超时，OpenClash 可能尚未就绪。"
+            log_msg "等待 Clash DNS（$clash_dns_port）超时，Clash 可能尚未就绪。"
         fi
     fi
 

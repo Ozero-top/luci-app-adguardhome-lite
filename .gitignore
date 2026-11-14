@@ -6,6 +6,8 @@ dist/
 __pycache__/
 *.pyc
 *.tmp
+debug.log
+.trae-html-share-packages/
 
 # 原始 .run 插件仅作本地参考，不随项目发布
 adguardhome.run

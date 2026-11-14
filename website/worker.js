@@ -1,0 +1,1085 @@
+const HTML = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdGuard Home 助手 - 一键部署与 DNS 接管插件</title>
+<meta name="description" content="AdGuard Home 助手是 OpenWrt / ImmortalWrt / iStoreOS 的 LuCI 插件：自动安装官方内核、一键接管 DNS、页内查看拦截统计，停止或卸载自动恢复原 DNS，兼容 ipk 与 25.12 apk 系统。">
+<meta name="keywords" content="AdGuard Home,OpenWrt,ImmortalWrt,iStoreOS,LuCI,去广告,DNS,广告拦截,路由器插件,软路由">
+<meta name="theme-color" content="#f3eddf">
+<meta name="author" content="Ozero-top">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta property="og:type" content="website">
+<meta property="og:title" content="AdGuard Home 助手 - 一键部署与 DNS 接管插件">
+<meta property="og:description" content="自动安装内核、一键接管 DNS、页内查看拦截统计。三步完成，停止或卸载自动恢复原 DNS。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:site_name" content="AdGuard Home 助手">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234f7d3a'/%3E%3Ctext x='32' y='41' font-family='Arial,sans-serif' font-size='21' font-weight='bold' fill='%23fff' text-anchor='middle'%3EAGH%3C/text%3E%3C/svg%3E">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"AdGuard Home 助手","applicationCategory":"UtilitiesApplication","operatingSystem":"OpenWrt","description":"面向 OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 插件，支持一键安装官方内核、DNS 接管、页内拦截统计，停止或卸载时自动恢复原 DNS。","url":"https://github.com/Ozero-top/luci-app-adguardhome-lite","license":"https://www.gnu.org/licenses/gpl-3.0.html","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"},"codeRepository":"https://github.com/Ozero-top/luci-app-adguardhome-lite"}
+</script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"AdGuard Home 助手和传统 AdGuard Home 插件有什么区别？","acceptedAnswer":{"@type":"Answer","text":"传统插件更偏向把 AdGuard Home 的配置项全部搬进 LuCI；本插件只做装内核、接 DNS、看状态三件事，默认三步完成，接管前记录 DNSMasq 原值，停止或卸载时自动还原。"}},
+{"@type":"Question","name":"OpenWrt 25.12 升级 apk 系统后怎么安装？","acceptedAnswer":{"@type":"Answer","text":"25.12 起默认使用 apk，不能安装 ipk。直接运行 install.sh 脚本安装，脚本会补齐依赖、安装文件并清理 LuCI 缓存。"}},
+{"@type":"Question","name":"需要先手动安装 AdGuard Home 吗？","acceptedAnswer":{"@type":"Answer","text":"不需要。插件自带内核安装流程，首次使用点击安装/更新内核即可；已存在 AdGuardHome.yaml 时会直接复用。"}},
+{"@type":"Question","name":"启用后不能上网怎么办？","acceptedAnswer":{"@type":"Answer","text":"在概览页点击停止并关闭自启，插件会恢复接管前的 DNSMasq 设置。仍异常可执行 /etc/init.d/adguardhome_lite stop 和 /etc/init.d/dnsmasq restart。"}},
+{"@type":"Question","name":"同时运行 Clash 时去广告不生效？","acceptedAnswer":{"@type":"Answer","text":"先检查 nft list chain inet fw4 agh_dns_redirect 是否有 redirect to :53。没有这条链时，重新保存一次接管 53 端口模式。"}},
+{"@type":"Question","name":"停止服务后面板打不开？","acceptedAnswer":{"@type":"Answer","text":"这是正常现象，面板随服务停止。重新点击启动服务即可；如果服务已运行仍打不开，检查 UCI 端口与 YAML address 是否一致。"}},
+{"@type":"Question","name":"重启后内核消失？","acceptedAnswer":{"@type":"Answer","text":"内核装在 /tmp 内存位置时会这样。重新安装内核，或在基础设置里把安装位置改到内置存储。"}},
+{"@type":"Question","name":"卸载后 DNS 会恢复吗？","acceptedAnswer":{"@type":"Answer","text":"会。正常停止或卸载时只写回接管前记录的 DNSMasq 端口、noresolv、resolvfile 和 server，不会写入公共 DNS。"}}
+]}
+</script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f3eddf;--bg-2:#fbf8ef;--surface:#fffdf7;--surface-2:#faf5ea;
+  --text:#2f3b2a;--muted:#747a6a;--dim:#9aa18f;
+  --border:#e2d8c2;--border-strong:#d3c6a9;
+  --primary:#4f7d3a;--primary-2:#6f9a4e;--primary-soft:#e9f0df;
+  --accent:#c8a45a;--accent-soft:#f4e9cf;--success:#3e7a3a;
+  --grad:linear-gradient(120deg,#3f6d2e 0%,#5f8f45 45%,#c8a45a 115%);
+  --grad-soft:linear-gradient(135deg,#4f7d3a 0%,#6f9a4e 100%);
+  --shadow:0 24px 64px -28px rgba(61,80,49,.35);
+  --shadow-sm:0 10px 26px rgba(61,80,49,.09);
+  --radius:18px;--nav-h:70px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+html{scroll-behavior:smooth;color-scheme:light;-webkit-text-size-adjust:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.65;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(ellipse 58% 48% at 12% 8%,rgba(111,154,78,.20),transparent 62%),
+    radial-gradient(ellipse 50% 42% at 88% 4%,rgba(200,164,90,.17),transparent 62%),
+    radial-gradient(ellipse 55% 45% at 76% 92%,rgba(111,154,78,.13),transparent 60%),
+    linear-gradient(160deg,#f7f3e8 0%,#f3eddf 46%,#ede6d5 100%);
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.38;
+  background-image:radial-gradient(rgba(79,125,58,.13) 1px,transparent 1px);
+  background-size:26px 26px;
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.65),transparent 72%);
+}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+code,pre{font-family:var(--mono)}
+::selection{background:rgba(111,154,78,.28)}
+.skip{position:fixed;top:-60px;left:16px;z-index:200;background:var(--primary);color:#fff;padding:10px 16px;border-radius:10px;transition:top .25s}
+.skip:focus{top:12px}
+#progress{position:fixed;top:0;left:0;width:0;height:3px;z-index:120;background:var(--grad)}
+.page-veil{position:fixed;inset:0;z-index:9999;background:var(--bg);pointer-events:none;animation:veilOut .85s .12s var(--ease) forwards}
+@keyframes veilOut{to{opacity:0;visibility:hidden}}
+.container{width:min(1160px,calc(100% - 48px));margin:0 auto}
+section[id]{scroll-margin-top:92px}
+.hero-grid>*,.split>*,.install-grid>*,.compat-grid>*,.feature-grid>*,.steps>*,.footer-grid>*{min-width:0}
+.code-card,.table-wrap,.panel,.hero-visual{min-width:0}
+.code-pane pre,.table-wrap{max-width:100%}
+
+/* 导航 */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(243,237,223,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid transparent;transition:background .3s,border-color .3s,box-shadow .3s}
+.nav.scrolled{background:rgba(255,253,247,.9);border-bottom-color:var(--border);box-shadow:0 8px 30px -20px rgba(61,80,49,.35)}
+.nav-inner{height:var(--nav-h);display:flex;align-items:center;gap:20px}
+.brand{display:flex;align-items:center;gap:11px;flex:0 0 auto}
+.brand-mark{width:42px;height:42px;border-radius:13px;background:var(--grad-soft);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:800;letter-spacing:.6px;box-shadow:0 8px 18px -8px rgba(47,93,42,.6)}
+.brand-text strong{display:block;font-size:15px;line-height:1.25;letter-spacing:-.01em}
+.brand-text small{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em}
+.nav-links{margin-left:auto;display:flex;align-items:center;gap:3px}
+.nav-links a{font-size:14px;color:var(--muted);padding:8px 11px;border-radius:9px;transition:color .2s,background .2s}
+.nav-links a:hover{color:var(--primary);background:var(--primary-soft)}
+.nav-links .nav-cta{background:var(--primary);color:#fff;padding:9px 17px;margin-left:8px;font-weight:600;box-shadow:0 8px 18px -10px rgba(47,93,42,.7)}
+.nav-links .nav-cta:hover{background:#3f6d2e;color:#fff}
+.burger{display:none;width:42px;height:42px;margin-left:auto;border:1px solid var(--border);border-radius:11px;background:var(--surface);place-items:center}
+.burger span,.burger span::before,.burger span::after{display:block;width:18px;height:2px;background:var(--text);border-radius:2px;position:relative;transition:.25s}
+.burger span::before,.burger span::after{content:"";position:absolute;left:0}
+.burger span::before{top:-6px}.burger span::after{top:6px}
+.burger.open span{background:transparent}
+.burger.open span::before{top:0;transform:rotate(45deg)}
+.burger.open span::after{top:0;transform:rotate(-45deg)}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:11px;font-size:14px;font-weight:600;line-height:1;transition:transform .2s var(--ease),box-shadow .2s,background .2s,border-color .2s;white-space:nowrap}
+.btn svg{width:17px;height:17px;flex:0 0 auto}
+.btn-primary{background:var(--primary);color:#fff;box-shadow:0 14px 28px -14px rgba(47,93,42,.7)}
+.btn-primary:hover{background:#3f6d2e;transform:translateY(-2px);box-shadow:0 18px 32px -14px rgba(47,93,42,.75)}
+.btn-ghost{background:rgba(255,253,247,.72);border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{background:var(--surface);border-color:var(--border-strong);transform:translateY(-2px)}
+.btn-light{background:#fff;color:var(--primary);box-shadow:0 14px 28px -16px rgba(0,0,0,.4)}
+.btn-light:hover{transform:translateY(-2px)}
+.btn-outline-light{border:1px solid rgba(255,255,255,.45);color:#fff;background:rgba(255,255,255,.08)}
+.btn-outline-light:hover{background:rgba(255,255,255,.16);transform:translateY(-2px)}
+
+/* Hero */
+.hero{padding:calc(var(--nav-h) + 72px) 0 76px;position:relative}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+.badge{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border:1px solid var(--border);background:rgba(255,253,247,.7);border-radius:999px;font-size:12px;color:var(--muted);letter-spacing:.02em}
+.badge .dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 0 4px rgba(62,122,58,.13)}
+.hero h1{font-size:clamp(2.3rem,4.3vw,3.6rem);line-height:1.07;letter-spacing:-.035em;margin:22px 0 14px;font-weight:800}
+.gradient-text{background:var(--grad);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:gradShift 9s ease-in-out infinite}
+@keyframes gradShift{50%{background-position:100% 50%}}
+.hero-sub{font-size:clamp(1.05rem,1.8vw,1.3rem);font-weight:700;color:var(--text);margin-bottom:10px}
+.hero-desc{max-width:560px;color:var(--muted);font-size:1.01rem}
+.hero-actions{display:flex;flex-wrap:wrap;gap:11px;margin:28px 0 24px}
+.hero-meta{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:.84rem;color:var(--muted)}
+.hero-meta span{display:flex;align-items:center;gap:6px}
+.hero-meta svg{width:15px;height:15px;color:var(--success)}
+
+/* Hero 面板 */
+.hero-visual{position:relative;perspective:1300px}
+.panel{position:relative;z-index:1;background:var(--surface);border:1px solid var(--border);border-radius:22px;box-shadow:0 46px 100px -36px rgba(47,93,42,.45);padding:20px;transform:rotateY(-6deg) rotateX(2deg);animation:float 7s ease-in-out infinite}
+@keyframes float{50%{transform:rotateY(-6deg) rotateX(2deg) translateY(-10px)}}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.status{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--success);background:var(--primary-soft);padding:5px 10px;border-radius:999px}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 0 3px rgba(62,122,58,.16)}
+.panel-refresh{font-size:11px;color:var(--dim)}
+.panel-bar{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:16px 0 12px}
+.panel-title{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.panel-hint{font-size:10.5px;color:var(--muted)}
+.metric-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.metric{background:var(--surface-2);border:1px solid var(--border);border-radius:13px;padding:13px 14px}
+.metric strong{display:block;font-size:1.55rem;line-height:1.1;letter-spacing:-.02em;color:var(--primary)}
+.metric span{display:block;font-size:10.5px;color:var(--muted);margin-top:5px}
+.metric:nth-child(2) strong{color:var(--success)}
+.chain{margin-top:13px;background:rgba(233,240,223,.55);border:1px solid var(--border);border-radius:13px;padding:12px 13px}
+.chain-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10.5px;color:var(--muted);margin-bottom:9px}
+.chain-title b{color:var(--primary);font-weight:700}
+.chain-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.chain-row i{font-style:normal;color:var(--dim);font-size:11px}
+.node{font-size:10.5px;padding:4px 8px;border-radius:7px;background:#fff;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.node.green{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.panel-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:10.5px;color:var(--muted)}
+.panel-foot .ok{display:flex;align-items:center;gap:6px}
+.panel-foot .ok i{width:7px;height:7px;border-radius:50%;background:var(--success)}
+
+/* 数据条 */
+.proof-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:rgba(255,253,247,.72);border:1px solid var(--border);border-radius:20px;padding:22px 8px;box-shadow:var(--shadow-sm);margin-top:14px}
+.proof{border-right:1px solid var(--border);padding:0 22px;text-align:center}
+.proof:last-child{border-right:0}
+.proof strong{display:block;font-size:clamp(1.7rem,3vw,2.2rem);line-height:1.1;letter-spacing:-.03em;color:var(--primary);font-weight:800}
+.proof span{display:block;font-size:.8rem;color:var(--muted);margin-top:4px}
+
+/* 通用 section */
+section{padding:92px 0}
+.section-head{text-align:center;max-width:760px;margin:0 auto 48px}
+.section-kicker{display:inline-block;font-size:.74rem;letter-spacing:.19em;text-transform:uppercase;color:var(--primary-2);font-weight:800}
+.section-title{font-size:clamp(1.8rem,3.5vw,2.65rem);line-height:1.2;letter-spacing:-.03em;margin:13px 0 12px;font-weight:800;text-wrap:balance}
+.section-sub{color:var(--muted);font-size:1rem;max-width:730px;margin:0 auto;text-wrap:balance}
+
+/* 特性 */
+.feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.feature{background:rgba(255,253,247,.82);border:1px solid var(--border);border-radius:18px;padding:24px;transition:transform .25s var(--ease),box-shadow .25s,border-color .25s}
+.feature:hover{transform:translateY(-5px);box-shadow:var(--shadow);border-color:rgba(79,125,58,.3)}
+.feature-icon{width:46px;height:46px;border-radius:14px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;margin-bottom:16px}
+.feature-icon svg{width:22px;height:22px}
+.feature h3{font-size:1.04rem;margin:0 0 7px;letter-spacing:-.01em}
+.feature p{font-size:.92rem;color:var(--muted);margin:0}
+
+/* 分栏 */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:center}
+.copy h2{font-size:clamp(1.7rem,3.2vw,2.4rem);line-height:1.22;letter-spacing:-.03em;margin-bottom:14px;text-wrap:balance}
+.copy > p{color:var(--muted);font-size:.98rem;margin-bottom:22px}
+.check-list{display:grid;gap:13px;margin-bottom:24px}
+.check-list li{list-style:none;display:flex;gap:11px;font-size:.93rem;color:var(--muted)}
+.check-list svg{width:19px;height:19px;flex:0 0 auto;color:var(--success);margin-top:2px}
+.check-list b{color:var(--text);font-weight:700}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-size:12px;padding:7px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+.pill.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+
+/* DNS flow */
+.flow-card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:26px;box-shadow:var(--shadow)}
+.flow-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.flow-card-head strong{font-size:14px}
+.flow-card-head span{font-size:11px;color:var(--primary);background:var(--primary-soft);padding:5px 9px;border-radius:999px;font-weight:600}
+.flow-step{display:flex;gap:14px;padding:15px 0;position:relative}
+.flow-step:not(:last-child)::before{content:"";position:absolute;left:19px;top:47px;bottom:-8px;width:2px;background:linear-gradient(var(--primary-2),var(--border))}
+.flow-num{width:40px;height:40px;flex:0 0 auto;border-radius:12px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:12px;font-weight:800;position:relative;z-index:1}
+.flow-step:first-of-type .flow-num{background:var(--primary);color:#fff}
+.flow-text strong{display:block;font-size:.95rem;margin-bottom:2px}
+.flow-text span{font-size:.82rem;color:var(--muted)}
+.flow-note{margin-top:14px;padding:12px 14px;background:var(--accent-soft);border:1px solid #e7d3a8;border-radius:11px;font-size:11.5px;color:#7a5a1e;line-height:1.6}
+.flow-note code{font-size:11px;background:rgba(255,255,255,.6);padding:1px 5px;border-radius:4px}
+
+/* 统计洞察 */
+.insight-card{background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:24px;box-shadow:var(--shadow)}
+.insight-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.insight-head strong{font-size:14px}
+.insight-head span{font-size:11px;color:var(--dim)}
+.big-stat{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+.big-stat strong{font-size:2.7rem;line-height:1;letter-spacing:-.04em;color:var(--primary);font-weight:800}
+.big-stat span{font-size:.8rem;color:var(--muted)}
+.spark{margin:18px 0 20px}
+.spark svg{display:block;width:100%;height:auto}
+.bar-list{display:grid;gap:12px}
+.bar-row{display:grid;grid-template-columns:88px 1fr 58px;align-items:center;gap:10px;font-size:11.5px;color:var(--muted)}
+.bar-track{height:8px;border-radius:99px;background:var(--primary-soft);overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;background:var(--grad-soft)}
+.bar-row b{text-align:right;font-weight:600;color:var(--text)}
+.insight-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}
+
+/* 三步 */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.step{background:rgba(255,253,247,.82);border:1px solid var(--border);border-radius:18px;padding:26px 24px;position:relative;transition:transform .25s var(--ease),box-shadow .25s}
+.step:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.step-num{font-size:2.2rem;line-height:1;letter-spacing:-.05em;font-weight:800;color:var(--primary-soft);-webkit-text-stroke:1px rgba(79,125,58,.28);margin-bottom:16px}
+.step h3{font-size:1.05rem;margin-bottom:8px}
+.step p{font-size:.9rem;color:var(--muted);margin-bottom:14px}
+.step code{font-size:11px;background:var(--primary-soft);color:var(--primary);padding:3px 7px;border-radius:6px}
+.step-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--success)}
+.step-tag i{width:6px;height:6px;border-radius:50%;background:var(--success)}
+
+/* 安装 */
+.install-grid{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}
+.code-card{background:#22301e;border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -30px rgba(34,48,30,.65)}
+.code-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:rgba(255,255,255,.05);border-bottom:1px solid rgba(255,255,255,.08)}
+.code-dots{display:flex;gap:6px}
+.code-dots i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.25)}
+.code-dots i:first-child{background:#e08a7a}.code-dots i:nth-child(2){background:#d8bf6a}.code-dots i:nth-child(3){background:#7cae72}
+.code-tabs{display:flex;gap:4px;margin-left:4px;flex-wrap:wrap}
+.code-tab{font-size:11.5px;padding:6px 10px;border-radius:7px;color:rgba(255,255,255,.55);transition:.2s}
+.code-tab:hover{color:#fff;background:rgba(255,255,255,.08)}
+.code-tab.active{background:rgba(255,255,255,.13);color:#fff}
+.code-body{position:relative}
+.code-pane{display:none}
+.code-pane.active{display:block}
+.code-pane pre{padding:22px 20px;overflow-x:auto;color:#e9f0df;font-size:12.5px;line-height:1.8}
+.code-pane pre .cmt{color:#8fa184}
+.copy-btn{position:absolute;top:10px;right:10px;display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:6px 9px;border-radius:7px;background:rgba(255,255,255,.09);color:rgba(255,255,255,.7);transition:.2s}
+.copy-btn:hover{background:rgba(255,255,255,.17);color:#fff}
+.copy-btn svg{width:13px;height:13px}
+.install-notes{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:12px}
+.note{background:#eef3e6;border:1px solid #d9e4cc;border-radius:14px;padding:15px 17px;font-size:.86rem;color:var(--muted);display:flex;gap:10px}
+.note svg{width:17px;height:17px;flex:0 0 auto;color:var(--primary);margin-top:2px}
+.note b{color:var(--text)}
+
+/* 兼容 */
+.compat-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.compat-card{background:rgba(255,253,247,.82);border:1px solid var(--border);border-radius:18px;padding:24px}
+.compat-card h3{font-size:1rem;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.compat-card h3 svg{width:19px;height:19px;color:var(--primary)}
+.chip-list{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:12px;padding:6px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+.chip.green{background:var(--primary-soft);border-color:#d8e5cc;color:var(--primary)}
+.chip.dim{opacity:.55;text-decoration:line-through}
+.compat-note{margin-top:18px;font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
+
+/* 对比表 */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:18px;background:rgba(255,253,247,.86);box-shadow:var(--shadow-sm)}
+table{width:100%;border-collapse:collapse;min-width:760px;font-size:.9rem}
+th,td{padding:16px 18px;text-align:left;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th{background:var(--surface-2);font-size:.78rem;letter-spacing:.04em;color:var(--muted);font-weight:700}
+th:nth-child(3){color:var(--primary)}
+td:first-child{font-weight:600}
+td:nth-child(3){background:rgba(233,240,223,.5);color:var(--primary);font-weight:600}
+td:nth-child(2),td:nth-child(4){color:var(--muted)}
+
+/* FAQ */
+.faq-list{max-width:830px;margin:0 auto;display:grid;gap:10px}
+details{background:rgba(255,253,247,.82);border:1px solid var(--border);border-radius:14px;padding:0 20px;transition:border-color .2s,box-shadow .2s}
+details[open]{border-color:rgba(79,125,58,.3);box-shadow:var(--shadow-sm)}
+summary{cursor:pointer;padding:17px 0;font-weight:600;font-size:.96rem;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-size:20px;font-weight:400;color:var(--primary);line-height:1;transition:transform .2s}
+details[open] summary::after{content:"−"}
+details p{padding:0 0 18px;color:var(--muted);font-size:.9rem}
+details code{font-size:.82em;background:var(--primary-soft);color:var(--primary);padding:1px 5px;border-radius:4px}
+
+/* CTA */
+.cta{position:relative;background:linear-gradient(135deg,#3f6d2e 0%,#4f7d3a 52%,#6f9a4e 100%);border-radius:28px;padding:58px 40px;text-align:center;color:#fff;overflow:hidden;box-shadow:0 40px 80px -40px rgba(47,93,42,.7)}
+.cta::before,.cta::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.07);pointer-events:none}
+.cta::before{width:340px;height:340px;top:-170px;right:-90px;animation:orbA 12s ease-in-out infinite alternate}
+.cta::after{width:260px;height:260px;bottom:-150px;left:-70px;animation:orbB 15s ease-in-out infinite alternate}
+@keyframes orbA{to{transform:translate(-28px,24px) scale(1.08)}}
+@keyframes orbB{to{transform:translate(30px,-18px) scale(1.1)}}
+.cta h2{position:relative;font-size:clamp(1.8rem,3.2vw,2.4rem);line-height:1.2;letter-spacing:-.03em;margin-bottom:12px;text-wrap:balance}
+.cta p{position:relative;color:rgba(255,255,255,.78);max-width:620px;margin:0 auto 26px;font-size:.98rem}
+.cta-actions{position:relative;display:flex;justify-content:center;flex-wrap:wrap;gap:11px}
+
+/* 页脚 */
+footer{padding:58px 0 28px;border-top:1px solid var(--border);background:rgba(255,253,247,.45);margin-top:40px}
+.footer-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:32px}
+.footer-brand p{font-size:.86rem;color:var(--muted);max-width:300px;margin-top:12px}
+.footer-col h4{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.footer-col a{display:block;font-size:.86rem;color:var(--muted);padding:4px 0;transition:color .2s}
+.footer-col a:hover{color:var(--primary)}
+.footer-bottom{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:24px;margin-top:36px;border-top:1px solid var(--border);font-size:.78rem;color:var(--dim)}
+.totop{position:fixed;right:22px;bottom:22px;width:42px;height:42px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--primary);display:grid;place-items:center;box-shadow:var(--shadow-sm);opacity:0;visibility:hidden;transform:translateY(8px);transition:.25s;z-index:80}
+.totop.show{opacity:1;visibility:visible;transform:none}
+.totop svg{width:18px;height:18px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:#22301e;color:#e9f0df;font-size:12px;padding:10px 16px;border-radius:9px;opacity:0;pointer-events:none;transition:.25s;z-index:200}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* 动效 */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.reveal-left{opacity:0;transform:translateX(-28px);transition:opacity .75s var(--ease),transform .75s var(--ease)}
+.reveal-right{opacity:0;transform:translateX(28px);transition:opacity .75s var(--ease),transform .75s var(--ease)}
+.reveal-zoom{opacity:0;transform:scale(.965);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+.reveal.visible,.reveal-left.visible,.reveal-right.visible,.reveal-zoom.visible{opacity:1;transform:none}
+.reveal.d1{transition-delay:.06s}.reveal.d2{transition-delay:.12s}.reveal.d3{transition-delay:.18s}
+.section-head .section-kicker,.section-head .section-title,.section-head .section-sub{opacity:0;transform:translateY(14px);transition:opacity .65s var(--ease),transform .65s var(--ease)}
+.section-head.visible .section-kicker{opacity:1;transform:none;transition-delay:.02s}
+.section-head.visible .section-title{opacity:1;transform:none;transition-delay:.1s}
+.section-head.visible .section-sub{opacity:1;transform:none;transition-delay:.18s}
+.note{transition:transform .25s var(--ease),box-shadow .25s,border-color .25s}
+.note:hover{transform:translateY(-3px);box-shadow:var(--shadow-sm);border-color:rgba(79,125,58,.3)}
+.page-dots{position:fixed;right:26px;top:50%;transform:translateY(-50%);z-index:70;display:flex;flex-direction:column;gap:13px}
+.page-dots a{position:relative;width:9px;height:9px;border-radius:50%;border:1.5px solid rgba(79,125,58,.3);background:transparent;transition:background .25s,border-color .25s,transform .25s}
+.page-dots a::after{content:attr(aria-label);position:absolute;right:20px;top:50%;transform:translateY(-50%) translateX(4px);white-space:nowrap;font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:4px 8px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;box-shadow:var(--shadow-sm)}
+.page-dots a:hover::after,.page-dots a:focus-visible::after{opacity:1;transform:translateY(-50%) translateX(0)}
+.page-dots a.active{background:var(--primary);border-color:var(--primary);transform:scale(1.35)}
+@media(max-width:1200px){.page-dots{display:none}}
+
+/* 响应式 */
+@media(max-width:1100px){
+  .install-notes{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:1000px){
+  .hero-grid{gap:36px}
+  .feature-grid{grid-template-columns:repeat(2,1fr)}
+  .split{gap:34px}
+  .footer-grid{grid-template-columns:1.4fr 1fr 1fr}
+}
+@media(max-width:880px){
+  .container{width:calc(100% - 36px)}
+  .nav-links{position:absolute;top:var(--nav-h);left:12px;right:12px;display:none;flex-direction:column;align-items:stretch;gap:4px;background:rgba(255,253,247,.98);border:1px solid var(--border);border-radius:16px;padding:12px;box-shadow:var(--shadow)}
+  .nav-links.open{display:flex}
+  .nav-links a{padding:11px 12px}
+  .nav-links .nav-cta{margin:4px 0 0;text-align:center}
+  .burger{display:grid}
+  .hero{padding-top:calc(var(--nav-h) + 44px)}
+  .hero-grid,.split,.install-grid,.compat-grid{grid-template-columns:1fr}
+  .hero-visual{max-width:560px;margin:0 auto}
+  .panel{transform:none;animation:none}
+  .proof-strip{grid-template-columns:repeat(2,1fr);gap:16px;padding:18px}
+  .proof{border-right:0;padding:0}
+  .steps{grid-template-columns:1fr}
+  .footer-grid{grid-template-columns:1fr 1fr}
+  .footer-brand{grid-column:1/-1}
+  section{padding:72px 0}
+}
+@media(max-width:600px){
+  .container{width:calc(100% - 28px)}
+  .brand-text small{display:none}
+  .hero h1{font-size:2.3rem}
+  .hero-sub{font-size:1rem}
+  .hero-actions .btn{flex:1 1 auto}
+  .feature-grid{grid-template-columns:1fr}
+  .metric-grid{grid-template-columns:1fr 1fr}
+  .panel{padding:16px}
+  .metric strong{font-size:1.3rem}
+  .proof strong{font-size:1.6rem}
+  .cta{padding:44px 22px;border-radius:22px}
+  .footer-grid{grid-template-columns:1fr}
+  .footer-bottom{justify-content:center;text-align:center}
+  .code-tabs{width:100%;margin-left:0}
+  .code-tab{flex:1 1 auto;text-align:center}
+  .install-notes{grid-template-columns:1fr;grid-auto-rows:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  html{scroll-behavior:auto}
+  .reveal,.reveal-left,.reveal-right,.reveal-zoom,.section-head .section-kicker,.section-head .section-title,.section-head .section-sub{opacity:1;transform:none}
+  .page-veil{display:none}
+  .gradient-text{animation:none}
+  .cta::before,.cta::after{animation:none}
+}
+</style>
+<noscript><style>.reveal,.reveal-left,.reveal-right,.reveal-zoom,.section-head .section-kicker,.section-head .section-title,.section-head .section-sub{opacity:1!important;transform:none!important}.page-veil{display:none}</style></noscript>
+</head>
+<body>
+<div class="page-veil" aria-hidden="true"></div>
+<a class="skip" href="#main">跳到主要内容</a>
+<div id="progress" aria-hidden="true"></div>
+
+<header class="nav" id="nav">
+  <div class="container nav-inner">
+    <a class="brand" href="#top" aria-label="AdGuard Home 助手首页">
+      <span class="brand-mark">AGH</span>
+      <span class="brand-text"><strong>AdGuard Home 助手</strong><small>OpenWrt / iStoreOS 插件</small></span>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="主导航">
+      <a href="#features">特性</a>
+      <a href="#dns">DNS 接管</a>
+      <a href="#start">三步上手</a>
+      <a href="#install">安装</a>
+      <a href="#compat">兼容性</a>
+      <a href="#faq">常见问题</a>
+      <a class="nav-cta" href="https://github.com/Ozero-top/luci-app-adguardhome-lite/releases" target="_blank" rel="noopener noreferrer">下载安装</a>
+    </nav>
+    <button class="burger" id="burger" aria-label="切换菜单" aria-expanded="false" aria-controls="navLinks"><span></span></button>
+  </div>
+</header>
+
+<nav class="page-dots" aria-label="页面章节">
+  <a href="#top" data-target="top" aria-label="顶部"></a>
+  <a href="#features" data-target="features" aria-label="特性"></a>
+  <a href="#dns" data-target="dns" aria-label="DNS 接管"></a>
+  <a href="#start" data-target="start" aria-label="三步上手"></a>
+  <a href="#install" data-target="install" aria-label="安装"></a>
+  <a href="#compat" data-target="compat" aria-label="兼容性"></a>
+  <a href="#faq" data-target="faq" aria-label="常见问题"></a>
+</nav>
+
+<main id="main">
+  <section class="hero" id="top">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <div class="badge reveal"><span class="dot"></span>GPL-3.0 开源 · v1.3.0 · 适配 25.12 apk</div>
+        <h1 class="reveal d1">AdGuard Home 助手<br><span class="gradient-text">三步解决广告烦恼</span></h1>
+        <p class="hero-sub reveal d1">OpenWrt / ImmortalWrt / iStoreOS · LuCI 插件</p>
+        <p class="hero-desc reveal d2">自动识别架构安装官方内核，一键接管 DNS，页内查看拦截统计。不用手改配置文件，停止或卸载时自动恢复原 DNS。</p>
+        <div class="hero-actions reveal d2">
+          <a class="btn btn-primary" href="https://github.com/Ozero-top/luci-app-adguardhome-lite/releases" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            <span>下载安装</span>
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/Ozero-top/luci-app-adguardhome-lite/blob/main/README.md" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+            <span>查看文档</span>
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/Ozero-top/luci-app-adguardhome-lite" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4 18.3 4.3 18.3 4.3c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5z"/></svg>
+            <span>GitHub</span>
+          </a>
+        </div>
+        <div class="hero-meta reveal d3">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg>自动恢复原 DNS</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg>官方内核</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg>兼容 Clash</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg>x86 / ARM / MIPS / RISC-V</span>
+        </div>
+      </div>
+
+      <div class="hero-visual reveal-right">
+        <div class="panel" aria-label="插件过滤统计界面示意">
+          <div class="panel-head">
+            <span class="status"><i></i>运行中</span>
+            <span class="panel-refresh">每 10 秒自动刷新</span>
+          </div>
+          <div class="panel-bar">
+            <span class="panel-title">过滤统计</span>
+            <span class="panel-hint">界面示意</span>
+          </div>
+          <div class="metric-grid">
+            <div class="metric"><strong>322,289</strong><span>DNS 查询</span></div>
+            <div class="metric"><strong>278,281</strong><span>已拦截（广告/跟踪）</span></div>
+            <div class="metric"><strong>1,723</strong><span>恶意 / 钓鱼</span></div>
+            <div class="metric"><strong>738</strong><span>大人内容</span></div>
+          </div>
+          <div class="chain">
+            <div class="chain-title"><span>当前链路</span><b>接管 53 端口</b></div>
+            <div class="chain-row">
+              <span class="node">客户端</span><i>→</i>
+              <span class="node green">53 AGH</span><i>→</i>
+              <span class="node">1745 DNSMasq</span><i>→</i>
+              <span class="node">Clash / WAN</span>
+            </div>
+          </div>
+          <div class="panel-foot">
+            <span class="ok"><i></i>防护已开启 · 11 规则 + 1 白名单</span>
+            <span>13800</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="proof-strip reveal">
+        <div class="proof"><strong data-count="3">3</strong><span>步完成配置</span></div>
+        <div class="proof"><strong data-count="4">4</strong><span>种 DNS 接管方式</span></div>
+        <div class="proof"><strong data-count="12">12</strong><span>条内置规则</span></div>
+        <div class="proof"><strong data-count="10" data-suffix="s">10s</strong><span>统计刷新间隔</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-kicker">Features</span>
+        <h2 class="section-title">把复杂的部分，收进一个页面</h2>
+        <p class="section-sub">装内核、接 DNS、看状态，三步完成。过滤规则和查询日志仍交给 AdGuard Home 自己的面板。</p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature reveal">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></div>
+          <h3>一键装内核</h3>
+          <p>自动识别 CPU 架构，从官方源下载最新稳定版；支持 GitHub 反代与 fake-IP 环境。</p>
+        </article>
+        <article class="feature reveal d1">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg></div>
+          <h3>低侵入接管</h3>
+          <p>接管 53 端口，DNSMasq 自动移到 1745；停止或卸载时按原值恢复，不写公共 DNS。</p>
+        </article>
+        <article class="feature reveal d2">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <h3>兼容 Clash</h3>
+          <p>自建 agh_dns_redirect 链，在 DNS 劫持之前收回 53 查询；劫持目标写 53、1745 还是 7874 都不影响过滤。</p>
+        </article>
+        <article class="feature reveal">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg></div>
+          <h3>页内看统计</h3>
+          <p>概览直接显示查询、拦截、恶意/钓鱼、大人内容四项数据，每 10 秒随状态刷新。</p>
+        </article>
+        <article class="feature reveal d1">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><circle cx="18" cy="18" r="2"/></svg></div>
+          <h3>按设备放行</h3>
+          <p>指定不参与接管的接口或客户端 IP/CIDR，这些查询直接交给 DNSMasq，不进入 AdGuard Home。</p>
+        </article>
+        <article class="feature reveal d2">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg></div>
+          <h3>配置可维护</h3>
+          <p>高级配置保存前自动 --check-config 并留备份；内置中文界面、11 个过滤规则和 1 个白名单。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="dns">
+    <div class="container split">
+      <div class="copy reveal-left">
+        <span class="section-kicker">DNS Takeover</span>
+        <h2>接管 53 端口，<br>先过滤再分流</h2>
+        <p>设备发出的 DNS 查询先进入 AdGuard Home 过滤，再交给 DNSMasq 和上游。逐设备统计、Clash fake-IP 与分流都能保留。</p>
+        <ul class="check-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg><span><b>接管 53 端口</b>：默认推荐，能看到每台设备的真实 IP。</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg><span><b>Clash 共存</b>：agh_dns_redirect 链优先收回查询，不被劫持绕过。</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg><span><b>停止即恢复</b>：切回接管前的端口、noresolv、resolvfile 和上游。</span></li>
+        </ul>
+        <div class="pill-row">
+          <span class="pill active">接管 53</span>
+          <span class="pill">DNSMasq 上游</span>
+          <span class="pill">Clash 前置</span>
+          <span class="pill">仅面板</span>
+        </div>
+      </div>
+      <div class="flow-card reveal-right">
+        <div class="flow-card-head"><strong>查询走向</strong><span>接管 53 端口</span></div>
+        <div class="flow-step">
+          <span class="flow-num">01</span>
+          <div class="flow-text"><strong>局域网设备</strong><span>手机、电脑、电视统一把 DNS 指向路由器</span></div>
+        </div>
+        <div class="flow-step">
+          <span class="flow-num">02</span>
+          <div class="flow-text"><strong>53 · AdGuard Home</strong><span>过滤广告、跟踪与恶意域名，记录真实设备 IP</span></div>
+        </div>
+        <div class="flow-step">
+          <span class="flow-num">03</span>
+          <div class="flow-text"><strong>1745 · DNSMasq</strong><span>系统 DNS 自动让位，继续处理本地域名与 DHCP</span></div>
+        </div>
+        <div class="flow-step">
+          <span class="flow-num">04</span>
+          <div class="flow-text"><strong>7874 · Clash / WAN DNS</strong><span>保留 fake-IP、分流，或直接使用运营商 DNS</span></div>
+        </div>
+        <div class="flow-note">检查收回规则：<code>nft list chain inet fw4 agh_dns_redirect</code><br>看到 <code>redirect to :53</code> 即为正常。</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container split">
+      <div class="insight-card reveal-left">
+        <div class="insight-head"><strong>过滤统计</strong><span>更新于 16:12</span></div>
+        <div class="big-stat"><strong>322,289</strong><span>DNS 查询</span></div>
+        <div class="spark" aria-hidden="true">
+          <svg viewBox="0 0 320 96" role="img">
+            <defs>
+              <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#6f9a4e" stop-opacity=".28"/>
+                <stop offset="1" stop-color="#6f9a4e" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0 74 L24 66 L48 70 L72 56 L96 60 L120 44 L144 50 L168 32 L192 40 L216 26 L240 34 L264 18 L288 24 L320 12 L320 96 L0 96 Z" fill="url(#sparkFill)"/>
+            <path d="M0 74 L24 66 L48 70 L72 56 L96 60 L120 44 L144 50 L168 32 L192 40 L216 26 L240 34 L264 18 L288 24 L320 12" fill="none" stroke="#4f7d3a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="bar-list">
+          <div class="bar-row"><span>已拦截</span><div class="bar-track"><div class="bar-fill" style="width:86%"></div></div><b>278,281</b></div>
+          <div class="bar-row"><span>恶意 / 钓鱼</span><div class="bar-track"><div class="bar-fill" style="width:42%"></div></div><b>1,723</b></div>
+          <div class="bar-row"><span>大人内容</span><div class="bar-track"><div class="bar-fill" style="width:24%"></div></div><b>738</b></div>
+        </div>
+        <div class="insight-foot"><span>数据来自 AdGuard Home 统计接口</span><span>每 10 秒刷新</span></div>
+      </div>
+      <div class="copy reveal-right">
+        <span class="section-kicker">Insight</span>
+        <h2>不用打开控制台，<br>拦截数据就在首页</h2>
+        <p>概览页直接读取 AdGuard Home 统计接口，省去来回切换面板。查询数、拦截数、恶意/钓鱼与大人内容一屏看完。</p>
+        <ul class="check-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg><span><b>四项指标</b>：查询、已拦截、恶意/钓鱼、大人内容。</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg><span><b>10 秒刷新</b>：跟随状态接口自动更新，无需手动刷新。</span></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg><span><b>规则状态可见</b>：过滤规则、内核版本、面板端口一目了然。</span></li>
+        </ul>
+        <a class="btn btn-ghost" href="https://github.com/Ozero-top/luci-app-adguardhome-lite/blob/main/README.md" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          <span>了解统计说明</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section id="start">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-kicker">Quick Start</span>
+        <h2 class="section-title">从空白路由器，到全屋过滤</h2>
+        <p class="section-sub">不需要命令行经验。三步完成后，用默认账号登录控制台，再按需添加规则。</p>
+      </div>
+      <div class="steps">
+        <article class="step reveal">
+          <div class="step-num">01</div>
+          <h3>安装内核</h3>
+          <p>概览页点「安装/更新内核」，插件自动识别架构并从官方源下载，失败会回退 GitHub 直连。</p>
+          <span class="step-tag"><i></i>约 1–3 分钟</span>
+        </article>
+        <article class="step reveal d1">
+          <div class="step-num">02</div>
+          <h3>一键启用</h3>
+          <p>从内置模板生成 AdGuardHome.yaml，默认接管 53 端口，DNSMasq 自动移到 1745。</p>
+          <span class="step-tag"><i></i>配置自动写入</span>
+        </article>
+        <article class="step reveal d2">
+          <div class="step-num">03</div>
+          <h3>打开控制台</h3>
+          <p>使用 <code>admin / admin123</code> 登录，添加过滤规则、查看日志或调整上游。</p>
+          <span class="step-tag"><i></i>首次登录后改密码</span>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-kicker">Install</span>
+        <h2 class="section-title">选一种方式，装到路由器上</h2>
+        <p class="section-sub">新版 LuCI、旧版 LuCI、25.12 apk 系统和国内网络都有对应方案。同一台设备只装一个。</p>
+      </div>
+      <div class="install-grid">
+        <div class="code-card reveal">
+          <div class="code-head">
+            <div class="code-dots"><i></i><i></i><i></i></div>
+            <div class="code-tabs" role="tablist" aria-label="安装方式">
+              <button class="code-tab active" data-tab="ipk" role="tab" aria-selected="true">ipk</button>
+              <button class="code-tab" data-tab="run" role="tab" aria-selected="false">离线 run</button>
+              <button class="code-tab" data-tab="apk" role="tab" aria-selected="false">25.12 apk</button>
+              <button class="code-tab" data-tab="proxy" role="tab" aria-selected="false">国内反代</button>
+            </div>
+          </div>
+          <div class="code-body">
+            <div class="code-pane active" data-pane="ipk">
+              <pre><span class="cmt"># 新版 LuCI：上传后在 /tmp 执行</span>
+opkg install /tmp/luci-app-adguardhome-lite_1.3.0-1_all.ipk
+
+<span class="cmt"># 旧版 LuCI（22.03 及更早）请把包名换成</span>
+<span class="cmt"># luci-app-adguardhome-lite_1.3.0-1-legacy_all.ipk</span></pre>
+              <button class="copy-btn" data-copy="ipk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制</button>
+            </div>
+            <div class="code-pane" data-pane="run">
+              <pre><span class="cmt"># 离线自解压包，内含 modern 与 legacy</span>
+sh /tmp/luci-app-adguardhome-lite_1.3.0-1.run</pre>
+              <button class="copy-btn" data-copy="run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制</button>
+            </div>
+            <div class="code-pane" data-pane="apk">
+              <pre><span class="cmt"># OpenWrt / iStoreOS 25.12 及 apk 系统</span>
+curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh</pre>
+              <button class="copy-btn" data-copy="apk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制</button>
+            </div>
+            <div class="code-pane" data-pane="proxy">
+              <pre><span class="cmt"># 国内网络：脚本与文件都走反代</span>
+curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org</pre>
+              <button class="copy-btn" data-copy="proxy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制</button>
+            </div>
+          </div>
+        </div>
+        <div class="install-notes reveal d1">
+          <div class="note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+            <span><b>同一设备只装一个。</b>modern 用于 23.05 / 24.10，legacy 用于 22.03 及更早。</span>
+          </div>
+          <div class="note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z"/></svg>
+            <span><b>先卸载旧插件。</b>与 luci-app-adguardhome 冲突，旧服务需先停止。</span>
+          </div>
+          <div class="note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
+            <span><b>校验文件。</b>Release 页提供 SHA256SUMS，可核对安装包完整性。</span>
+          </div>
+          <div class="note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+            <span><b>25.12 用脚本。</b>apk 系统无法安装 ipk，升级和卸载继续用 install.sh。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="compat">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-kicker">Compatibility</span>
+        <h2 class="section-title">不挑架构，也不挑 LuCI 版本</h2>
+        <p class="section-sub">覆盖常见软路由、硬路由与开发板；新旧 LuCI 分别提供安装包，25.12 apk 系统使用脚本。</p>
+      </div>
+      <div class="compat-grid">
+        <div class="compat-card reveal-left">
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/></svg>固件与安装方式</h3>
+          <div class="chip-list">
+            <span class="chip green">OpenWrt 23.05 / 24.10</span>
+            <span class="chip green">ImmortalWrt</span>
+            <span class="chip green">iStoreOS 24.10</span>
+            <span class="chip green">25.12 / apk（脚本）</span>
+            <span class="chip">OpenWrt 22.03 legacy</span>
+            <span class="chip">Kwrt 25.12</span>
+          </div>
+        </div>
+        <div class="compat-card reveal-right">
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v5c0 5 3.4 8 8 9 4.6-1 8-4 8-9V7l-8-4Z"/><path d="m9 12 2 2 4-4"/></svg>CPU 架构</h3>
+          <div class="chip-list">
+            <span class="chip green">x86_64 / 386</span>
+            <span class="chip green">ARM64</span>
+            <span class="chip green">ARM v5 / v6 / v7 / v8</span>
+            <span class="chip green">MIPS / MIPSel</span>
+            <span class="chip green">MIPS64 / MIPS64el</span>
+            <span class="chip green">RISC-V 64</span>
+            <span class="chip green">PPC64LE</span>
+            <span class="chip dim">LoongArch</span>
+          </div>
+        </div>
+      </div>
+      <p class="compat-note">实测环境：iStoreOS 24.10 / 25.12 x86_64、Kwrt aarch64；内核基线 AdGuard Home v0.107.80。</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-kicker">Why Lite</span>
+        <h2 class="section-title">和手动配置、旧插件比，省在哪</h2>
+        <p class="section-sub">把容易出错的步骤自动化，把不该改的系统配置原样恢复。</p>
+      </div>
+      <div class="table-wrap reveal">
+        <table>
+          <thead><tr><th>环节</th><th>手动配置</th><th>AdGuard Home 助手</th><th>传统插件</th></tr></thead>
+          <tbody>
+            <tr><td>内核安装</td><td>手动找架构、找下载地址</td><td>自动识别 + 官方源 + 反代兜底</td><td>部分支持</td></tr>
+            <tr><td>DNS 接管</td><td>手改 DNSMasq，容易断网</td><td>一键切换，写入后回读校验</td><td>需手动配置</td></tr>
+            <tr><td>停止 / 卸载</td><td>手动恢复原配置</td><td>按接管前原值自动还原</td><td>不保证恢复</td></tr>
+            <tr><td>25.12 apk</td><td>不支持 ipk</td><td>install.sh 脚本安装</td><td>不支持</td></tr>
+            <tr><td>过滤统计</td><td>打开 AGH 面板查看</td><td>页内四项指标，10 秒刷新</td><td>跳转面板</td></tr>
+            <tr><td>界面</td><td>命令行 + 英文配置</td><td>独立中文页面，保留 LuCI 导航</td><td>传统 LuCI 表单</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-kicker">FAQ</span>
+        <h2 class="section-title">常见问题</h2>
+        <p class="section-sub">更多排查步骤见安装与使用说明。</p>
+      </div>
+      <div class="faq-list reveal">
+        <details open>
+          <summary>AdGuard Home 助手和传统 AdGuard Home 插件有什么区别？</summary>
+          <p>传统插件更偏向把 AdGuard Home 的配置项全部搬进 LuCI；本插件只做装内核、接 DNS、看状态三件事，默认三步完成，接管前记录 DNSMasq 原值，停止或卸载时自动还原。</p>
+        </details>
+        <details>
+          <summary>OpenWrt 25.12 apk 系统怎么安装？</summary>
+          <p>25.12 起默认使用 <code>apk</code>，不能安装 <code>.ipk</code>。直接运行 <code>install.sh</code>，脚本会补齐依赖、安装文件并清理 LuCI 缓存；后续升级和卸载继续用脚本。</p>
+        </details>
+        <details>
+          <summary>需要先手动安装 AdGuard Home 吗？</summary>
+          <p>不需要。插件自带内核安装流程，首次使用点「安装/更新内核」即可；已存在 <code>/etc/AdGuardHome.yaml</code> 时会直接复用。</p>
+        </details>
+        <details>
+          <summary>启用后不能上网怎么办？</summary>
+          <p>到概览页点「停止并关闭自启」，插件会恢复接管前的 DNSMasq 设置。仍异常可执行 <code>/etc/init.d/adguardhome_lite stop</code> 和 <code>/etc/init.d/dnsmasq restart</code>。</p>
+        </details>
+        <details>
+          <summary>同时运行 Clash 时去广告不生效？</summary>
+          <p>先检查 <code>nft list chain inet fw4 agh_dns_redirect</code> 是否有 <code>redirect to :53</code>。没有这条链时，重新保存一次「接管 53 端口」模式。</p>
+        </details>
+        <details>
+          <summary>停止服务后面板打不开？</summary>
+          <p>这是正常现象，面板随服务停止。重新点「启动服务」即可；如果服务已运行仍打不开，检查 UCI 端口与 YAML <code>address</code> 是否一致。</p>
+        </details>
+        <details>
+          <summary>重启后内核消失？</summary>
+          <p>内核装在 <code>/tmp</code> 内存位置时会这样。重新安装内核，或在基础设置里把安装位置改到内置存储。</p>
+        </details>
+        <details>
+          <summary>卸载后 DNS 会恢复吗？</summary>
+          <p>会。正常停止或卸载时只写回接管前记录的 DNSMasq 端口、<code>noresolv</code>、<code>resolvfile</code> 和 <code>server</code>，不会写入公共 DNS。</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="cta reveal-zoom">
+        <h2>AdGuard Home 助手 - OpenWRT 插件</h2>
+        <p>三步解决广告烦恼</p>
+        <div class="cta-actions">
+          <a class="btn btn-light" href="https://github.com/Ozero-top/luci-app-adguardhome-lite/releases" target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            <span>下载安装包</span>
+          </a>
+          <a class="btn btn-outline-light" href="https://github.com/Ozero-top/luci-app-adguardhome-lite/blob/main/README.md" target="_blank" rel="noopener noreferrer">查看 README</a>
+          <a class="btn btn-outline-light" href="https://github.com/Ozero-top/luci-app-adguardhome-lite" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#top">
+          <span class="brand-mark">AGH</span>
+          <span class="brand-text"><strong>AdGuard Home 助手</strong><small>OpenWrt / iStoreOS 插件</small></span>
+        </a>
+        <p>把 AdGuard Home 的安装、DNS 接管和服务管理收进一个 LuCI 页面。</p>
+      </div>
+      <div class="footer-col">
+        <h4>项目</h4>
+        <a href="https://github.com/Ozero-top/luci-app-adguardhome-lite" target="_blank" rel="noopener noreferrer">GitHub 仓库</a>
+        <a href="https://github.com/Ozero-top/luci-app-adguardhome-lite/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+        <a href="https://github.com/Ozero-top/luci-app-adguardhome-lite/blob/main/README.md" target="_blank" rel="noopener noreferrer">README</a>
+      </div>
+      <div class="footer-col">
+        <h4>文档</h4>
+        <a href="https://github.com/Ozero-top/luci-app-adguardhome-lite/blob/main/docs/安装与使用说明.md" target="_blank" rel="noopener noreferrer">安装与使用说明</a>
+        <a href="https://github.com/Ozero-top/luci-app-adguardhome-lite/wiki" target="_blank" rel="noopener noreferrer">Wiki</a>
+        <a href="https://github.com/Ozero-top/luci-app-adguardhome-lite/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+      </div>
+      <div class="footer-col">
+        <h4>说明</h4>
+        <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GPL-3.0 许可证</a>
+        <a href="https://github.com/AdguardTeam/AdGuardHome" target="_blank" rel="noopener noreferrer">AdGuard Home 内核</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year">2026</span> AdGuard Home 助手 · 社区开源插件</span>
+      <span>与 AdGuard 官方无关 · 请遵守当地法律法规与网络服务条款</span>
+    </div>
+  </div>
+</footer>
+
+<button class="totop" id="totop" aria-label="回到顶部">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+</button>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var nav=document.getElementById('nav');
+  var progress=document.getElementById('progress');
+  var totop=document.getElementById('totop');
+  function onScroll(){
+    var y=window.scrollY||document.documentElement.scrollTop;
+    var h=document.documentElement.scrollHeight-window.innerHeight;
+    nav.classList.toggle('scrolled',y>10);
+    totop.classList.toggle('show',y>600);
+    progress.style.width=(h>0?(y/h*100):0)+'%';
+  }
+  window.addEventListener('scroll',onScroll,{passive:true});
+  onScroll();
+
+  var burger=document.getElementById('burger');
+  var navLinks=document.getElementById('navLinks');
+  burger.addEventListener('click',function(){
+    var open=navLinks.classList.toggle('open');
+    burger.classList.toggle('open',open);
+    burger.setAttribute('aria-expanded',open?'true':'false');
+  });
+  navLinks.addEventListener('click',function(e){
+    if(e.target.closest('a')){
+      navLinks.classList.remove('open');
+      burger.classList.remove('open');
+      burger.setAttribute('aria-expanded','false');
+    }
+  });
+
+  totop.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'});});
+
+  var reveals=document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-zoom');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){en.target.classList.add('visible');io.unobserve(en.target);}
+      });
+    },{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+    reveals.forEach(function(el){io.observe(el);});
+  }else{
+    reveals.forEach(function(el){el.classList.add('visible');});
+  }
+
+  var reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var counters=document.querySelectorAll('[data-count]');
+  var readyAt=Date.now()+80;
+  if(!reduceMotion&&'IntersectionObserver' in window&&counters.length){
+    var counterObserver=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(!en.isIntersecting)return;
+        var el=en.target;
+        var target=parseInt(el.getAttribute('data-count'),10);
+        var suffix=el.getAttribute('data-suffix')||'';
+        var start=null;
+        function tick(ts){
+          if(!start)start=ts;
+          var p=Math.min((ts-start)/900,1);
+          var val=Math.round(target*(1-Math.pow(1-p,3)));
+          el.textContent=val+suffix;
+          if(p<1)requestAnimationFrame(tick);
+        }
+        counterObserver.unobserve(el);
+        setTimeout(function(){requestAnimationFrame(tick);},Math.max(0,readyAt-Date.now()));
+      });
+    },{threshold:.6});
+    counters.forEach(function(el){counterObserver.observe(el);});
+  }
+
+  var dots=Array.prototype.slice.call(document.querySelectorAll('.page-dots a'));
+  if(dots.length&&'IntersectionObserver' in window){
+    var dotObserver=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(!en.isIntersecting)return;
+        dots.forEach(function(dot){
+          dot.classList.toggle('active',dot.getAttribute('data-target')===en.target.id);
+        });
+      });
+    },{rootMargin:'-45% 0px -45% 0px',threshold:0});
+    dots.forEach(function(dot){
+      var section=document.getElementById(dot.getAttribute('data-target'));
+      if(section)dotObserver.observe(section);
+    });
+  }
+
+  var tabs=document.querySelectorAll('.code-tab');
+  var panes=document.querySelectorAll('.code-pane');
+  tabs.forEach(function(tab){
+    tab.addEventListener('click',function(){
+      var name=tab.getAttribute('data-tab');
+      tabs.forEach(function(t){t.classList.toggle('active',t===tab);t.setAttribute('aria-selected',t===tab?'true':'false');});
+      panes.forEach(function(p){p.classList.toggle('active',p.getAttribute('data-pane')===name);});
+    });
+  });
+
+  var toast=document.getElementById('toast');
+  var toastTimer;
+  function showToast(msg){
+    toast.textContent=msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){toast.classList.remove('show');},1800);
+  }
+  document.querySelectorAll('.copy-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var pane=btn.closest('.code-pane');
+      var code=pane?pane.querySelector('pre'):null;
+      if(!code)return;
+      var text=code.innerText.replace(/^#.*$/gm,'').replace(/\\n{2,}/g,'\\n').trim();
+      function done(){showToast('命令已复制');}
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(function(){fallback(text,done);});
+      }else{
+        fallback(text,done);
+      }
+    });
+  });
+  function fallback(text,cb){
+    var ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');cb();}catch(e){showToast('复制失败，请手动选择');}
+    document.body.removeChild(ta);
+  }
+
+  var year=document.getElementById('year');
+  if(year)year.textContent=new Date().getFullYear();
+})();
+</script>
+</body>
+</html>
+`;
+
+const ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#4f7d3a"/><text x="32" y="41" font-family="Arial,sans-serif" font-size="21" font-weight="bold" fill="#fff" text-anchor="middle">AGH</text></svg>`;
+
+const SECURITY_HEADERS = {
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "geolocation=(), microphone=(), camera=()",
+  "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  "strict-transport-security": "max-age=31536000; includeSubDomains"
+};
+
+export default {
+  async fetch(request) {
+    const method = request.method;
+    if (method !== "GET" && method !== "HEAD") {
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: { "allow": "GET, HEAD", "content-type": "text/plain; charset=utf-8" }
+      });
+    }
+
+    const { pathname } = new URL(request.url);
+
+    if (pathname === "/" || pathname === "/index.html") {
+      return new Response(method === "HEAD" ? null : HTML, {
+        status: 200,
+        headers: {
+          ...SECURITY_HEADERS,
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "public, max-age=300, s-maxage=3600"
+        }
+      });
+    }
+
+    if (pathname === "/favicon.ico" || pathname === "/favicon.svg") {
+      return new Response(method === "HEAD" ? null : ICON, {
+        status: 200,
+        headers: {
+          ...SECURITY_HEADERS,
+          "content-type": "image/svg+xml; charset=utf-8",
+          "cache-control": "public, max-age=86400"
+        }
+      });
+    }
+
+    if (pathname === "/robots.txt") {
+      const robots = "User-agent: *\nAllow: /\n";
+      return new Response(method === "HEAD" ? null : robots, {
+        status: 200,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "public, max-age=86400"
+        }
+      });
+    }
+
+    if (pathname === "/healthz") {
+      return new Response(method === "HEAD" ? null : "ok", {
+        status: 200,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" }
+      });
+    }
+
+    return new Response(method === "HEAD" ? null : "Not Found", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" }
+    });
+  }
+};

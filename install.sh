@@ -9,7 +9,7 @@
 #   curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
 #
 # 常用参数：
-#   -v VERSION   指定版本（默认 1.2.0），可写 latest 取最新 Release
+#   -v VERSION   指定版本（默认 1.3.0），可写 latest 取最新 Release
 #   -m URL       指定 GitHub 反代（可重复），默认依次尝试 gh-proxy.org / ghfast.top / gh-proxy.com
 #   --no-deps    不自动安装依赖
 #   --src DIR    从本地源码目录安装（开发调试用）
@@ -21,7 +21,7 @@ set -u
 
 REPO="Ozero-top/luci-app-adguardhome-lite"
 PKG="luci-app-adguardhome-lite"
-VERSION="1.2.0"
+VERSION="1.3.0"
 MIRRORS=""
 NO_DEPS=0
 SRC_DIR=""
@@ -38,7 +38,7 @@ usage() {
 	cat <<'EOF'
 AdGuard Home 助手 安装脚本
 
-  -v VERSION   指定版本号（默认 1.2.0，latest 表示最新 Release）
+  -v VERSION   指定版本号（默认 1.3.0，latest 表示最新 Release）
   -f, --force  强制更新：忽略版本标签，直接用 main 分支最新代码覆盖安装
   -m URL       指定 GitHub 反代，可重复，例如 -m https://gh-proxy.org
   --no-deps    跳过依赖安装

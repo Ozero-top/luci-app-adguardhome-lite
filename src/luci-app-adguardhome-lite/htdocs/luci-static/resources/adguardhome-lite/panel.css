@@ -209,8 +209,20 @@ code {
 	box-shadow: var(--agh-shadow);
 }
 
+.agh-hero-main {
+	min-width: 0;
+}
+
+.agh-hero-heading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-bottom: 5px;
+}
+
 .agh-hero h2 {
-	margin: 0 0 5px;
+	margin: 0;
 	font-size: 20px;
 	color: #324a2c;
 	letter-spacing: 0.3px;
@@ -222,13 +234,17 @@ code {
 	max-width: 860px;
 }
 
-.agh-hero-version {
-	margin-top: 8px !important;
+.agh-hero-version-badge {
+	flex: 0 0 auto;
+	padding: 3px 9px;
+	border-radius: 999px;
 	font-size: 12px;
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	flex-wrap: wrap;
+	font-weight: 700;
+	line-height: 1.5;
+	color: var(--agh-primary);
+	background: var(--agh-primary-soft);
+	border: 1px solid #cfdcbf;
+	white-space: nowrap;
 }
 
 .agh-update-tip {
@@ -250,6 +266,7 @@ code {
 	align-items: center;
 	justify-content: flex-end;
 	gap: 8px;
+	flex: 0 0 auto;
 	flex-wrap: wrap;
 }
 
@@ -299,11 +316,15 @@ code {
 .agh-status-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+	grid-auto-rows: 1fr;
 	gap: 10px;
 }
 
 .agh-status-item {
-	padding: 11px 13px;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	padding: 10px 13px;
 	border-radius: 11px;
 	background: var(--agh-surface-2);
 	border: 1px solid var(--agh-border);
@@ -312,13 +333,15 @@ code {
 
 .agh-status-item .agh-k {
 	display: block;
-	font-size: 12px;
+	font-size: 11px;
 	color: var(--agh-muted);
-	margin-bottom: 3px;
+	margin-bottom: 4px;
+	line-height: 1.4;
 }
 
 .agh-status-item .agh-v {
 	display: block;
+	font-size: 13px;
 	font-weight: 700;
 	line-height: 1.5;
 	word-break: break-all;
@@ -338,8 +361,10 @@ code {
 
 .agh-path {
 	font-family: var(--agh-mono);
-	font-size: 12px;
+	font-size: 11px;
 	font-weight: 500;
+	word-break: normal;
+	overflow-wrap: anywhere;
 }
 
 .agh-pass-wrap {
@@ -369,6 +394,10 @@ code {
 .agh-steps {
 	display: grid;
 	gap: 11px;
+}
+
+.agh-step-init[hidden] {
+	display: none;
 }
 
 .agh-step {
@@ -654,6 +683,13 @@ code {
 	min-width: 0;
 }
 
+/* 加密上游右列：提示文字与左侧下拉框垂直居中 */
+.agh-crypto-side {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
 .agh-field label {
 	display: block;
 	font-weight: 700;
@@ -662,7 +698,8 @@ code {
 }
 
 .agh-field input,
-.agh-field select {
+.agh-field select,
+.agh-field textarea {
 	width: 100%;
 	padding: 9px 11px;
 	border-radius: 10px;
@@ -673,14 +710,24 @@ code {
 	transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
+.agh-field textarea {
+	min-height: 78px;
+	resize: vertical;
+	font-family: var(--agh-mono);
+	font-size: 12.5px;
+	line-height: 1.65;
+}
+
 .agh-field input:focus,
 .agh-field select:focus,
+.agh-field textarea:focus,
 .agh-code:focus {
 	border-color: var(--agh-primary);
 	box-shadow: 0 0 0 3px var(--agh-primary-soft);
 }
 
-.agh-field input::placeholder { color: var(--agh-muted); }
+.agh-field input::placeholder,
+.agh-field textarea::placeholder { color: var(--agh-muted); }
 
 .agh-field-switch {
 	display: flex;
@@ -695,6 +742,50 @@ code {
 
 .agh-field-switch label { margin-bottom: 2px; }
 .agh-field-switch .agh-hint { margin: 2px 0 0; }
+.agh-field-switch .agh-switch-state { margin-left: auto; }
+
+/* 开关状态文字：避免只看滑块分不清开/关 */
+.agh-switch-state {
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid var(--agh-border);
+	background: var(--agh-surface-2);
+	color: var(--agh-muted);
+	font-size: 11.5px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.agh-switch-state.is-on {
+	color: var(--agh-primary);
+	background: var(--agh-primary-soft);
+	border-color: #cdddc2;
+}
+
+/* 过滤开关卡片：标题行放开关，说明另起一行，四张卡片高度一致 */
+.agh-field-switch-stack {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 6px;
+}
+
+.agh-switch-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.agh-field-switch-stack .agh-switch-head label {
+	margin-bottom: 0;
+}
+
+.agh-field-switch-stack .agh-switch-head .agh-switch-state {
+	margin-left: auto;
+}
+
+.agh-field-switch-stack .agh-hint {
+	margin: 0;
+}
 
 .agh-switch {
 	position: relative;
@@ -735,6 +826,7 @@ code {
 
 .agh-switch input:checked + span { background: var(--agh-primary); }
 .agh-switch input:checked + span::after { transform: translateX(21px); }
+.agh-switch input:disabled + span { opacity: 0.5; cursor: not-allowed; }
 
 .agh-form-actions {
 	display: flex;
@@ -902,5 +994,132 @@ code {
 
 @media (max-width: 460px) {
 	.agh-hero h2 { font-size: 18px; }
-	.agh-status-grid { grid-template-columns: 1fr; }
+	.agh-status-grid { grid-template-columns: 1fr; grid-auto-rows: auto; }
+}
+
+/* 过滤规则 / 查询日志 */
+.agh-subhead {
+	margin: 16px 0 8px;
+	font-size: 13px;
+	color: var(--agh-text);
+}
+
+.agh-rule-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.agh-rule {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 11px;
+	border: 1px solid var(--agh-border);
+	border-radius: 10px;
+	background: var(--agh-surface-2);
+}
+
+.agh-rule-name {
+	flex: 1;
+	min-width: 0;
+	font-size: 12.5px;
+	word-break: break-all;
+}
+
+.agh-rule-meta {
+	color: var(--agh-muted);
+	font-size: 11px;
+}
+
+.agh-rule-tag {
+	margin-left: 6px;
+	padding: 1px 6px;
+	border-radius: 6px;
+	background: var(--agh-primary-soft);
+	color: var(--agh-primary);
+	font-size: 10.5px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.agh-log-list {
+	display: flex;
+	flex-direction: column;
+}
+
+.agh-log-row {
+	display: grid;
+	grid-template-columns: 96px 120px minmax(0, 1fr) 90px;
+	gap: 8px;
+	align-items: center;
+	padding: 7px 4px;
+	border-bottom: 1px dashed var(--agh-border);
+	font-size: 12px;
+}
+
+.agh-log-row:last-child {
+	border-bottom: 0;
+}
+
+.agh-log-domain {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agh-log-ok { color: var(--agh-success); }
+.agh-log-block { color: var(--agh-danger); }
+
+@media (max-width: 800px) {
+	.agh-log-row { grid-template-columns: 70px minmax(0, 1fr) 70px; }
+	.agh-log-client { display: none; }
+}
+
+/* 基础设置二级导航 */
+.agh-subtabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 14px;
+}
+
+.agh-subtab {
+	appearance: none;
+	border: 1px solid var(--agh-border);
+	background: var(--agh-surface);
+	color: var(--agh-muted);
+	padding: 7px 13px;
+	border-radius: 999px;
+	cursor: pointer;
+	font-size: 12.5px;
+	font-weight: 700;
+	transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.agh-subtab:hover {
+	color: var(--agh-text);
+}
+
+.agh-subtab.is-active {
+	background: var(--agh-primary-soft);
+	border-color: #cdddc2;
+	color: var(--agh-primary);
+}
+
+#agh-tab-settings .agh-card[data-subpanel] {
+	display: none;
+}
+
+#agh-tab-settings .agh-card[data-subpanel].is-active {
+	display: block;
+}
+
+#agh-tab-logs .agh-card[data-logpanel] {
+	display: none;
+}
+
+#agh-tab-logs .agh-card[data-logpanel].is-active {
+	display: block;
 }

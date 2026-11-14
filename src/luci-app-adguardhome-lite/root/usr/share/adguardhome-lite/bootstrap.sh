@@ -35,6 +35,10 @@ log_msg "正在从内置模板生成首次配置..."
 cp -f "$TEMPLATE" "$configpath" || fail_bootstrap "复制默认配置模板失败。"
 chmod 600 "$configpath" 2>/dev/null
 
+# 新装默认开启 DNS 缓存（16MB、TTL 不覆盖、乐观缓存关闭）；
+# 若 UCI 已存在缓存选项，则以用户配置为准。
+migrate_cache_conf
+
 # 同步面板端口和 DNS 端口
 yaml_set_scalar "$configpath" "address" "0.0.0.0:$webport"
 yaml_set_scalar "$configpath" "port" "$dnsport"
@@ -47,14 +51,20 @@ case "$dns_mode" in
         upstream_note="DNSMasq（1745）"
         ;;
     openclash)
-        # OpenClash 串联：DNSMasq 把查询转发给 AdGuard Home，再交给 Clash 的 DNS
+        # Clash 串联：DNSMasq 把查询转发给 AdGuard Home，再交给 Clash 的 DNS
         upstream="127.0.0.1:$clash_dns_port"
         upstream_note="Clash DNS（$clash_dns_port）"
         ;;
     clashfirst)
         # 前置模式：Clash 把上游交给 AdGuard Home，AdGuard Home 必须查询真实 DNS
-        upstream="$(detect_real_upstream_dns)"
-        upstream_note="真实上游 DNS（$upstream）"
+        _crypto_up="$(dns_crypto_url)"
+        if [ -n "$_crypto_up" ]; then
+            upstream="$_crypto_up"
+            upstream_note="加密上游（$_crypto_up）"
+        else
+            upstream="$(detect_real_upstream_dns)"
+            upstream_note="真实上游 DNS（$upstream）"
+        fi
         ;;
     upstream)
         # DNSMasq 在 53 且转发给 AdGuard Home，本机 53 会形成回环，
