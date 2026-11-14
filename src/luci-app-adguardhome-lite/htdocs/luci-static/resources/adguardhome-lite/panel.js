@@ -191,10 +191,6 @@
 		return channel === 'beta' ? '测试版' : '稳定版';
 	}
 
-	function proxyLabel(proxy) {
-		return (!proxy || proxy === 'none') ? '关闭（不使用）' : proxy;
-	}
-
 	function setBusy(value) {
 		state.busy = value;
 		updateSteps(state.status);
@@ -285,11 +281,6 @@
 			['当前链路', '<span class="agh-path">' + esc(modeChain(d)) + '</span>'],
 			['更新通道', esc(channelLabel(d.channel))]
 		];
-
-		// GitHub 反代只在内核安装/更新时有用，服务运行中不显示，保持状态卡片两行对齐
-		if (!d.running) {
-			rows.push(['GitHub 反代', d.channel === 'beta' ? '<span class="agh-hint">测试版不使用</span>' : esc(proxyLabel(d.github_proxy))]);
-		}
 
 		rows.push(
 			['面板地址', '<a href="' + esc(panel) + '" target="_blank" rel="noopener">' + esc(panel.replace(/^http:\/\//, '')) + '</a>'],
