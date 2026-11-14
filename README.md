@@ -165,6 +165,8 @@ sh /tmp/luci-app-adguardhome-lite_<版本>.run
 
 Release 页同时提供 `SHA256SUMS`，可校验文件完整性。
 
+---
+
 ### 方式二：脚本安装（25.12 / apk 系统）
 
 OpenWrt / iStoreOS **25.12 起默认使用 `apk`**，`.ipk` 装不上。这类系统直接用 `install.sh`：脚本自动下载源码、补齐依赖、安装文件并清理 LuCI 缓存，不需要打安装包。
