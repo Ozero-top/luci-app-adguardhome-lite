@@ -1,8 +1,8 @@
 # AdGuard Home 助手
 
-OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件，支持三步安装、低侵入 DNS 接管，兼容 `.ipk` 与 25.12 `apk` 系统。
+OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件，支持三步安装、低侵入 DNS 接管系统。
 
-> 插件管安装与接管；过滤规则、查询日志、家长控制等仍在 AdGuard Home 面板里操作。
+> 插件负责安装、DNS 接管、过滤与统计；更细的高级项仍可在 AdGuard Home 面板调整。
 
 ## 目录
 
@@ -63,20 +63,20 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 ---
 
 <div align=center>
-<img src="https://ozero.top/media/2026/11/6af2d7b3091938.16423231.png" width="600" height="794">
+<img src="https://ozero.top/media/2026/11/6af82bb0625a57.22446996.png" width="600" height="794">
 </div>
 
 ---
 
 > **搭配浏览器扩展效果更佳**
 >
-> 路由器上的 AdGuard Home 只能按域名拦截，页面内的广告位、同域名广告和追踪脚本需要浏览器端过滤。建议再装一个 AdGuard 浏览器扩展或 uBlock Origin，两者叠加后，adblock-tester.com、adblock.turtlecute.org 这类测试通常能到 95% 以上。
+> 路由器端只能按域名拦截，页面内的广告位、同域名广告和追踪脚本需要浏览器端过滤。建议再装 AdGuard 浏览器扩展或 uBlock Origin，两者叠加后，adblock-tester.com 这类测试通常能到 95% 以上。
 >
 > - 官方下载页（自动识别浏览器）：<https://adguard.com/zh_cn/adguard-browser-extension/overview.html>
 > - Chrome 应用商店：<https://chromewebstore.google.com/detail/adguard-adblocker/bgnkhhnnamicmpeenaelnjfhikgbkllg>
-> - Edge 在扩展商店搜「AdGuard AdBlocker」；Firefox 在 addons.mozilla.org 搜「AdGuard」
+> - Edge / Firefox 在各自扩展商店搜「AdGuard AdBlocker」
 >
-> 只装扩展，手机、电视这类设备过滤不到；只装路由器端，页面里还是会剩一些广告。推荐两边一起用。
+> 只装扩展，手机、电视过滤不到；只装路由器端，页面里仍会剩一些广告。推荐两边一起用。
 
 ---
 
@@ -84,24 +84,26 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 ### 安装与内核
 
-- **三步上手**：安装内核 → 一键启用 → 打开控制台，每步都有状态提示和失败原因，不需要敲命令。
+- **三步上手**：安装内核 → 一键启用 → 打开控制台，每步都有状态提示和失败原因。
 - **官方内核**：自动识别 CPU 架构，从 AdGuard 官方源下载最新稳定版。
 - **下载兜底**：可选 `gh-proxy.org`、`ghproxy.cc`、`ghproxy.com`、`ghfast.top` 反代，失败自动回退官方 CDN 与 GitHub 直连。
-- **fake-IP 兼容**：路由器使用 fake-IP DNS 时，自动用公共 DNS 解析真实 IP，再以 `curl --resolve` 下载。
+- **fake-IP 兼容**：路由器使用 fake-IP DNS 时，自动解析真实 IP，再以 `curl --resolve` 下载。
 
 ### DNS 接管
 
 - **四种接管方式**：接管 53、DNSMasq 上游、Clash 前置、仅面板（「Clash 串联」已下线，旧配置自动迁移）。
 - **Clash 共存**：推荐「接管 53 + Clash DNS 劫持/转发」。插件自建 `agh_dns_redirect` 链收回设备的 53 查询，Clash 劫持指向 `53`、`1745` 还是 `7874` 都绕不过过滤；也支持「Clash → AdGuard Home → 真实 DNS」的前置链路。
-- **缓存与上游自动配置**：DNS 缓存默认开启（16MB，可关闭）；首次生成默认关闭 DNSSEC、使用并行上游，之后保存不再覆盖用户在 AGH 面板的修改。
-- **上游 DNS 可编辑**：默认按接管方式自动写入，也可固定自定义列表，支持 DoH/DoT/DoQ 与 `[/域名/]IP` 条件转发；加密预设不会覆盖自定义上游。注意「接管 53」模式下自定义上游会绕过本机 DNSMasq(1745)，`.lan` 等本地主机名将无法解析，需要时把 `127.0.0.1:1745` 加到列表末尾。
-- **不覆盖自定义配置**：`http_proxy`、本地 PTR、上游 DNS 只更新插件自己写入的值，用户手动配置的代理、反向解析和上游保持原样。
-- **加密上游（可选）**：仅「Clash 前置」模式可把上游切到阿里 / DNSPod DoH、Cloudflare DoH 或自定义 DoH/DoT/DoQ；其它模式的上游是本机 DNSMasq，保持不加密。
-- **按接口 / 客户端放行**：「接管 53」模式下可指定不参与接管的网络设备或客户端 IP/CIDR，这些查询直接由 DNSMasq 应答，不进 AdGuard Home。
+- **缓存与上游**：DNS 缓存默认开启（16MB，可关闭）；首次生成默认关闭 DNSSEC、使用并行上游，之后保存不再覆盖用户在 AGH 面板的修改。
+- **上游可编辑**：默认按接管方式自动写入，也可固定自定义列表，支持 DoH/DoT/DoQ 与 `[/域名/]IP` 条件转发；加密预设不会覆盖自定义上游。
+- **不覆盖自定义配置**：`http_proxy`、本地 PTR、上游 DNS 只更新插件自己写入的值，用户手改的代理、反向解析和上游保持原样。
+- **加密上游（可选）**：仅「Clash 前置」可把上游切到阿里 / DNSPod DoH、Cloudflare DoH 或自定义 DoH/DoT/DoQ；其它模式的上游是本机 DNSMasq，保持不加密。
+- **按接口 / 客户端放行**：「接管 53」下可指定不参与接管的网络设备或客户端 IP/CIDR，这些查询直接由 DNSMasq 应答，不进 AdGuard Home。
+
+> 「接管 53」+ 自定义上游会绕过本机 DNSMasq（1745），`.lan` 等本地主机名将无法解析；需要时把 `127.0.0.1:1745` 加到列表末尾。
 
 ### 过滤与统计
 
-- **页内看统计**：概览直接显示 DNS 查询、过滤器拦截、恶意/钓鱼、成人内容四项数据，每 10 秒随状态刷新，不用打开控制台。
+- **页内看统计**：概览显示 DNS 查询、过滤器拦截、恶意/钓鱼、成人内容四项数据，每 10 秒随状态刷新。
 - **查询日志**：运行日志 → 查询日志显示最近 20 条查询与拦截结果，只读。
 - **过滤规则管理**：基础设置 → 过滤规则内启用/停用规则、添加订阅（黑名单/白名单）、编辑自定义规则，修改立即生效。
 - **安全搜索 / 浏览安全**：一个开关即可启用或关闭。
@@ -185,7 +187,7 @@ wget -qO- https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/
 curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
 ```
 
-脚本会依次尝试 `gh-proxy.org`、`ghfast.top`、`gh-proxy.com` 和 GitHub 直连，哪个能用用哪个，`curl` 与 `wget` 都支持。
+脚本会依次尝试 `gh-proxy.org`、`ghfast.top`、`gh-proxy.com` 和 GitHub 直连，`curl` 与 `wget` 都支持。
 
 **强制更新**（不升版也能覆盖同版本文件，直接装 main 分支最新代码）：
 
@@ -271,9 +273,9 @@ sh install.sh -v 1.3.0 -m https://gh-proxy.org
 
 ### 接管 53 + Clash（推荐组合）
 
-Clash 开着「DNS 劫持」和「DNS 转发」时，这两件事分别是：
+Clash 开着「DNS 劫持」和「DNS 转发」时：
 
-- **DNS 劫持**：把设备的 DNS 请求（包括设备自己设的 `8.8.8.8`）收回路由器。部分固件写 `redirect to :53`，也有写 `:1745` / `:7874` 的；插件的 `agh_dns_redirect` 链会先一步收回 53，三种写法都不影响过滤。
+- **DNS 劫持**：把设备的 DNS 请求（包括设备自设的 `8.8.8.8`）收回路由器。部分固件写 `redirect to :53`，也有写 `:1745` / `:7874` 的；插件的 `agh_dns_redirect` 链先一步收回 53，三种写法都不影响过滤。
 - **DNS 转发**：把 DNSMasq 的上游改成 `127.0.0.1#7874`，交给 Clash DNS 解析。
 
 完整链路：
@@ -283,7 +285,7 @@ Clash 开着「DNS 劫持」和「DNS 转发」时，这两件事分别是：
       → 1745 DNSMasq → 7874 Clash DNS（fake-IP、分流）→ 真实 DNS
 ```
 
-过滤、逐设备统计、fake-IP 与分流同时保留。
+过滤、逐设备统计、fake-IP 与分流同时保留。Clash 必须保持运行（DNSMasq 上游指向 7874），停止时会解析失败。
 
 检查是否生效：
 
@@ -296,8 +298,6 @@ nft list chain inet fw4 dstnat | grep 'Clash DNS Hijack'
 - Clash 自己的劫持写成 `:1745` 或 `:7874` 都没关系，前面的自定义链已经先接住了；
 - 没有 `agh_dns_redirect` 且劫持直接指向 `:7874`：查询会跳过 AdGuard Home，重新选一次「接管 53 端口」。
 
-注意：这套组合里 Clash 必须保持运行（DNSMasq 上游指向 7874），Clash 停止时会解析失败。
-
 ### 排除接口与客户端（仅「接管 53」）
 
 「接管 53」会收回所有私网来源的 53 查询。如果访客网络、IoT 网段或某台自建 DNS 的设备不想被过滤，在「基础设置 → 插件配置」里填：
@@ -305,31 +305,31 @@ nft list chain inet fw4 dstnat | grep 'Clash DNS Hijack'
 - **不参与接管的接口**：网络设备名，空格分隔，例如 `br-guest wg0`；
 - **不参与接管的客户端 IP / CIDR**：IPv4、IPv6 均可，例如 `192.168.1.50 192.168.2.0/24 fd00::5`。
 
-命中的查询由插件生成的 nft 规则直接交给系统 DNSMasq（1745）应答，不进入 AdGuard Home，也不计入统计。只有「问路由器本机」的查询会重定向到 DNSMasq，指向 `8.8.8.8` 这类外部 DNS 的查询直接放行，既不会被 AdGuard Home 过滤，也不会被 Clash 的 DNS 劫持带走。留空即维持原来的「全部接管」。
+命中的查询由插件生成的 nft 规则直接交给系统 DNSMasq（1745）应答，不进入 AdGuard Home，也不计入统计；指向 `8.8.8.8` 这类外部 DNS 的查询直接放行。留空即维持「全部接管」。
 
-AdGuard Home 官方配置没有「按接口放行」的开关（`dns.allowed_clients` 是「只接受这些客户端」，`disallowed_clients` 是「直接丢弃请求」），所以这里在防火墙层实现，不改 `AdGuardHome.yaml`，也不会影响 `--check-config`。
+AdGuard Home 官方配置没有「按接口放行」的开关（`dns.allowed_clients` 是「只接受这些客户端」，`disallowed_clients` 是「直接丢弃请求」），所以这里在防火墙层实现，不改 `AdGuardHome.yaml`，也不影响 `--check-config`。
 
 排查：`nft list chain inet fw4 agh_dns_redirect` 能看到 `AGH bypass ... to-dnsmasq` 和 `... direct` 成对规则就说明已生效。
 
 ### 自定义域名转发（`server=/域名/IP`）
 
-DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，不同接管方式的影响不一样：
+DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，不同接管方式影响不同：
 
-- **接管 53**：客户端查询先到 AdGuard Home，过滤和统计照常生效；自定义规则只改变 AGH 上游的解析路径，不会绕过过滤。
-- **DNSMasq 上游**：DNSMasq 会优先匹配域名规则，这些域名直接发给指定服务器，不经过 AdGuard Home，不过滤、也不计入统计。
+- **接管 53**：查询先到 AdGuard Home，过滤和统计照常生效；自定义规则只改变 AGH 上游的解析路径，不会绕过过滤。
+- **DNSMasq 上游**：DNSMasq 优先匹配域名规则，这些域名直接发给指定服务器，不经过 AdGuard Home，不过滤、也不计入统计。
 
 需要这些域名也走过滤时，把规则改到 AdGuard Home 的「上游 DNS」，用 `[/corp.example/]10.0.0.1` 的写法配置。
 
 ### Clash 前置说明
 
-部分 Clash 配置会把 53 查询直接劫持到 `7874`（「接管 53」已由 `agh_dns_redirect` 收回，不受影响）。如果不想让 AdGuard Home 占 53，可以选「Clash 前置」，插件会自动：
+部分 Clash 配置会把 53 查询直接劫持到 `7874`（「接管 53」已由 `agh_dns_redirect` 收回，不受影响）。如果不想让 AdGuard Home 占 53，可选「Clash 前置」，插件会自动：
 
 - 让 AdGuard Home 监听 `5335`，上游改为真实 DNS（WAN 优先，其次公共 DNS），绝不指向 Clash；
 - 开启 Clash 自定义 DNS（`enable_custom_dns=1`），新增 `127.0.0.1:5335` 的 nameserver，暂时禁用其它 nameserver，并关闭「追加 WAN DNS」（`append_wan_dns=0`）；
 - 原值全部记在插件 UCI 里，停止/切换模式时恢复，并重启 Clash 使配置生效；
-- 要求 Clash 内核正在运行且 Clash DNS 劫持已开启，否则面板会提示「被绕过」。
+- 要求 Clash 内核正在运行且 DNS 劫持已开启，否则面板会提示「被绕过」。
 
-这个模式下 AdGuard Home 看到的来源都是 Clash（`127.0.0.1`），没有逐设备统计；需要逐设备统计请用「接管 53」。另外 Clash 的 fake-IP 会对所有 A 记录返回 `198.18.x.x`，被拦截的域名在 DNS 层不会显示成 `0.0.0.0`，实际拦截发生在连接阶段。
+该模式下来源都是 Clash（`127.0.0.1`），没有逐设备统计；需要逐设备统计请用「接管 53」。另外 Clash 的 fake-IP 会对所有 A 记录返回 `198.18.x.x`，被拦截的域名在 DNS 层不会显示成 `0.0.0.0`，实际拦截发生在连接阶段。
 
 ### 「Clash 串联」为什么下线
 
@@ -343,7 +343,7 @@ DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，
 
 ### 与 Clash 的启动顺序
 
-开机按初始化顺序启动：**DNSMasq（START=19）→ AdGuard Home（START=95）→ Clash（START=99）**。
+开机顺序固定为 **DNSMasq（19）→ AdGuard Home（95）→ Clash（99）**：前置模式下 Clash 的上游写着 `127.0.0.1:5335`，必须等 AdGuard Home 先监听；接管 53 时 AdGuard Home 又依赖先启动的 DNSMasq（1745）。插件已注册 `START=95`，无需手动调整。
 
 | DNS 接管方式 | 顺序要求 | 说明 |
 |---|---|---|
@@ -351,7 +351,6 @@ DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，
 | 接管 53 端口 | 可与 Clash 劫持同用 | 自定义链先收回 53，再经 DNSMasq（1745）交给 Clash（7874） |
 | DNSMasq 上游 / 仅面板 | 无要求 | 不涉及 53 端口劫持 |
 
-- 顺序固定为 **DNSMasq（19）→ AdGuard Home（95）→ Clash（99）**：前置模式下 Clash 的上游写着 `127.0.0.1:5335`，必须等 AdGuard Home 先监听；接管 53 时 AdGuard Home 又依赖先启动的 DNSMasq（1745）。插件已注册好 `START=95`，无需手动调整。
 - 想逐设备统计：用「接管 53」，Clash 的 DNS 劫持/转发保持开启即可；
 - 不想让 AdGuard Home 占 53：用「Clash 前置」（没有逐设备统计）；
 - Clash 重启期间 DNS 会短暂中断 1~2 秒，属正常现象。
@@ -367,21 +366,15 @@ DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，
 - 默认三步完成，不要求先手动安装 AdGuard Home；
 - 自动识别架构下载官方内核，内置反代与 fake-IP 兜底；
 - 接管前记录 DNSMasq 原值，停止或卸载时自动还原；
-- 过滤规则、查询日志、家长控制仍由 AdGuard Home 面板管理；
+- 过滤规则、查询日志等常用项也能在插件内完成，高级项仍由 AdGuard Home 面板管理；
 - 与旧插件冲突，安装前需卸载旧插件及中文语言包。
 
 ### Q2：OpenWrt 25.12 升级 apk 系统后怎么安装？
 
-25.12 起默认使用 `apk`，不能安装 `.ipk`，直接用 `install.sh`：
+25.12 起默认使用 `apk`，不能安装 `.ipk`，直接用 `install.sh`（详见[脚本安装](#方式二脚本安装2512--apk-系统)）：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh
-```
-
-国内网络可加反代：
-
-```sh
-curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
 ```
 
 脚本会补齐依赖、安装文件并清理 LuCI 缓存。常用参数：`-v` 指定版本、`-f` 强制更新、`--uninstall` 卸载保留配置、`--purge` 卸载并删除配置与内核。脚本安装不会在 `apk` 已安装列表里留记录，后续升级和卸载继续使用 `install.sh`。
@@ -441,11 +434,11 @@ uci commit dhcp
 
 ### Q11：卸载后 DNS 会恢复吗？
 
-会。正常停止或卸载时只写回接管前记录的 DNSMasq 端口、`noresolv`、`resolvfile` 和 `server`，不会写入公共 DNS。`install.sh --uninstall` 卸载并恢复 DNS、保留配置与内核；`--purge` 才会删除配置、内核与统计。
+会。停止或卸载时只写回接管前记录的 DNSMasq 端口、`noresolv`、`resolvfile` 和 `server`，不会写入公共 DNS。`install.sh --uninstall` 卸载并恢复 DNS、保留配置与内核；`--purge` 才会删除配置、内核与统计。
 
 ### Q12：DNS 缓存默认开启吗？怎么关闭？
 
-默认开启：16MB、最小 TTL 0（不覆盖上游）、最大 TTL 不限制、乐观缓存关闭。进入「基础设置 → DNS 解析」关闭开关并保存即可；关闭后不再缓存 DNS 响应。升级用户会保留原有 YAML 中的缓存状态。
+默认开启：16MB、最小 TTL 0（不覆盖上游）、最大 TTL 不限制、乐观缓存关闭。进入「基础设置 → DNS 解析」关闭开关并保存即可；升级用户会保留原有 YAML 中的缓存状态。
 
 ### Q13：加密 DNS 什么时候需要开？
 
