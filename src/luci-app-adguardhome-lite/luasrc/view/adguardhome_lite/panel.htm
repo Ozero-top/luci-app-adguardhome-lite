@@ -613,11 +613,11 @@
 					<h3>一、初始化配置</h3>
 				</div>
 				<ol class="agh-guide-list">
-					<li><b>安装内核：</b>在“概览”页点击“安装/更新内核”，自动识别架构并下载官方最新稳定版。</li>
-					<li><b>一键启用：</b>首次启用从内置模板生成配置，默认密码 admin123，默认用“接管 53 端口”。<b>装了 Clash 也可以保持“接管 53 端口”</b>；只有 Clash 把 53 直接劫持到 7874 时，才需要改成“Clash 前置”。</li>
+					<li><b>安装内核：</b>在“概览 → 初始化配置”点击“安装/更新内核”，自动识别架构并下载官方最新稳定版。</li>
+					<li><b>一键启用：</b>首次启用从内置模板生成配置，默认密码 admin123，默认用“接管 53 端口”。<b>装了 Clash 也可以保持“接管 53 端口”</b>；只有收回规则在你的固件上确实不生效、查询被 Clash 抢走时，才需要改成“Clash 前置”。</li>
 					<li><b>打开控制台：</b>用概览页显示的地址、账号和默认密码登录 AdGuard Home。</li>
 				</ol>
-				<p class="agh-hint">国内网络如果下载失败，可在“基础设置”选择 GitHub 反代（推荐 gh-proxy.org）；反代不可用时自动回退。</p>
+				<p class="agh-hint">国内网络如果下载失败，可在“基础设置 → 插件配置”选择 GitHub 反代（推荐 gh-proxy.org）；反代不可用时自动回退直连。</p>
 			</div>
 
 			<div class="agh-card">
@@ -671,7 +671,7 @@
 					<li><b>接管 53 端口（默认）：</b>相当于把「问路的前台」直接换成 AdGuard Home。设备一上来就问它，它先把广告域名拦掉，剩下的再转交给系统原来的 DNSMasq（被挪到 1745 端口）。<br>
 					<b>什么时候用：</b>想看到每台设备、让所有域名都先过滤；装了 Clash 也推荐这个。<br>
 					<b>要注意：</b>插件会自建一条 nft 规则，把设备的 53 查询在 Clash 劫持之前收回 53；如果这条规则没生效（面板会提示），查询仍可能被 Clash 抢走。<br>
-					<b>不想被接管：</b>访客 WiFi、IoT 网段、旁路由或某台自建 DNS 的设备，可在“基础设置 → 不参与接管的接口 / 客户端”里排除；这些查询直接交给系统 DNSMasq（1745）应答，不进入 AdGuard Home，也不计入统计。</li>
+					<b>不想被接管：</b>访客 WiFi、IoT 网段、旁路由或某台自建 DNS 的设备，可在“基础设置 → 插件配置 → 不参与接管的接口 / 客户端”里排除；这些查询直接交给系统 DNSMasq（1745）应答，不进入 AdGuard Home，也不计入统计。</li>
 					<li><b>DNSMasq 上游：</b>前台还是 DNSMasq，但它不再自己查，而是把所有查询转给 AdGuard Home（5333）过滤。<br>
 					<b>什么时候用：</b>你不想让 AdGuard Home 占用 53 端口，同时又没有程序抢 53。<br>
 					<b>要注意：</b>Clash 开着 DNS 劫持时不要用。</li>
@@ -686,20 +686,36 @@
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>四、AdGuard Home 面板常用功能</h3>
+					<h3>四、插件里可以直接做的事</h3>
 				</div>
 				<ul class="agh-tips">
-					<li><b>拦截广告：</b>“过滤器 → DNS 黑名单”，启用默认规则或添加订阅。</li>
-					<li><b>安全搜索 / 家长控制：</b>“设置 → 常规设置”。</li>
-					<li><b>上游 DNS：</b>“设置 → DNS 设置”。</li>
-					<li><b>查询统计：</b>“仪表盘”和“查询日志”。</li>
-					<li><b>设备命名：</b>“设置 → 客户端设置”。</li>
+					<li><b>基础设置 → 插件配置：</b>启用/停止服务、DNS 接管方式、管理面板端口、内核安装位置与更新通道、GitHub 反代、数据工作目录、不参与接管的接口 / 客户端；下方同时提供面板密码修改和统计与日志保留（按天设置，保存后重启生效）。</li>
+					<li><b>基础设置 → DNS 解析：</b>上游 DNS 可选“自动（按接管方式）”或“自定义”；自定义支持 IP、<code>tls://</code>、<code>https://</code>、<code>quic://</code> 以及 <code>[/域名/]IP</code> 条件转发。DNS 缓存可设 8～128MB、最小/最大 TTL 和乐观缓存；加密上游（DoH/DoT/DoQ）只在“Clash 前置”模式生效。</li>
+					<li><b>基础设置 → 过滤规则：</b>总开关控制全部订阅与自定义规则是否生效；成人内容拦截（HaGeZi NSFW）、安全搜索、浏览安全可一键启停；订阅支持添加、启停、删除，列表类型选“白名单（放行）”即作为白名单使用；自定义规则支持 <code>@@</code> 白名单语法。以上修改立即生效，不需要重启。</li>
+					<li><b>运行日志：</b>查看系统日志中的 AdGuard 记录、内核安装日志和最近一次服务操作日志，支持自动刷新与下载；“查询日志”子页显示最近 20 条查询与拦截结果。</li>
+					<li><b>高级配置：</b>直接编辑 <code>/etc/AdGuardHome.yaml</code>，保存前自动执行 <code>--check-config</code>，校验失败不覆盖原文件，并保留 <code>.bak</code> 备份。</li>
+					<li><b>概览：</b>过滤统计（DNS 查询、已拦截、恶意/钓鱼、成人内容）直接取自 AdGuard Home 统计接口，可用“清空统计”重置；服务停止时数值显示“-”。</li>
 				</ul>
+				<p class="agh-hint">「接管 53 端口」下自定义上游会绕过本机 DNSMasq（1745），<code>xxx.lan</code> 等本地主机名将无法解析；需要保留本地解析时，请在自定义列表末尾加上 <code>127.0.0.1:1745</code>。</p>
 			</div>
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>五、常见问题</h3>
+					<h3>五、仍需在 AdGuard Home 面板设置的</h3>
+				</div>
+				<ul class="agh-tips">
+					<li><b>客户端设置：</b>“设置 → 客户端设置”，给设备命名、按设备单独指定上游或过滤规则。</li>
+					<li><b>家长控制：</b>“设置 → 常规设置 → 附加过滤器”，插件不单独提供开关；概览里的“成人内容（家长控制）”统计的就是这一项。</li>
+					<li><b>阻止服务：</b>“设置 → 常规设置”，可整块屏蔽抖音、游戏平台等服务。</li>
+					<li><b>DNSSEC、fallback、上游模式：</b>“设置 → DNS 设置”；插件只在首次生成配置时写入默认值，之后以面板为准。</li>
+					<li><b>详细统计：</b>“仪表盘”和“查询日志”，可按时间、客户端、域名筛选，比插件概览更细。</li>
+				</ul>
+				<p class="agh-hint">插件里的开关与 AdGuard Home 面板修改的是同一份配置，两边都能改，以最后一次保存为准。</p>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>六、常见问题</h3>
 				</div>
 				<ul class="agh-tips">
 					<li><b>面板打不开：</b>确认服务处于“运行中”；停止服务时面板也会关闭。</li>
@@ -714,7 +730,7 @@
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>六、开机启动顺序（不用手动干预）</h3>
+					<h3>七、开机启动顺序（不用手动干预）</h3>
 				</div>
 				<ul class="agh-tips">
 					<li><b>顺序：</b>DNSMasq（START=19）→ AdGuard Home（START=95）→ Clash（START=99）。</li>
@@ -725,7 +741,7 @@
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>七、安全提示</h3>
+					<h3>八、安全提示</h3>
 				</div>
 				<ul class="agh-tips">
 					<li>AdGuard Home 面板默认对局域网开放，请勿把 13800 映射到公网。</li>
