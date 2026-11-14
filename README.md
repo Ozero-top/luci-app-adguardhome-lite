@@ -4,22 +4,16 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 > 插件负责安装、DNS 接管、过滤与统计；更细的高级项仍可在 AdGuard Home 面板调整。
 
+<div align=center>
+<img src="https://ozero.top/media/2026/11/6af82bb0625a57.22446996.png" width="600" height="614">
+</div>
+
 ## 目录
 
-- [结构化摘要](#结构化摘要)
-- [项目初衷](#项目初衷)
-- [功能特性](#功能特性)
-- [兼容性](#兼容性)
-- [安装](#安装)
-- [三步上手](#三步上手)
-- [DNS 接管方式](#dns-接管方式)
-- [常见问题（FAQ）](#常见问题faq)
-- [项目结构](#项目结构)
-- [构建](#构建)
-- [文档](#文档)
-- [反馈与贡献](#反馈与贡献)
-- [安全建议](#安全建议)
-- [许可证](#许可证)
+- **了解**：[结构化摘要](#结构化摘要) · [项目初衷](#项目初衷) · [功能特性](#功能特性)
+- **安装**：[兼容性](#兼容性) · [安装](#安装) · [三步上手](#三步上手)
+- **DNS**：[接管方式](#dns-接管方式)
+- **排障与开发**：[常见问题](#常见问题faq) · [项目结构](#项目结构) · [构建](#构建) · [文档](#文档) · [反馈与贡献](#反馈与贡献) · [安全建议](#安全建议) · [许可证](#许可证)
 
 ---
 
@@ -27,23 +21,9 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 **一句话**：把 AdGuard Home 的「装内核、接 DNS、看状态」收进一个 LuCI 页面，三步完成，不需要手改配置。
 
-**解决的问题**：
+> 💡 能装 `.ipk` 就用安装包；软件包页面显示 `apk` 或固件为 25.12 及以上，直接用 `install.sh`。
 
-- 官方内核下载失败、架构选错；
-- 接管 53 后 DNSMasq 配置混乱，停止或卸载后无法恢复；
-- 新旧 LuCI、`.ipk` 与 `apk` 系统的安装方式不统一。
-
-**核心能力**：
-
-- 自动识别架构并下载官方内核，支持 GitHub 反代与 fake-IP 环境；
-- 四种 DNS 接管方式，停止或卸载时自动还原原 DNS；
-- 兼容 Clash DNS 劫持，保留逐设备统计；
-- 概览直接查看查询、拦截、恶意/钓鱼、成人内容统计。
-
-**适用环境**：OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 24.10；25.12 / `apk` 系统用脚本安装；22.03 及更早用 `legacy` 包。  
 **不适用**：Docker、NAS、普通 Linux 发行版；LoongArch 架构暂不支持。
-
-> 快速判断：能装 `.ipk` 就用安装包；软件包页面显示 `apk` 或固件为 25.12 及以上，直接运行 `install.sh`。
 
 ---
 
@@ -59,24 +39,6 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 - **不挑固件**：新旧 LuCI 都支持，覆盖 OpenWrt、ImmortalWrt、iStoreOS 及衍生固件。
 
 需要更细的控制，仍可以在 AdGuard Home 面板或插件「高级配置」里改。
-
----
-
-<div align=center>
-<img src="https://ozero.top/media/2026/11/6af82bb0625a57.22446996.png" width="600" height="794">
-</div>
-
----
-
-> **搭配浏览器扩展效果更佳**
->
-> 路由器端只能按域名拦截，页面内的广告位、同域名广告和追踪脚本需要浏览器端过滤。建议再装 AdGuard 浏览器扩展或 uBlock Origin，两者叠加后，adblock-tester.com 这类测试通常能到 95% 以上。
->
-> - 官方下载页（自动识别浏览器）：<https://adguard.com/zh_cn/adguard-browser-extension/overview.html>
-> - Chrome 应用商店：<https://chromewebstore.google.com/detail/adguard-adblocker/bgnkhhnnamicmpeenaelnjfhikgbkllg>
-> - Edge / Firefox 在各自扩展商店搜「AdGuard AdBlocker」
->
-> 只装扩展，手机、电视过滤不到；只装路由器端，页面里仍会剩一些广告。推荐两边一起用。
 
 ---
 
@@ -99,7 +61,7 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 - **加密上游（可选）**：仅「Clash 前置」可把上游切到阿里 / DNSPod DoH、Cloudflare DoH 或自定义 DoH/DoT/DoQ；其它模式的上游是本机 DNSMasq，保持不加密。
 - **按接口 / 客户端放行**：「接管 53」下可指定不参与接管的网络设备或客户端 IP/CIDR，这些查询直接由 DNSMasq 应答，不进 AdGuard Home。
 
-> 「接管 53」+ 自定义上游会绕过本机 DNSMasq（1745），`.lan` 等本地主机名将无法解析；需要时把 `127.0.0.1:1745` 加到列表末尾。
+> ⚠️ 「接管 53」+ 自定义上游会绕过本机 DNSMasq（1745），`.lan` 等本地主机名将无法解析；需要时把 `127.0.0.1:1745` 加到列表末尾。
 
 ### 过滤与统计
 
@@ -129,7 +91,7 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 | 架构 | x86_64 / 386、ARM64、ARM v5/v6/v7/v8、MIPS / MIPSel / MIPS64 / MIPS64el、RISC-V 64、PPC64LE（暂不支持 LoongArch） |
 | 实测环境 | Kwrt aarch64、iStoreOS 24.10 / 25.12 x86_64；内核 AdGuard Home v0.107.80 |
 
-> 与旧版 `luci-app-adguardhome` 冲突，安装前先卸载旧插件及中文语言包。
+> ⚠️ 与旧版 `luci-app-adguardhome` 冲突，安装前先卸载旧插件及中文语言包。
 
 ---
 
@@ -226,7 +188,7 @@ sh install.sh -f
 sh install.sh -v 1.3.0 -m https://gh-proxy.org
 ```
 
-> 脚本安装不会在 `apk` 的已安装列表里留记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
+> 💡 脚本安装不会在 `apk` 的已安装列表里留记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
 
 ---
 
@@ -331,7 +293,8 @@ DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，
 
 该模式下来源都是 Clash（`127.0.0.1`），没有逐设备统计；需要逐设备统计请用「接管 53」。另外 Clash 的 fake-IP 会对所有 A 记录返回 `198.18.x.x`，被拦截的域名在 DNS 层不会显示成 `0.0.0.0`，实际拦截发生在连接阶段。
 
-### 「Clash 串联」为什么下线
+<details>
+<summary>「Clash 串联」为什么下线</summary>
 
 该模式曾把 `server=/#/127.0.0.1#5333` 写进 DNSMasq 的 `conf-dir`，让查询先过 AdGuard Home 再交给 Clash。但实际环境里：
 
@@ -340,6 +303,8 @@ DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，
 - Clash 每次启动还会重写这条上游，转发文件随时失效。
 
 结果就是「显示已接管、实际没过滤」。所以插件移除了这个选项，旧配置在保存或启动时自动迁移为「接管 53 端口」——它既能逐设备统计，也能保留 Clash 的 fake-IP 与分流。
+
+</details>
 
 ### 与 Clash 的启动顺序
 
@@ -502,6 +467,18 @@ make package/luci-app-adguardhome-lite/compile V=s
 
 - [安装与使用说明](docs/安装与使用说明.md)：安装验证清单、DNS 接管详解、Clash 排查、卸载回滚与常见问题。
 - 插件内「使用引导」标签包含三步说明与常见问题入口。
+
+---
+
+> **搭配浏览器扩展效果更佳**
+>
+> 路由器端只能按域名拦截，页面内的广告位、同域名广告和追踪脚本需要浏览器端过滤。建议再装 AdGuard 浏览器扩展或 uBlock Origin，两者叠加后，adblock-tester.com 这类测试通常能到 95% 以上。
+>
+> - 官方下载页（自动识别浏览器）：<https://adguard.com/zh_cn/adguard-browser-extension/overview.html>
+> - Chrome 应用商店：<https://chromewebstore.google.com/detail/adguard-adblocker/bgnkhhnnamicmpeenaelnjfhikgbkllg>
+> - Edge / Firefox 在各自扩展商店搜「AdGuard AdBlocker」
+>
+> 只装扩展，手机、电视过滤不到；只装路由器端，页面里仍会剩一些广告。推荐两边一起用。
 
 ---
 
