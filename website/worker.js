@@ -430,7 +430,7 @@ footer{padding:58px 0 28px;border-top:1px solid var(--border);background:rgba(25
   <section class="hero" id="top">
     <div class="container hero-grid">
       <div class="hero-copy">
-        <div class="badge reveal"><span class="dot"></span>GPL-3.0 开源 · v1.3.0 · 适配 25.12 apk</div>
+        <div class="badge reveal"><span class="dot"></span>GPL-3.0 开源 · v1.3.1 · 适配 25.12 apk</div>
         <h1 class="reveal d1">AdGuard Home 助手<br><span class="gradient-text">三步解决广告烦恼</span></h1>
         <p class="hero-sub reveal d1">OpenWrt / ImmortalWrt / iStoreOS · LuCI 插件</p>
         <p class="hero-desc reveal d2">自动识别架构安装官方内核，一键接管 DNS，页内查看拦截统计。不用手改配置文件，停止或卸载时自动恢复原 DNS。</p>
@@ -674,15 +674,15 @@ footer{padding:58px 0 28px;border-top:1px solid var(--border);background:rgba(25
           <div class="code-body">
             <div class="code-pane active" data-pane="ipk">
               <pre><span class="cmt"># 新版 LuCI：上传后在 /tmp 执行</span>
-opkg install /tmp/luci-app-adguardhome-lite_1.3.0-1_all.ipk
+opkg install /tmp/luci-app-adguardhome-lite_1.3.1-1_all.ipk
 
 <span class="cmt"># 旧版 LuCI（22.03 及更早）请把包名换成</span>
-<span class="cmt"># luci-app-adguardhome-lite_1.3.0-1-legacy_all.ipk</span></pre>
+<span class="cmt"># luci-app-adguardhome-lite_1.3.1-1-legacy_all.ipk</span></pre>
               <button class="copy-btn" data-copy="ipk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制</button>
             </div>
             <div class="code-pane" data-pane="run">
               <pre><span class="cmt"># 离线自解压包，内含 modern 与 legacy</span>
-sh /tmp/luci-app-adguardhome-lite_1.3.0-1.run</pre>
+sh /tmp/luci-app-adguardhome-lite_1.3.1-1.run</pre>
               <button class="copy-btn" data-copy="run"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>复制</button>
             </div>
             <div class="code-pane" data-pane="apk">

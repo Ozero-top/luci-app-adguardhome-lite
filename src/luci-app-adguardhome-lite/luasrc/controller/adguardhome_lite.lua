@@ -937,6 +937,54 @@ function action_filters_save()
         end
         path = "/control/filtering/set_rules"
         body = jsonc.stringify({ rules = rules })
+    elseif act == "trim" then
+        -- 按设备内存档位自动启停黑名单订阅，白名单与自定义规则不动
+        local tier = tonumber(http.formvalue("tier")) or 2048
+        local budget
+        if tier <= 512 then
+            budget = 250000
+        elseif tier <= 1024 then
+            budget = 800000
+        end
+
+        local _, sresp = agh_api("/control/filtering/status", "GET")
+        local st = jsonc.parse(sresp)
+        if not st or type(st.filters) ~= "table" then
+            json_error("读取规则列表失败，请确认 AdGuard Home 正在运行。")
+            return
+        end
+
+        local lists = {}
+        for _, f in ipairs(st.filters) do
+            if not f.whitelist then
+                lists[#lists + 1] = f
+            end
+        end
+        table.sort(lists, function(a, b)
+            return (tonumber(a.rules_count) or 0) < (tonumber(b.rules_count) or 0)
+        end)
+
+        local kept, changed = 0, 0
+        for _, f in ipairs(lists) do
+            local cnt = tonumber(f.rules_count) or 0
+            local enable = (budget == nil) or (kept + cnt <= budget)
+            if enable then
+                kept = kept + cnt
+            end
+            if (not not f.enabled) ~= enable then
+                agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
+                    url = f.url,
+                    whitelist = false,
+                    data = { name = f.name or f.url, url = f.url, enabled = enable, whitelist = false }
+                }))
+                changed = changed + 1
+            end
+        end
+
+        http.header("Cache-Control", "no-store")
+        http.prepare_content("application/json")
+        http.write_json({ ok = true, tier = tier, changed = changed, kept = kept })
+        return
     elseif act == "feature" then
         local feature = http.formvalue("feature") or ""
         local value = http.formvalue("value") == "1"
