@@ -1,6 +1,6 @@
 # AdGuard Home 助手
 
-OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件，支持三步安装、低侵入 DNS 接管系统。
+OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件，支持三步安装、低侵入 DNS 接管。
 
 > 插件负责安装、DNS 接管、过滤与统计；更细的高级项仍可在 AdGuard Home 面板调整。
 
