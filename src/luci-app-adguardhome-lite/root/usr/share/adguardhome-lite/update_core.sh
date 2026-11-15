@@ -69,6 +69,10 @@ case "$channel" in
         ;;
 esac
 
+# 记录实际安装通道，供页面区分「测试版」标识；回退稳定版时会改写
+installed_channel="stable"
+[ "$channel" = "beta" ] && installed_channel="beta"
+
 log_msg "开始安装 AdGuard Home 内核（${channel_name}）"
 log_msg "设备架构：$arch，目标路径：$binpath"
 
@@ -160,6 +164,7 @@ if try_download "$url_list"; then
 elif [ "$channel" = "beta" ]; then
     log_msg "测试版通道不可用，回退到稳定版安装..."
     channel_name="稳定版"
+    installed_channel="stable"
     if try_download "$stable_list"; then
         download_ok="1"
     fi
@@ -303,6 +308,7 @@ fi
 [ -n "$backup" ] && rm -f "$backup"
 
 uci -q set "$CONF.main.core_version=$newver" 2>/dev/null
+uci -q set "$CONF.main.core_channel=$installed_channel" 2>/dev/null
 uci -q commit "$CONF" 2>/dev/null
 
 log_msg "AdGuard Home 内核安装/更新成功：$newver"
