@@ -11,3 +11,9 @@ debug.log
 
 # 原始 .run 插件仅作本地参考，不随项目发布
 adguardhome.run
+
+# 本地素材，不提交仓库
+assets/
+
+# 官网源码仅本地维护，不提交仓库
+website/
