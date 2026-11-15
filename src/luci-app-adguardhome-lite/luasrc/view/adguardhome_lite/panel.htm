@@ -8,7 +8,26 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>AdGuard Home 助手</title>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261115k">
+	<script>
+		// 首屏前应用主题，避免暗色用户刷新时闪一下浅色背景
+		(function () {
+			try {
+				var theme = localStorage.getItem('agh-theme');
+				if (theme !== 'dark' && theme !== 'light') {
+					theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+				}
+				if (theme === 'dark') document.documentElement.classList.add('agh-dark');
+			} catch (e) { /* 忽略 */ }
+		})();
+	</script>
+	<style>
+		/* 首屏关键样式：CSS 文件加载前先用暗色兜底，避免白闪 */
+		html.agh-dark, html.agh-dark body {
+			background: #141517;
+			color-scheme: dark;
+		}
+	</style>
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261115l">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -51,7 +70,7 @@
 			<button type="button" id="agh-theme-toggle" class="agh-theme-btn" title="切换暗色 / 浅色主题">切换为暗色</button>
 			<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
 			<a href="#" id="agh-header-console" class="agh-badge agh-badge-link is-disabled" target="_blank" rel="noopener" aria-disabled="true">打开控制台</a>
-			<span class="agh-hero-badge">v0.107.80+</span>
+			<span id="agh-hero-core" class="agh-hero-badge" title="正在读取内核版本">读取中</span>
 		</div>
 	</div>
 
@@ -796,6 +815,6 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261115f"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261115i"></script>
 </body>
 </html>

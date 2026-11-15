@@ -1274,14 +1274,14 @@ code {
 	white-space: nowrap;
 }
 
-body.agh-dark .agh-beta-tag {
+.agh-dark .agh-beta-tag {
 	color: #e0c58e;
 	background: #2b2517;
 	border-color: #574a2c;
 }
 
 /* 暗色主题：对齐 AdGuard Home 原生暗色（近黑底 + 灰阶卡片 + 薄荷绿高亮） */
-body.agh-dark {
+.agh-dark {
 	--agh-bg: #141517;
 	--agh-surface: #1d1f22;
 	--agh-surface-2: #24262a;
@@ -1307,106 +1307,106 @@ body.agh-dark {
 		var(--agh-bg);
 }
 
-body.agh-dark .agh-hero {
+.agh-dark .agh-hero {
 	background: linear-gradient(135deg, #202327, #1a1c1f 62%);
 	border-color: var(--agh-border);
 }
 
-body.agh-dark .agh-hero h2,
-body.agh-dark .agh-card-head h3,
-body.agh-dark .agh-card h2,
-body.agh-dark .agh-step-title,
-body.agh-dark .agh-field label {
+.agh-dark .agh-hero h2,
+.agh-dark .agh-card-head h3,
+.agh-dark .agh-card h2,
+.agh-dark .agh-step-title,
+.agh-dark .agh-field label {
 	color: #e8eaec;
 }
 
-body.agh-dark .agh-tabs {
+.agh-dark .agh-tabs {
 	background: rgba(29, 31, 34, 0.92);
 }
 
-body.agh-dark .agh-tab.is-active {
+.agh-dark .agh-tab.is-active {
 	color: #102016;
 	box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
 }
 
-body.agh-dark .agh-btn-primary {
+.agh-dark .agh-btn-primary {
 	color: #102016;
 }
 
-body.agh-dark .agh-btn-primary:hover {
+.agh-dark .agh-btn-primary:hover {
 	background: #6fd391;
 }
 
-body.agh-dark .agh-btn-secondary:hover,
-body.agh-dark .agh-ghost-btn:hover,
-body.agh-dark .agh-mini-btn:hover {
+.agh-dark .agh-btn-secondary:hover,
+.agh-dark .agh-ghost-btn:hover,
+.agh-dark .agh-mini-btn:hover {
 	border-color: #3c4249;
 }
 
-body.agh-dark .agh-hero-badge,
-body.agh-dark .agh-hero-version-badge,
-body.agh-dark .agh-step-index,
-body.agh-dark .agh-step-no,
-body.agh-dark .agh-switch-state.is-on,
-body.agh-dark .agh-subtab.is-active,
-body.agh-dark .agh-pill-ok {
+.agh-dark .agh-hero-badge,
+.agh-dark .agh-hero-version-badge,
+.agh-dark .agh-step-index,
+.agh-dark .agh-step-no,
+.agh-dark .agh-switch-state.is-on,
+.agh-dark .agh-subtab.is-active,
+.agh-dark .agh-pill-ok {
 	border-color: #36503f;
 }
 
-body.agh-dark .agh-badge {
+.agh-dark .agh-badge {
 	color: #d9c496;
 	border-color: #574a2c;
 }
 
-body.agh-dark .agh-badge-link:hover {
+.agh-dark .agh-badge-link:hover {
 	background: #322b1c;
 }
 
-body.agh-dark .agh-update-tip {
+.agh-dark .agh-update-tip {
 	color: #e6c98c;
 	background: #2c2718;
 	border-color: #574a2c;
 }
 
-body.agh-dark .agh-pill-bad,
-body.agh-dark .agh-btn-danger {
+.agh-dark .agh-pill-bad,
+.agh-dark .agh-btn-danger {
 	border-color: #5a3a33;
 }
 
-body.agh-dark .agh-btn-danger:hover {
+.agh-dark .agh-btn-danger:hover {
 	background: #3a2621;
 }
 
-body.agh-dark .agh-pill-warn {
+.agh-dark .agh-pill-warn {
 	border-color: #574a2c;
 }
 
-body.agh-dark .agh-log,
-body.agh-dark .agh-code {
+.agh-dark .agh-log,
+.agh-dark .agh-code {
 	background: #111315;
 }
 
-body.agh-dark .agh-switch span {
+.agh-dark .agh-switch span {
 	background: #3a3f45;
 }
 
-body.agh-dark .agh-switch span::after {
+.agh-dark .agh-switch span::after {
 	background: #e6e8ea;
 	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
-body.agh-dark .agh-table th {
+.agh-dark .agh-table th {
 	color: #a9aeb4;
 }
 
-body.agh-dark .agh-toast.is-ok {
+.agh-dark .agh-toast.is-ok {
 	border-color: #34513c;
 }
 
-body.agh-dark .agh-toast.is-bad {
+.agh-dark .agh-toast.is-bad {
 	border-color: #5a3a33;
 }
 
-body.agh-dark .agh-toast.is-warn {
+.agh-dark .agh-toast.is-warn {
 	border-color: #574a2c;
 }

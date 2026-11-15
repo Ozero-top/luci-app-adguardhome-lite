@@ -34,10 +34,12 @@
 	}
 
 	var THEME_KEY = 'agh-theme';
+	var CORE_KEY = 'agh-core-version';
 
 	function applyTheme(theme) {
 		var dark = theme === 'dark';
-		document.body.classList.toggle('agh-dark', dark);
+		// 类挂在 html 上，页面首屏前就能生效，避免刷新时闪一下浅色
+		document.documentElement.classList.toggle('agh-dark', dark);
 		var btn = $('agh-theme-toggle');
 		if (btn) btn.textContent = dark ? '切换为浅色' : '切换为暗色';
 		try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) { /* 隐私模式下忽略 */ }
@@ -53,7 +55,7 @@
 	}
 
 	function toggleTheme() {
-		applyTheme(document.body.classList.contains('agh-dark') ? 'light' : 'dark');
+		applyTheme(document.documentElement.classList.contains('agh-dark') ? 'light' : 'dark');
 	}
 
 	// 开关旁边的状态文字，可按开关自定义开/关文案
@@ -250,6 +252,43 @@
 		}
 	}
 
+	function applyHeroCore(version, installed) {
+		var el = $('agh-hero-core');
+		if (!el) return;
+		if (installed === false) {
+			el.textContent = '未安装内核';
+			el.title = '尚未安装 AdGuard Home 内核';
+			return;
+		}
+		if (version) {
+			el.textContent = version;
+			el.title = '当前内核版本';
+			return;
+		}
+		el.textContent = '读取中';
+		el.title = '正在读取内核版本';
+	}
+
+	// 先用缓存渲染，避免刷新瞬间显示成占位文案
+	function initHeroCore() {
+		var saved = '';
+		try { saved = localStorage.getItem(CORE_KEY) || ''; } catch (e) { /* 忽略 */ }
+		applyHeroCore(saved, true);
+	}
+
+	function updateHeroCore(d) {
+		if (!d) return;
+		if (!d.core) {
+			applyHeroCore('', false);
+			try { localStorage.removeItem(CORE_KEY); } catch (e) { /* 忽略 */ }
+			return;
+		}
+		applyHeroCore(d.version || '', true);
+		if (d.version) {
+			try { localStorage.setItem(CORE_KEY, d.version); } catch (e) { /* 忽略 */ }
+		}
+	}
+
 	function updateHeaderStatus() {
 		var el = $('agh-header-status');
 		if (!el) return;
@@ -298,6 +337,7 @@
 		var d = state.status;
 		updateHeaderStatus();
 		updatePluginVersion(d);
+		updateHeroCore(d);
 		if (!d) {
 			var grid = $('agh-status-grid');
 			if (grid) grid.innerHTML = '<div class="agh-empty">无法读取状态</div>';
@@ -1714,6 +1754,7 @@
 
 	function init() {
 		initTheme();
+		initHeroCore();
 		initEvents();
 		updateSwitchStates();
 		var hash = (window.location.hash || '#overview').replace('#', '');
