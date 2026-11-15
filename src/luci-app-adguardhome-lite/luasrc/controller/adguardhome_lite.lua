@@ -504,25 +504,19 @@ end
 local function plugin_update_info()
     local cache = fs.readfile(PLUGIN_UPDATE) or ""
     local latest = clean_tag(cache:match("latest=([^\n]*)"))
-    local beta = cache:match("beta=(%d)") == "1"
     local checked = tonumber(cache:match("time=(%d+)"))
 
     -- 拿到结果才缓存一天；检查失败时只缓存一小时，尽快重试
     local ttl = (latest ~= "") and 86400 or 3600
     if not checked or (os.time() - checked) > ttl then
         -- 先写占位时间，避免每次轮询都重复启动检查任务
-        fs.writefile(PLUGIN_UPDATE, "latest=" .. latest .. "\nbeta=" .. (beta and "1" or "0") .. "\ntime=" .. os.time() .. "\n")
+        fs.writefile(PLUGIN_UPDATE, "latest=" .. latest .. "\ntime=" .. os.time() .. "\n")
         sys.exec("sh " .. SHARE .. "/check_plugin_update.sh >/dev/null 2>&1 &")
     end
 
+    -- 插件 Release 都是正式版，不比内核的稳定版 / 测试版通道，直接比版本号
     local current = plugin_version()
     local newer = version_newer(latest, current)
-
-    -- 预发布版本只提示同样在跑测试版用户，避免把 beta 推给稳定版
-    local current_beta = current:lower():find("%-b%.?%d") ~= nil
-    if beta and not current_beta then
-        newer = false
-    end
 
     local url = RELEASE_URL
     if latest ~= "" then
@@ -532,7 +526,6 @@ local function plugin_update_info()
     return {
         current = current,
         latest = latest,
-        beta = beta,
         update = newer,
         url = url
     }

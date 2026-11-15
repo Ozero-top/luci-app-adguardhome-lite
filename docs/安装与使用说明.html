@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 助手 使用说明 · 1.3.2-B2</title>
+<title>AdGuard Home 助手 使用说明 · 1.3.2-B3</title>
 <meta name="description" content="AdGuard Home 助手使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 助手 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.2-B2</span>
+  <span class="pill"><span class="dot"></span>1.3.2-B3</span>
 </header>
 
 <div class="layout">
@@ -210,7 +210,7 @@ footer{
       <h1>AdGuard Home 助手 使用说明</h1>
       <p>本插件只做三件事：<strong>装内核、接 DNS、看状态</strong>。过滤规则、查询日志、家长控制仍在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.2-B2</span>
+        <span>适用版本 1.3.2-B3</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -523,9 +523,9 @@ rm -f /etc/AdGuardHome.yaml</code></pre>
 python tools/build_run.py      # 离线 .run</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.2-B2_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.2-B2-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.2-B2.run</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.2-B3_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.2-B3-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.2-B3.run</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
@@ -539,6 +539,10 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
         <table>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
+            <tr>
+              <td><span class="tag">1.3.2-B3</span></td>
+              <td>插件更新提示不再区分稳定版 / 测试版：所有 Release 都是正式版，更新提示直接按版本号比较；稳定版 / 测试版只用于 AdGuard Home 内核通道</td>
+            </tr>
             <tr>
               <td><span class="tag">1.3.2-B2</span></td>
               <td>新增「PassWall 前置」接管方式：不改 PassWall 的 DNS 劫持，插件把收回链提前到 <code>priority -102</code>，AdGuard Home 占 53 后上游自动指向 PassWall 的动态 DNS 端口（默认从 <code>11400</code> 起），过滤、逐设备统计与国内外分流同时保留；PassWall 未启用时上游自动回退到本机 DNSMasq（<code>1745</code>）；概览会提示上游是否已偏离当前 PassWall 端口</td>
@@ -575,7 +579,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 助手 · 使用说明 1.3.2-B2 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 助手 · 使用说明 1.3.2-B3 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {
