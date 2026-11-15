@@ -393,19 +393,19 @@ end
 local function core_update_info(binpath, channel)
     local cache = fs.readfile(CORE_UPDATE) or ""
     local stable = cache:match("stable=([^\n]*)") or ""
-    local beta = cache:match("beta=([^\n]*)") or ""
+    local beta_tag = cache:match("beta=([^\n]*)") or ""
     local checked = tonumber(cache:match("time=(%d+)"))
 
     if not checked or (os.time() - checked) > 86400 then
         -- 先写占位时间，避免每次轮询都重复启动检查任务
-        fs.writefile(CORE_UPDATE, "stable=" .. stable .. "\nbeta=" .. beta .. "\ntime=" .. os.time() .. "\n")
+        fs.writefile(CORE_UPDATE, "stable=" .. stable .. "\nbeta=" .. beta_tag .. "\ntime=" .. os.time() .. "\n")
         sys.exec("sh " .. SHARE .. "/check_core_update.sh >/dev/null 2>&1 &")
     end
 
     -- 稳定版只看正式版；测试版在预发布与正式版中取更新的一个
     local candidates = { stable }
-    if channel == "beta" and beta ~= "" then
-        candidates = { beta, stable }
+    if channel == "beta" and beta_tag ~= "" then
+        candidates = { beta_tag, stable }
     end
     local latest = ""
     for i = 1, #candidates do
@@ -419,7 +419,8 @@ local function core_update_info(binpath, channel)
     return {
         current = current,
         latest = latest,
-        beta = latest:lower():find("%-b%.?%d") ~= nil,
+        -- 通道由 Releases API 的 prerelease 标记决定，不能只看版本号里的 -b
+        beta = (beta_tag ~= "" and latest == beta_tag),
         update = (latest ~= "" and current ~= "" and version_newer(latest, current)) or false
     }
 end
