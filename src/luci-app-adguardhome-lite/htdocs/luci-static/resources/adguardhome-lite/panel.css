@@ -548,6 +548,35 @@ code {
 	font-weight: 700;
 }
 
+.agh-progress-bar {
+	position: relative;
+	height: 8px;
+	margin-bottom: 10px;
+	border-radius: 999px;
+	background: var(--agh-surface);
+	border: 1px solid var(--agh-border);
+	overflow: hidden;
+}
+
+.agh-progress-bar > i {
+	display: block;
+	height: 100%;
+	width: 0;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--agh-primary), var(--agh-primary-2));
+	transition: width 0.3s ease;
+}
+
+.agh-progress-bar.is-indeterminate > i {
+	width: 35%;
+	animation: agh-progress-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes agh-progress-slide {
+	0% { transform: translateX(-100%); }
+	100% { transform: translateX(300%); }
+}
+
 .agh-log {
 	margin: 0;
 	padding: 12px;

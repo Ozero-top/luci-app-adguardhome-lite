@@ -135,6 +135,73 @@ resolve_ipv4() {
     echo "$_rout" | awk '$1 == "Address:" && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print $2; exit }'
 }
 
+# 下载进度只写到标准输出（供 LuCI 进度日志显示），不写系统日志，避免刷屏
+log_progress() {
+    echo "[$(date '+%H:%M:%S')] $*"
+}
+
+# 带进度显示的 curl 下载：后台执行 curl，前台每 2 秒读取已下载大小。
+# 参数：URL、输出路径、其余参数原样传给 curl。
+curl_with_progress() {
+    _cp_url="$1"
+    _cp_out="$2"
+    shift 2
+
+    _cp_rc="/tmp/adguardhome_lite_dl_$$.rc"
+    rm -f "$_cp_rc" "$_cp_out"
+
+    # 先探测文件大小；部分反代不返回 Content-Length，此时只显示已下载大小
+    _cp_total=$(curl -fsIL --connect-timeout 5 -m 8 "$@" "$_cp_url" 2>/dev/null | tr -d '\r' \
+        | awk 'tolower($1) == "content-length:" { v = $2 + 0 } END { print v + 0 }')
+
+    ( curl -fsSL --connect-timeout 10 --retry 2 --retry-delay 2 "$@" -o "$_cp_out" "$_cp_url"; echo $? > "$_cp_rc" ) &
+
+    _cp_start=$(date +%s)
+    _cp_last_pct=-1
+    _cp_last_log=$_cp_start
+
+    while [ ! -s "$_cp_rc" ]; do
+        sleep 2
+        [ -s "$_cp_rc" ] && break
+
+        _cp_size=0
+        if [ -f "$_cp_out" ]; then
+            _cp_size=$(wc -c < "$_cp_out" 2>/dev/null | tr -d ' ')
+            [ -n "$_cp_size" ] || _cp_size=0
+        fi
+
+        if [ "$_cp_total" -gt 0 ]; then
+            _cp_pct=$(( _cp_size * 100 / _cp_total ))
+            [ "$_cp_pct" -gt 100 ] && _cp_pct=100
+            if [ "$_cp_pct" != "$_cp_last_pct" ]; then
+                log_progress "下载进度：${_cp_pct}%（$(( _cp_size / 1024 ))KB / $(( _cp_total / 1024 ))KB）"
+                _cp_last_pct="$_cp_pct"
+            fi
+        else
+            _cp_now=$(date +%s)
+            if [ $(( _cp_now - _cp_last_log )) -ge 3 ]; then
+                log_progress "下载进度：已下载 $(( _cp_size / 1024 ))KB（$(( _cp_now - _cp_start )) 秒）"
+                _cp_last_log="$_cp_now"
+            fi
+        fi
+    done
+
+    _cp_code=$(cat "$_cp_rc" 2>/dev/null)
+    rm -f "$_cp_rc"
+
+    _cp_elapsed=$(( $(date +%s) - _cp_start ))
+    _cp_size=0
+    if [ -f "$_cp_out" ]; then
+        _cp_size=$(wc -c < "$_cp_out" 2>/dev/null | tr -d ' ')
+        [ -n "$_cp_size" ] || _cp_size=0
+    fi
+    if [ "$_cp_code" = "0" ] && [ "$_cp_size" -gt 0 ]; then
+        log_msg "下载完成：$(( _cp_size / 1024 ))KB，用时 ${_cp_elapsed} 秒"
+    fi
+
+    return "${_cp_code:-1}"
+}
+
 # 下载文件；OpenWrt 上按可用性自动选择下载器
 # 如果检测到 fake-IP DNS（198.18.0.0/16 等），使用 curl --resolve 指定真实 IP，
 # 避免 Clash 的 fake-IP 路由异常导致下载超时。
@@ -184,7 +251,11 @@ download_file() {
             fi
         fi
 
-        curl -fsSL --connect-timeout 10 --retry 2 --retry-delay 2 $_resolve_opts -o "$_out" "$_url"
+        if [ -n "$_resolve_opts" ]; then
+            curl_with_progress "$_url" "$_out" $_resolve_opts
+        else
+            curl_with_progress "$_url" "$_out"
+        fi
     elif have_cmd wget-ssl; then
         wget-ssl -q --timeout=15 --tries=2 -O "$_out" "$_url"
     elif have_cmd wget; then
