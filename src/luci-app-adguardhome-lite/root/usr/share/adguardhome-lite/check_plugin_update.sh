@@ -24,9 +24,7 @@ done
 latest=${latest#v}
 
 beta=0
-case "$latest" in
-    *-B[0-9]*|*-b[0-9]*) beta=1 ;;
-esac
+printf '%s' "$latest" | grep -qiE -- '-b\.?[0-9]' && beta=1
 
 {
     printf 'latest=%s\n' "$latest"
