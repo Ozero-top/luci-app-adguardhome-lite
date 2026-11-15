@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdGuard Home 助手 使用说明 · 1.3.2-B1</title>
+<meta name="description" content="AdGuard Home 助手使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#f3eddf;--bg-2:#fbf8ef;--surface:#fffdf7;--surface-2:#faf5ea;
+  --text:#2f3b2a;--muted:#6f7566;--dim:#9aa18f;
+  --border:#e2d8c2;--border-strong:#d3c6a9;
+  --primary:#4f7d3a;--primary-2:#6f9a4e;--primary-soft:#e9f0df;
+  --accent:#c8a45a;--accent-soft:#f4e9cf;
+  --code-bg:#2f3b2a;--code-text:#eef3e6;
+  --inline-bg:#eee7d5;--inline-text:#3c4a33;
+  --radius:14px;--nav-h:58px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+html{scroll-behavior:smooth;color-scheme:light;-webkit-text-size-adjust:100%}
+body{
+  margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(ellipse 55% 45% at 10% 0%,rgba(111,154,78,.16),transparent 62%),
+    radial-gradient(ellipse 50% 40% at 92% 4%,rgba(200,164,90,.14),transparent 62%),
+    linear-gradient(160deg,#f7f3e8 0%,#f3eddf 50%,#ede6d5 100%);
+}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+code,pre{font-family:var(--mono)}
+
+/* 顶栏 */
+.topbar{
+  position:sticky;top:0;z-index:50;height:var(--nav-h);
+  display:flex;align-items:center;gap:12px;
+  padding:0 24px;
+  background:rgba(243,237,223,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.01em}
+.brand-mark{
+  width:32px;height:32px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#4f7d3a,#6f9a4e);color:#fff;font-size:10px;font-weight:800;letter-spacing:.5px;
+}
+.brand small{font-weight:500;color:var(--muted);font-size:12px;margin-left:2px}
+.topbar .spacer{margin-left:auto}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--border);font-size:12px;color:var(--muted);
+}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:#3e7a3a;box-shadow:0 0 0 4px rgba(62,122,58,.12)}
+
+/* 布局 */
+.layout{
+  display:grid;grid-template-columns:246px minmax(0,1fr);gap:36px;
+  width:min(1180px,calc(100% - 48px));margin:0 auto;padding:34px 0 80px;
+  align-items:start;
+}
+.toc{
+  position:sticky;top:calc(var(--nav-h) + 20px);
+  max-height:calc(100vh - var(--nav-h) - 40px);overflow:auto;
+  padding:18px 16px;border:1px solid var(--border);border-radius:var(--radius);
+  background:rgba(255,253,247,.78);
+}
+.toc h2{
+  margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:700;
+}
+.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+.toc li{margin:0}
+.toc a{
+  display:block;padding:6px 9px;border-radius:8px;color:var(--muted);font-size:13.5px;
+  border-left:2px solid transparent;
+}
+.toc a:hover{background:var(--primary-soft);color:var(--primary);text-decoration:none}
+.toc a.active{color:var(--primary);background:var(--primary-soft);border-left-color:var(--primary);font-weight:600}
+
+main{min-width:0}
+.doc-head{
+  padding:26px 28px;border:1px solid var(--border);border-radius:18px;
+  background:linear-gradient(135deg,rgba(255,253,247,.95),rgba(249,244,232,.92));
+  box-shadow:0 18px 44px -34px rgba(61,80,49,.5);
+  margin-bottom:26px;
+}
+.doc-head h1{margin:0 0 8px;font-size:clamp(1.5rem,3vw,2rem);letter-spacing:-.02em;line-height:1.25}
+.doc-head p{margin:0;color:var(--muted);font-size:14px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.meta span{
+  font-size:12px;padding:4px 10px;border-radius:999px;background:var(--surface);
+  border:1px solid var(--border);color:var(--muted);
+}
+
+section.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:8px 28px 22px;margin-bottom:20px;
+}
+h2.sec{
+  font-size:1.32rem;margin:24px 0 12px;padding-bottom:10px;border-bottom:1px dashed var(--border-strong);
+  letter-spacing:-.01em;scroll-margin-top:78px;
+}
+h3{font-size:1.03rem;margin:22px 0 8px;color:#3b4a34;scroll-margin-top:78px}
+p{margin:10px 0}
+ul,ol{margin:10px 0;padding-left:22px}
+li{margin:5px 0}
+strong{color:#2b3727}
+hr{border:0;border-top:1px solid var(--border);margin:28px 0}
+
+/* 表格 */
+.table-wrap{overflow-x:auto;margin:14px 0;border:1px solid var(--border);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:14px;background:var(--surface)}
+th,td{padding:10px 13px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}
+th{background:var(--surface-2);font-weight:700;color:#3b4a34;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#fdfaf2}
+td code{font-size:12.5px}
+
+/* 代码 */
+pre{
+  margin:14px 0;padding:14px 16px;border-radius:11px;overflow:auto;
+  background:var(--code-bg);color:var(--code-text);font-size:13px;line-height:1.6;
+  border:1px solid #26301f;
+}
+pre code{background:none;color:inherit;padding:0;border:0;font-size:inherit}
+:not(pre) > code{
+  background:var(--inline-bg);color:var(--inline-text);
+  padding:1.5px 6px;border-radius:6px;font-size:12.6px;border:1px solid #e3d9c2;
+  word-break:break-word;
+}
+
+/* 提示块 */
+.note{
+  margin:14px 0;padding:12px 16px;border-radius:11px;
+  background:var(--surface-2);border:1px solid var(--border);
+  border-left:3px solid var(--accent);color:#4a5344;font-size:13.8px;
+}
+.note.warn{border-left-color:#c07a3a;background:#faf1e4}
+.note p{margin:6px 0}
+.note p:first-child{margin-top:0}
+.note p:last-child{margin-bottom:0}
+
+/* 常见问题 */
+.faq{margin:16px 0;padding:14px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.faq h3{margin:0 0 6px;font-size:1rem}
+.faq p{margin:6px 0}
+
+.tag{
+  display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;
+  background:var(--primary-soft);color:var(--primary);vertical-align:1px;
+  border:1px solid #d8e4c8;
+}
+
+footer{
+  width:min(1180px,calc(100% - 48px));margin:0 auto;padding:0 0 60px;
+  color:var(--dim);font-size:12.5px;text-align:center;
+}
+
+@media (max-width:980px){
+  .layout{grid-template-columns:1fr;gap:18px;padding-top:22px}
+  .toc{position:static;max-height:none;order:-1}
+  .toc ol{display:flex;flex-wrap:wrap;gap:4px}
+  .toc a{padding:5px 9px;border-left:0;border:1px solid var(--border);border-radius:999px;font-size:12.5px}
+  .toc a.active{border-color:var(--primary)}
+}
+@media (max-width:600px){
+  .layout{width:calc(100% - 28px)}
+  section.card{padding:6px 18px 18px}
+  .doc-head{padding:20px}
+  footer{width:calc(100% - 28px)}
+}
+@media print{
+  body::before,.toc{display:none}
+  .layout{display:block;width:100%;padding:0}
+  .doc-head,section.card{border:0;box-shadow:none;padding:0;margin-bottom:18px}
+  pre{background:#f5f5f5;color:#111;border-color:#ddd}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 助手 <small>使用说明</small></div>
+  <div class="spacer"></div>
+  <span class="pill"><span class="dot"></span>1.3.2-B1</span>
+</header>
+
+<div class="layout">
+  <aside class="toc">
+    <h2>目录</h2>
+    <ol id="toc-list">
+      <li><a href="#s1">1. 快速开始</a></li>
+      <li><a href="#s2">2. 安装</a></li>
+      <li><a href="#s3">3. 三步启用</a></li>
+      <li><a href="#s4">4. 常用设置</a></li>
+      <li><a href="#s5">5. DNS 接管方式</a></li>
+      <li><a href="#s6">6. 常见问题</a></li>
+      <li><a href="#s7">7. 卸载与回滚</a></li>
+      <li><a href="#s8">8. 构建（可选）</a></li>
+      <li><a href="#s9">9. 版本记录</a></li>
+      <li><a href="#s10">10. 安全建议</a></li>
+    </ol>
+  </aside>
+
+  <main>
+    <div class="doc-head">
+      <h1>AdGuard Home 助手 使用说明</h1>
+      <p>本插件只做三件事：<strong>装内核、接 DNS、看状态</strong>。过滤规则、查询日志、家长控制仍在 AdGuard Home 面板中设置。</p>
+      <div class="meta">
+        <span>适用版本 1.3.2-B1</span>
+        <span>OpenWrt / ImmortalWrt / iStoreOS</span>
+      </div>
+    </div>
+
+    <section class="card" id="s1">
+      <h2 class="sec">1. 快速开始</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>步骤</th><th>做什么</th><th>位置</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>安装插件</td><td>LuCI 上传 ipk，或 25.12 系统运行 <code>install.sh</code></td></tr>
+            <tr><td>2</td><td>安装内核</td><td>服务 → AdGuard Home 助手 → 概览</td></tr>
+            <tr><td>3</td><td>一键启用</td><td>概览 → 一键启用</td></tr>
+            <tr><td>4</td><td>打开控制台</td><td>概览 → 打开控制台</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>默认配置：</p>
+      <ul>
+        <li>面板：<code>0.0.0.0:13800</code></li>
+        <li>账号：<code>admin</code> / <code>admin123</code></li>
+        <li>DNS：接管 53 端口，DNSMasq 移到 1745</li>
+        <li>上游：<code>127.0.0.1:1745</code></li>
+        <li>过滤规则：11 个订阅，默认按 512MB 档启用 6 个（约 24 万条）；1 个白名单默认关闭</li>
+        <li>日志/统计：保留 30 天，查询日志只存内存</li>
+        <li>DNS 缓存：默认开启，16MB，最小 TTL 0（不覆盖），乐观缓存关闭</li>
+        <li>加密上游：默认关闭；仅「Clash 前置」模式可开启（阿里 / DNSPod / Cloudflare DoH 或自定义）</li>
+        <li>DNSSEC、fallback：默认关闭</li>
+      </ul>
+      <div class="note"><p>首次登录后请在「基础设置 → 插件配置」更换密码。</p></div>
+    </section>
+
+    <section class="card" id="s2">
+      <h2 class="sec">2. 安装</h2>
+
+      <h3>2.1 选择安装方式</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>系统</th><th>使用</th></tr></thead>
+          <tbody>
+            <tr><td>OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 24.10</td><td><code>luci-app-adguardhome-lite_&lt;版本&gt;_all.ipk</code></td></tr>
+            <tr><td>OpenWrt 22.03 及更早（原生 Lua LuCI）</td><td><code>luci-app-adguardhome-lite_&lt;版本&gt;-legacy_all.ipk</code></td></tr>
+            <tr><td>OpenWrt / iStoreOS 25.12 及 apk 系统</td><td><code>install.sh</code></td></tr>
+            <tr><td>离线安装</td><td><code>luci-app-adguardhome-lite_&lt;版本&gt;.run</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>同一设备只装一个。安装前先卸载旧版 <code>luci-app-adguardhome</code> 和 <code>luci-i18n-adguardhome-zh-cn</code>，并确认旧服务已停止。</p>
+      <div class="note"><p>升级或重装会保留 <code>/etc/config/adguardhome_lite</code>，默认 <code>13800</code> 只对新安装生效；旧设备可在「基础设置 → 插件配置」中修改端口。</p></div>
+
+      <h3>2.2 ipk / run</h3>
+      <p>LuCI 上传：</p>
+      <ol>
+        <li>打开 <strong>系统 → 软件包 → 上传安装包</strong>；</li>
+        <li>选择对应 <code>.ipk</code>，等待依赖安装完成；</li>
+        <li>在 <strong>服务</strong> 菜单打开 <strong>AdGuard Home 助手</strong>。</li>
+      </ol>
+      <p>命令行安装：</p>
+<pre><code>opkg install /tmp/luci-app-adguardhome-lite_&lt;版本&gt;_all.ipk</code></pre>
+      <p>离线包：</p>
+<pre><code>sh /tmp/luci-app-adguardhome-lite_&lt;版本&gt;.run</code></pre>
+      <p><code>.run</code> 会优先安装新版 LuCI 包，失败时回退 legacy 包。</p>
+
+      <h3>2.3 脚本安装（25.12 / apk 系统）</h3>
+      <p>25.12 起使用 <code>apk</code>，不能安装 <code>.ipk</code>。直接运行：</p>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh</code></pre>
+      <p>只有 <code>wget</code> 时：</p>
+<pre><code>wget -qO- https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh</code></pre>
+      <p>国内网络可走反代：</p>
+<pre><code>curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org</code></pre>
+      <p>常用参数：</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>参数</th><th>作用</th></tr></thead>
+          <tbody>
+            <tr><td><code>-v &lt;版本&gt;</code></td><td>指定版本；<code>latest</code> 取最新 Release</td></tr>
+            <tr><td><code>-f</code> / <code>--force</code></td><td>强制更新，用 main 分支最新代码覆盖</td></tr>
+            <tr><td><code>-m &lt;地址&gt;</code></td><td>指定 GitHub 反代，可重复</td></tr>
+            <tr><td><code>--no-deps</code></td><td>跳过依赖安装</td></tr>
+            <tr><td><code>--keep-old</code></td><td>只检测旧版残留，不自动清理</td></tr>
+            <tr><td><code>--purge-old</code></td><td>清理旧版时一并删除旧统计数据（保留 <code>/etc/AdGuardHome.yaml</code>）</td></tr>
+            <tr><td><code>--src DIR</code></td><td>从本地源码目录安装（开发调试用）</td></tr>
+            <tr><td><code>--uninstall</code></td><td>卸载并恢复 DNS，保留配置与内核</td></tr>
+            <tr><td><code>--purge</code></td><td>卸载并删除配置、内核与统计</td></tr>
+          </tbody>
+        </table>
+      </div>
+<pre><code># 强制更新（不升版）
+sh install.sh -f
+
+# 卸载（保留配置）
+sh install.sh --uninstall</code></pre>
+      <div class="note">
+        <p>脚本安装不会写入 <code>apk</code> 已安装列表，后续升级和卸载继续用 <code>install.sh</code>。</p>
+        <p>iStoreOS 25.12 首次使用如提示“未设置密码”，先在 LuCI 设置管理员密码，或 SSH 执行 <code>passwd root</code>。</p>
+      </div>
+
+      <h3>2.4 安装后检查</h3>
+      <ul>
+        <li>「服务」菜单出现 <strong>AdGuard Home 助手</strong>；</li>
+        <li>概览能显示运行状态；</li>
+        <li>安装内核后显示实际内核版本（带 <code>-b</code> 的预发布版本会完整显示）；</li>
+        <li>一键启用后显示「运行中」；</li>
+        <li>局域网执行 <code>nslookup www.baidu.com 路由器IP</code> 能正常解析。</li>
+      </ul>
+      <p>可选 SSH 检查：</p>
+<pre><code>uci show adguardhome_lite
+/etc/init.d/adguardhome_lite status
+uci get dhcp.@dnsmasq[0].port          # 接管 53 时应为 1745
+nft list chain inet fw4 agh_dns_redirect</code></pre>
+      <div class="note"><p>接管 53 时：AdGuard Home 监听 <code>53</code>，DNSMasq 监听 <code>1745</code>。不要把 DNSMasq 的 <code>server</code> 写成单值 <code>option server '...'</code>，需要修改时用 <code>uci add_list</code>，或直接在插件里重新保存接管方式。</p></div>
+
+      <h3>2.5 旧版残留检测与清理</h3>
+      <p>概览页会自动扫描旧版残留，检测到时会显示「检测到旧版残留」卡片，可一键清理：</p>
+      <ul>
+        <li>旧插件包：<code>luci-app-adguardhome</code>、<code>luci-i18n-adguardhome-zh-cn</code></li>
+        <li>旧服务与旧 LuCI 控制器 / 视图文件</li>
+        <li>旧内核：<code>/usr/bin/AdGuardHome</code>、<code>/usr/sbin/AdGuardHome</code></li>
+      </ul>
+      <p>清理会先停止并禁用旧服务，把文件和旧内核备份到 <code>/etc/adguardhome_lite/legacy-backup-时间戳/</code>，然后删除；<code>/etc/AdGuardHome.yaml</code> 与统计数据会保留。</p>
+      <p>脚本安装同样会在安装前自动检测并清理，可用 <code>--keep-old</code> 只检测不清理，<code>--purge-old</code> 一并删除旧统计数据。</p>
+    </section>
+
+    <section class="card" id="s3">
+      <h2 class="sec">3. 三步启用</h2>
+
+      <h3>第 1 步：安装内核</h3>
+      <ol>
+        <li>打开 <strong>概览</strong>；</li>
+        <li>点击 <strong>安装/更新内核</strong>；</li>
+        <li>等待进度完成。</li>
+      </ol>
+      <p>插件会自动识别 CPU 架构，从 AdGuard 官方源下载对应内核。国内网络可在 <strong>基础设置 → 插件配置</strong> 选择 GitHub 反代（推荐 <code>gh-proxy.org</code>）；fake-IP 环境会自动解析真实 IP 后下载。</p>
+      <p>安装过程中「安装进度」会显示下载百分比或已下载大小、完成后记录用时；概览的「内核版本」行在有新版本时会显示「可更新」，第 1 步的说明也会同步提示，点击提示可跳到安装按钮。稳定版通道只提示正式版，测试版通道可提示预发布版本；同一基础版本的正式版发布后，测试通道会提示升级到正式版。</p>
+      <p>选择「测试版」时，页面提示过具体版本会直接按该版本下载，未取到时先从 GitHub Releases 取最新的预发布标签（可走反代），失败后依次回退官方测试通道与稳定版；升级大版本前会自动备份 <code>/etc/AdGuardHome.yaml</code>，概览页内核版本旁会标注「测试版」。</p>
+
+      <h3>第 2 步：一键启用</h3>
+      <p>首次启用会从内置模板生成 <code>/etc/AdGuardHome.yaml</code>，并写入默认账号、中文界面、过滤规则、日志周期和 DNS 接管配置。</p>
+      <p>默认采用「接管 53 端口」：AdGuard Home 监听 53，DNSMasq 移到 1745，上游指向 <code>127.0.0.1:1745</code>。</p>
+
+      <h3>第 3 步：打开控制台</h3>
+      <p>点击 <strong>打开控制台</strong>，用概览页显示的账号密码登录。过滤规则、上游 DNS、安全搜索、家长控制、查询日志都在 AdGuard Home 面板中操作。</p>
+    </section>
+
+    <section class="card" id="s4">
+      <h2 class="sec">4. 常用设置</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>设置项</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>启用 AdGuard Home</td><td>开启后启动服务；关闭后停止并恢复 DNSMasq 原始设置</td></tr>
+            <tr><td>DNS 接管方式</td><td>推荐「接管 53 端口」，详见第 5 节</td></tr>
+            <tr><td>管理面板端口</td><td>默认 <code>13800</code>，不能占用 53 / 1745 / 5333 / 5335</td></tr>
+            <tr><td>内核安装位置</td><td>内置存储重启保留；内存临时重启后需重装</td></tr>
+            <tr><td>数据工作目录</td><td>保存统计和过滤缓存；内存临时会减少闪存写入</td></tr>
+            <tr><td>内核更新通道</td><td>稳定版 / 测试版；测试版取 GitHub 预发布，失败自动回退稳定版，升级前备份配置；概览的更新提示按该通道判断</td></tr>
+            <tr><td>GitHub 反代</td><td>仅加速内核下载，不修改系统网络</td></tr>
+            <tr><td>不参与接管的接口</td><td>仅「接管 53」可用，勾选后该接口的查询交给 DNSMasq</td></tr>
+            <tr><td>不参与接管的客户端</td><td>仅「接管 53」可用，支持 IPv4 / IPv6 / CIDR</td></tr>
+            <tr><td>成人内容拦截</td><td>开启后追加 HaGeZi NSFW 规则，关闭即移除</td></tr>
+            <tr><td>DNS 缓存</td><td>默认开启；可选 8/16/32/64/128MB，默认 16MB</td></tr>
+            <tr><td>上游 DNS</td><td>默认自动；可改为自定义列表，支持 <code>[/域名/]IP</code> 条件转发</td></tr>
+            <tr><td>最小 / 最大 TTL</td><td>默认 0 / 0 秒；最小 0 表示不覆盖上游 TTL，最大 0 表示不限制</td></tr>
+            <tr><td>乐观缓存</td><td>默认关闭；Clash fake-IP 环境不建议开启</td></tr>
+            <tr><td>加密上游</td><td>仅「Clash 前置」生效；可选阿里 / DNSPod / Cloudflare DoH 或自定义 DoH/DoT/DoQ</td></tr>
+            <tr><td>过滤规则</td><td>启用/停用订阅、添加订阅（黑名单/白名单）、自定义规则，立即生效</td></tr>
+            <tr><td>安全搜索 / 浏览安全</td><td>过滤规则页开关，立即生效</td></tr>
+            <tr><td>成人内容拦截</td><td>过滤规则页开关，追加/移除 HaGeZi NSFW 订阅，立即生效</td></tr>
+            <tr><td>日志与统计保留</td><td>可选 7/30/90/180/365 天，保存后重启服务</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <p>缓存是内存缓存，重启 AdGuard Home 后清空。关闭缓存只停止缓存，不清空其他配置。</p>
+        <p>插件只更新自己写入的 <code>http_proxy</code>、本地 PTR 和上游 DNS；在 AdGuard Home 面板或 YAML 里手动改过的对应项会保持不变。DNSSEC、上游模式也只在首次生成配置时给默认值，之后以 AGH 面板为准。</p>
+        <p>加密上游只保护「AdGuard Home → 真实上游」这一段。「接管 53」「DNSMasq 上游」等模式的上游是本机 DNS，开启加密不会生效；默认由 Clash/代理负责出公网的加密。</p>
+        <p>「接管 53」模式下自定义上游会绕过本机 DNSMasq(1745)，<code>xxx.lan</code> 等本地主机名将无法解析；需要保留本地解析时，请在自定义列表末尾加上 <code>127.0.0.1:1745</code>。</p>
+        <p>AdGuard Home 的 <code>ratelimit</code> 按 /24 网段限速，默认 20 qps；本插件新装模板放宽到 100。升级用户若设备较多、出现偶发 DNS 超时，可在 AGH 面板把 <code>ratelimit</code> 调大或设为 0。</p>
+      </div>
+      <p><strong>高级配置</strong>：直接编辑 <code>/etc/AdGuardHome.yaml</code>，保存前自动执行 <code>--check-config</code>，失败不覆盖，并保留 <code>.bak</code> 备份。</p>
+      <p><strong>运行日志</strong>：查看最近 300 行系统日志、内核安装日志和最近一次服务操作日志，支持下载；「查询日志」子页可查看最近 20 条 DNS 查询与拦截结果。</p>
+    </section>
+
+    <section class="card" id="s5">
+      <h2 class="sec">5. DNS 接管方式</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>方式</th><th>AdGuard Home</th><th>DNSMasq</th><th>适合</th></tr></thead>
+          <tbody>
+            <tr><td>接管 53 端口（默认）</td><td>53</td><td>1745</td><td>想逐设备统计，装了 Clash 也能用</td></tr>
+            <tr><td>DNSMasq 上游</td><td>5333</td><td>53</td><td>不想让 AdGuard Home 占 53，且没有程序抢 53</td></tr>
+            <tr><td>Clash 前置</td><td>5335</td><td>53</td><td>不想占 53，不需要逐设备统计</td></tr>
+            <tr><td>仅面板</td><td>不接管</td><td>53</td><td>只想打开面板查看</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>怎么选</strong>：需要逐设备统计、所有域名先过滤，选「接管 53 端口」；不想让 AdGuard Home 占 53，选「Clash 前置」；只想看面板，选「仅面板」。</p>
+      <div class="note"><p>旧「Clash 串联」已下线，旧配置会自动迁移为「接管 53 端口」。前置模式会自动把 Clash 自定义上游指向 <code>127.0.0.1:5335</code>，停止或切换时恢复原值。</p></div>
+      <p><strong>与 Clash 共存</strong>：选「接管 53」时，插件会创建 <code>agh_dns_redirect</code> 链，把局域网设备的 53 查询收回路由器，Clash 劫持指向 <code>:53</code>、<code>:1745</code> 或 <code>:7874</code> 都不会绕过过滤。</p>
+      <p>检查：</p>
+<pre><code>nft list chain inet fw4 agh_dns_redirect</code></pre>
+      <p>看到 <code>redirect to :53</code> 即为正常；没有这条链时，重新保存一次「接管 53 端口」。</p>
+      <p><strong>切换与停止</strong>：切换方式会先恢复接管前的 DNSMasq 原值，再按新方式配置；停止或卸载时恢复端口、<code>noresolv</code>、<code>resolvfile</code> 和 <code>server</code>，不会写入公共 DNS。</p>
+      <p><strong>启动顺序</strong>：DNSMasq（19）→ AdGuard Home（95）→ Clash（99），插件已注册 <code>START=95</code>，无需手动调整。</p>
+      <p><strong>排除接口 / 客户端</strong>：仅「接管 53」生效。命中的查询直接交给 DNSMasq（1745），不进入 AdGuard Home，也不计入统计；指向外部 DNS 的查询直接放行。</p>
+      <p><strong>自定义域名转发</strong>：DNSMasq 里的 <code>server=/corp.example/10.0.0.1</code> 会保留。「接管 53」下查询仍先经过 AdGuard Home，过滤和统计正常；「DNSMasq 上游」下这类域名直接发给指定服务器，不经过 AdGuard Home。需要过滤时，改用 AdGuard Home 上游的 <code>[/corp.example/]10.0.0.1</code> 写法。</p>
+    </section>
+
+    <section class="card" id="s6">
+      <h2 class="sec">6. 常见问题</h2>
+
+      <div class="faq">
+        <h3>Q1：内核下载失败？</h3>
+        <p>检查网络和系统时间；国内网络启用 GitHub 反代；fake-IP 环境已自动处理；空间不足时把内核位置改到内置存储。</p>
+        <p>测试版会依次尝试 GitHub 预发布（含反代）→ 官方测试通道 → 稳定版，全部失败才会报错；安装日志里能看到每个下载地址的尝试结果与下载进度。</p>
+      </div>
+
+      <div class="faq">
+        <h3>Q2：启用后不能上网？</h3>
+        <p>概览页点「停止并关闭自启」，插件会恢复 DNSMasq。仍异常可执行：</p>
+<pre><code>/etc/init.d/adguardhome_lite stop
+/etc/init.d/dnsmasq restart</code></pre>
+      </div>
+
+      <div class="faq">
+        <h3>Q3：停止服务后面板打不开？</h3>
+        <p>正常现象，面板随服务停止。重新点「启动服务」即可。</p>
+      </div>
+
+      <div class="faq">
+        <h3>Q4：改了面板端口打不开？</h3>
+        <p>等待 5–10 秒，确认服务运行中，并检查 UCI 与 YAML 是否一致：</p>
+<pre><code>uci get adguardhome_lite.main.webport
+grep -m1 '^  address:' /etc/AdGuardHome.yaml</code></pre>
+      </div>
+
+      <div class="faq">
+        <h3>Q5：同时运行 Clash 时去广告不生效？</h3>
+        <p>先确认 <code>agh_dns_redirect</code> 链存在：</p>
+<pre><code>nft list chain inet fw4 agh_dns_redirect</code></pre>
+        <p>没有 <code>redirect to :53</code> 时，重新保存一次「接管 53 端口」。</p>
+      </div>
+
+      <div class="faq">
+        <h3>Q6：设备能连路由器但打不开网页？</h3>
+        <p>多为设备没拿到 IPv4 DNS。补一条 DHCP 下发：</p>
+<pre><code>uci add_list dhcp.lan.dhcp_option='6,路由器IP'
+uci commit dhcp
+/etc/init.d/dnsmasq restart</code></pre>
+        <p>设备断开重连后生效。</p>
+      </div>
+
+      <div class="faq">
+        <h3>Q7：重启后内核消失？</h3>
+        <p>内核装在 <code>/tmp</code> 内存位置时会这样。重新安装内核，或把安装位置改到内置存储。</p>
+      </div>
+
+      <div class="faq">
+        <h3>Q8：忘记面板密码？</h3>
+        <p>进入「基础设置 → 插件配置」，输入新密码保存即可，不需要旧密码。</p>
+      </div>
+
+      <div class="faq">
+        <h3>Q9：升级 OpenWrt 固件后？</h3>
+        <p><code>/etc/AdGuardHome.yaml</code> 和过滤缓存会保留；内核文件较大，不进入固件备份，升级后需要重新安装内核。</p>
+      </div>
+
+      <div class="faq">
+        <h3>Q10：开启「安全浏览」后解析变慢？</h3>
+        <p>安全浏览依赖 <code>family.adguard-dns.com</code>，国内不可达时会拖慢解析。到 AdGuard Home 面板关闭「安全浏览」，或执行：</p>
+<pre><code>sed -i 's/^  safebrowsing_enabled: true/  safebrowsing_enabled: false/' /etc/AdGuardHome.yaml
+/etc/init.d/adguardhome_lite restart</code></pre>
+      </div>
+
+      <div class="faq">
+        <h3>Q11：过滤规则一直更新失败？</h3>
+        <p>通常是直连 <code>raw.githubusercontent.com</code> 失败。插件会自动检测 Clash 的 HTTP 代理并写入 <code>http_proxy</code>：</p>
+<pre><code>grep -n '^http_proxy' /etc/AdGuardHome.yaml</code></pre>
+        <p>为空时启动 Clash，再回插件重新保存一次设置。</p>
+      </div>
+    </section>
+
+    <section class="card" id="s7">
+      <h2 class="sec">7. 卸载与回滚</h2>
+      <p><strong>LuCI 卸载</strong>：系统 → 软件包 → 卸载 <code>luci-app-adguardhome-lite</code>。</p>
+      <p><strong>脚本卸载</strong>：</p>
+<pre><code>sh install.sh --uninstall     # 恢复 DNS，保留配置与内核
+sh install.sh --purge         # 同时删除配置、内核与统计</code></pre>
+      <p>卸载会自动停止服务、恢复 DNSMasq、取消开机自启。</p>
+      <p>默认保留：</p>
+      <ul>
+        <li><code>/etc/config/adguardhome_lite</code></li>
+        <li><code>/etc/AdGuardHome.yaml</code></li>
+        <li><code>/etc/AdGuardHome/</code></li>
+        <li><code>/usr/bin/AdGuardHome/AdGuardHome</code></li>
+      </ul>
+      <p>彻底清理：</p>
+<pre><code>opkg remove luci-app-adguardhome-lite
+rm -f /usr/bin/AdGuardHome/AdGuardHome
+rm -rf /etc/AdGuardHome
+rm -f /etc/AdGuardHome.yaml</code></pre>
+      <p>回滚旧版：卸载本插件 → 安装 <code>luci-app-adguardhome</code> → 按旧版要求调整端口和工作目录。</p>
+    </section>
+
+    <section class="card" id="s8">
+      <h2 class="sec">8. 构建（可选）</h2>
+<pre><code>python tools/build_ipk.py      # modern + legacy ipk + SHA256SUMS
+python tools/build_run.py      # 离线 .run</code></pre>
+      <p>输出在 <code>dist/</code>：</p>
+      <ul>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.2-B1_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.2-B1-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.2-B1.run</code></li>
+        <li><code>dist/SHA256SUMS</code></li>
+      </ul>
+      <p>使用 OpenWrt SDK：</p>
+<pre><code>make menuconfig     # LuCI → Applications → luci-app-adguardhome-lite
+make package/luci-app-adguardhome-lite/compile</code></pre>
+    </section>
+
+    <section class="card" id="s9">
+      <h2 class="sec">9. 版本记录</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="tag">1.3.2-B1</span></td>
+              <td>新增暗黑主题（含首屏防闪与 iframe 底色同步）；概览新增旧版残留检测与一键清理，<code>install.sh</code> 支持 <code>--keep-old</code> / <code>--purge-old</code>；内核下载显示进度与进度条，完成后记录用时；概览内核版本按通道提示「可更新」；插件更新检查改为包含预发布版本；测试版内核改为取 GitHub 预发布标签（可走反代），失败回退官方测试通道与稳定版，升级前自动备份 <code>AdGuardHome.yaml</code>；安装时记录实际通道，概览按真实通道显示「测试版」；修复预发布内核版本号被截断；更新判定改为以 GitHub <code>prerelease</code> 字段区分通道，正式版按「基础版本 + 预发布号」比较</td>
+            </tr>
+            <tr><td>1.3.1</td><td>过滤规则页新增家长控制开关；五个过滤开关改为单行排布；新增按设备内存（512MB / 1GB / 2GB+）精简规则的按钮；预置黑名单默认按 512MB 档启用，白名单默认关闭；内置订阅地址加 gh-proxy.org 前缀；运行状态不再显示 GitHub 反代</td></tr>
+            <tr><td>1.3.0</td><td>基础设置改为二级导航（插件配置 / DNS 解析 / 过滤规则）；概览重排，初始化配置可折叠；查询日志并入运行日志；新增上游 DNS 编辑器与本地解析提示；白名单订阅可见可管，过滤开关状态准确且失败自动回滚；移除无效的家长控制开关</td></tr>
+            <tr><td>1.2.0</td><td>排除接口改为下拉多选，按接管方式置灰无效项，修复规则粘连</td></tr>
+            <tr><td>1.1.9</td><td>新增不参与接管的接口与客户端</td></tr>
+            <tr><td>1.1.8</td><td>版本提示与更新检查、<code>install.sh -f</code>、DNSMasq 1745 回读校验</td></tr>
+            <tr><td>1.1.6</td><td>支持 25.12 / apk 脚本安装</td></tr>
+            <tr><td>1.1.5</td><td>页内过滤统计、成人内容拦截、自动写入 <code>http_proxy</code></td></tr>
+            <tr><td>1.1.2</td><td>新增 <code>agh_dns_redirect</code> 链，防止 Clash 绕过过滤</td></tr>
+            <tr><td>1.1.0</td><td>修复 DNSMasq 抢端口断网，新增 Clash 前置模式</td></tr>
+            <tr><td>1.0.0</td><td>首个版本</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" id="s10">
+      <h2 class="sec">10. 安全建议</h2>
+      <ul>
+        <li>不要将 <code>13800</code> 面板端口映射到公网。</li>
+        <li>默认密码仅供首次登录，请及时修改。</li>
+        <li>「接管 53」会调整 DNSMasq，若同时运行 Pi-hole、旧版 AdGuard Home 或自建 DNS，请先确认端口不冲突。</li>
+        <li>高级配置会直接修改 <code>/etc/AdGuardHome.yaml</code>，修改前请备份。</li>
+        <li>对安全要求高的环境，请为 LuCI 启用 HTTPS。</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer>AdGuard Home 助手 · 使用说明 1.3.2-B1 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var map = {};
+  links.forEach(function (a) {
+    var el = document.querySelector(a.getAttribute('href'));
+    if (el) map[el.id] = a;
+  });
+  if (!('IntersectionObserver' in window)) return;
+
+  var visible = {};
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      visible[entry.target.id] = entry.isIntersecting;
+    });
+    var current = null;
+    Object.keys(map).forEach(function (id) {
+      if (visible[id] && !current) current = id;
+    });
+    if (!current) return;
+    links.forEach(function (a) { a.classList.remove('active'); });
+    map[current].classList.add('active');
+  }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
+
+  Object.keys(map).forEach(function (id) {
+    observer.observe(document.getElementById(id));
+  });
+})();
+</script>
+</body>
+</html>
