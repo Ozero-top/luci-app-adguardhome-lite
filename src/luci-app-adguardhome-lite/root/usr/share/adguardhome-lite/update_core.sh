@@ -270,6 +270,9 @@ fi
 
 log_msg "内核已替换，版本：$newver，大小：$(( newsize / 1024 / 1024 ))MB"
 
+# 内核已更换，清掉控制器缓存的版本号，避免页面继续显示旧版本
+rm -f /var/run/adguardhome_lite_core_version
+
 # 如果原来在运行或已设置开机自启，则启动服务
 if [ "$was_enabled" = "1" ] || [ "$was_running" = "1" ]; then
     log_msg "正在启动 AdGuard Home..."
