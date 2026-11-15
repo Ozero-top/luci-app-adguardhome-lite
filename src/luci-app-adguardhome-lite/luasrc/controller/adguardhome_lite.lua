@@ -12,6 +12,7 @@ local SHARE = "/usr/share/adguardhome-lite"
 local RUN = "/var/run/adguardhome_lite"
 local STATS_CACHE = RUN .. "_stats.json"
 local VERSION_CACHE = RUN .. "_core_version"
+local CORE_UPDATE = RUN .. "_core_update"
 local PLUGIN_UPDATE = RUN .. "_plugin_update"
 local INSTALL_VERSION = SHARE .. "/install_version"
 local RELEASE_URL = "https://github.com/Ozero-top/luci-app-adguardhome-lite/releases/latest"
@@ -388,6 +389,41 @@ local function version_newer(latest, current)
     return false
 end
 
+-- 内核更新检查：按「内核更新通道」取对应最新版本，结果缓存 24 小时
+local function core_update_info(binpath, channel)
+    local cache = fs.readfile(CORE_UPDATE) or ""
+    local stable = cache:match("stable=([^\n]*)") or ""
+    local beta = cache:match("beta=([^\n]*)") or ""
+    local checked = tonumber(cache:match("time=(%d+)"))
+
+    if not checked or (os.time() - checked) > 86400 then
+        -- 先写占位时间，避免每次轮询都重复启动检查任务
+        fs.writefile(CORE_UPDATE, "stable=" .. stable .. "\nbeta=" .. beta .. "\ntime=" .. os.time() .. "\n")
+        sys.exec("sh " .. SHARE .. "/check_core_update.sh >/dev/null 2>&1 &")
+    end
+
+    -- 稳定版只看正式版；测试版在预发布与正式版中取更新的一个
+    local candidates = { stable }
+    if channel == "beta" and beta ~= "" then
+        candidates = { beta, stable }
+    end
+    local latest = ""
+    for i = 1, #candidates do
+        local v = candidates[i]
+        if v ~= "" and (latest == "" or version_newer(v, latest)) then
+            latest = v
+        end
+    end
+
+    local current = core_version(binpath)
+    return {
+        current = current,
+        latest = latest,
+        beta = latest:lower():find("%-b%.?%d") ~= nil,
+        update = (latest ~= "" and current ~= "" and version_newer(latest, current)) or false
+    }
+end
+
 -- 插件版本：取包管理器与 install.sh 记录中较新的一个，兼容 ipk 与脚本安装混用
 local function plugin_version()
     local cached = read_cache(RUN .. "_plugin_version", 3600)
@@ -444,7 +480,7 @@ local function plugin_update_info()
     local newer = version_newer(latest, current)
 
     -- 预发布版本只提示同样在跑测试版用户，避免把 beta 推给稳定版
-    local current_beta = current:lower():find("%-b%d") ~= nil
+    local current_beta = current:lower():find("%-b%.?%d") ~= nil
     if beta and not current_beta then
         newer = false
     end
@@ -667,6 +703,7 @@ function action_status()
         admin_user = cfg("adminuser", "admin"),
         admin_pass = password,
         channel = cfg("channel", "stable"),
+        core_update = core_update_info(binpath, cfg("channel", "stable")),
         github_proxy = cfg("github_proxy", "gh-proxy.org"),
         mode_applied = cfg("mode_applied", "none"),
         openclash_hijack = hijack_port ~= "",

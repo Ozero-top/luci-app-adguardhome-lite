@@ -221,6 +221,13 @@
 		return /(^|-)b\.?\d/i.test(String(version || ''));
 	}
 
+	function coreUpdateBadge(d) {
+		var u = d && d.core_update;
+		if (!u || !u.update || !u.latest) return '';
+		return ' <a href="#" class="agh-update-tip agh-core-update" title="点击前往安装">可更新 v' +
+			esc(u.latest) + (u.beta ? '（测试版）' : '') + '</a>';
+	}
+
 	function renderCoreVersion(d) {
 		if (!d.core) return '<span class="agh-bad">未安装</span>';
 		var version = d.version || '已安装';
@@ -228,6 +235,7 @@
 		if (isBetaVersion(d.version)) {
 			html += ' <span class="agh-beta-tag">测试版</span>';
 		}
+		html += coreUpdateBadge(d);
 		return html;
 	}
 
@@ -333,6 +341,18 @@
 		}
 	}
 
+	// 点击「可更新」跳转到初始化配置的内核安装按钮
+	function attachCoreUpdateAction() {
+		var links = document.querySelectorAll('.agh-core-update');
+		for (var i = 0; i < links.length; i++) {
+			links[i].onclick = function (e) {
+				e.preventDefault();
+				var btn = $('agh-install-btn');
+				if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			};
+		}
+	}
+
 	function renderStatus() {
 		var d = state.status;
 		updateHeaderStatus();
@@ -397,6 +417,7 @@
 		if (grid) grid.innerHTML = html;
 
 		attachPasswordActions(pass);
+		attachCoreUpdateAction();
 		updateSteps(d);
 		applyStepsVisibility(d);
 
@@ -439,11 +460,21 @@
 		}
 		var coreHint = $('agh-core-hint');
 		if (coreHint) {
+			var cu = d.core_update;
 			if (d.core) {
-				var hintText = '已安装，当前版本：' + (d.version || '未知');
-				if (isBetaVersion(d.version)) hintText += '（测试版，升级大版本前会自动备份配置）';
+				var hintText;
+				if (cu && cu.update && cu.latest) {
+					hintText = '已安装 ' + (d.version || '未知') + '，发现新版本 ' + cu.latest +
+						(cu.beta ? '（测试版）' : '（稳定版）') + '，点击「安装/更新内核」升级';
+					coreHint.className = 'agh-hint agh-warn';
+				} else {
+					hintText = '已安装，当前版本：' + (d.version || '未知');
+					if (isBetaVersion(d.version)) hintText += '（测试版，升级大版本前会自动备份配置）';
+					coreHint.className = 'agh-hint';
+				}
 				coreHint.textContent = hintText;
 			} else {
+				coreHint.className = 'agh-hint';
 				coreHint.textContent = d.update_running ? '正在安装...' : '尚未安装内核';
 			}
 		}
