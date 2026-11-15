@@ -221,6 +221,14 @@
 		return /(^|-)b\.?\d/i.test(String(version || ''));
 	}
 
+	// 安装通道优先用安装时记录的值；旧安装没有记录时按版本号兜底
+	function isCoreBeta(d) {
+		var ch = d && d.core_channel;
+		if (ch === 'beta') return true;
+		if (ch === 'stable') return false;
+		return isBetaVersion(d && d.version);
+	}
+
 	function coreUpdateBadge(d) {
 		var u = d && d.core_update;
 		if (!u || !u.update || !u.latest) return '';
@@ -232,7 +240,7 @@
 		if (!d.core) return '<span class="agh-bad">未安装</span>';
 		var version = d.version || '已安装';
 		var html = '<span class="agh-ok">' + esc(version) + '</span>';
-		if (isBetaVersion(d.version)) {
+		if (isCoreBeta(d)) {
 			html += ' <span class="agh-beta-tag">测试版</span>';
 		}
 		html += coreUpdateBadge(d);
@@ -464,12 +472,12 @@
 			if (d.core) {
 				var hintText;
 				if (cu && cu.update && cu.latest) {
-					hintText = '已安装 ' + (d.version || '未知') + '，发现新版本 ' + cu.latest +
+					hintText = '已安装 ' + (d.version || '未知') + '，发现新版本 v' + cu.latest +
 						(cu.beta ? '（测试版）' : '（稳定版）') + '，点击「安装/更新内核」升级';
 					coreHint.className = 'agh-hint agh-warn';
 				} else {
 					hintText = '已安装，当前版本：' + (d.version || '未知');
-					if (isBetaVersion(d.version)) hintText += '（测试版，升级大版本前会自动备份配置）';
+					if (isCoreBeta(d)) hintText += '（测试版，升级大版本前会自动备份配置）';
 					coreHint.className = 'agh-hint';
 				}
 				coreHint.textContent = hintText;

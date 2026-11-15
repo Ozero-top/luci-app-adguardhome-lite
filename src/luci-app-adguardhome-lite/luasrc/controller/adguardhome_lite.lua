@@ -705,6 +705,7 @@ function action_status()
         admin_pass = password,
         channel = cfg("channel", "stable"),
         core_update = core_update_info(binpath, cfg("channel", "stable")),
+        core_channel = cfg("core_channel", ""),
         github_proxy = cfg("github_proxy", "gh-proxy.org"),
         mode_applied = cfg("mode_applied", "none"),
         openclash_hijack = hijack_port ~= "",
