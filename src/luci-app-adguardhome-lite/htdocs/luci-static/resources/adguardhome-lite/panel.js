@@ -859,6 +859,35 @@
 		});
 	}
 
+	function updateProgressBar(logText, running, done) {
+		var bar = $('agh-progress-bar');
+		if (!bar) return;
+		var fill = bar.querySelector('i');
+		var matches = String(logText || '').match(/下载进度：\d+%/g);
+		var pct = -1;
+		if (matches && matches.length) {
+			pct = parseInt(matches[matches.length - 1].replace(/[^0-9]/g, ''), 10);
+		}
+
+		if (done) {
+			bar.classList.remove('is-indeterminate');
+			if (fill) fill.style.width = '100%';
+			return;
+		}
+		if (!running) {
+			bar.classList.remove('is-indeterminate');
+			if (fill) fill.style.width = '0';
+			return;
+		}
+		if (pct < 0) {
+			bar.classList.add('is-indeterminate');
+			if (fill) fill.style.width = '';
+			return;
+		}
+		bar.classList.remove('is-indeterminate');
+		if (fill) fill.style.width = Math.max(2, Math.min(100, pct)) + '%';
+	}
+
 	function showProgress(text) {
 		var wrap = $('agh-progress-wrap');
 		if (wrap) wrap.hidden = false;
@@ -866,11 +895,13 @@
 		if (log && text) log.textContent = text;
 		var stateEl = $('agh-progress-state');
 		if (stateEl) stateEl.textContent = '';
+		updateProgressBar('', true, false);
 	}
 
 	function hideProgress() {
 		var wrap = $('agh-progress-wrap');
 		if (wrap) wrap.hidden = true;
+		updateProgressBar('', true, false);
 	}
 
 	function startProgressPoll() {
@@ -878,6 +909,7 @@
 		var ticks = 0;
 		state.updateTimer = true;
 		state.busy = true;
+		state.updateStart = Date.now();
 
 		async function tick() {
 			ticks++;
@@ -890,7 +922,9 @@
 				}
 				var stateEl = $('agh-progress-state');
 				if (d && d.running) {
-					if (stateEl) stateEl.textContent = '进行中...';
+					var elapsed = Math.max(0, Math.round((Date.now() - state.updateStart) / 1000));
+					if (stateEl) stateEl.textContent = '进行中 · ' + elapsed + ' 秒';
+					updateProgressBar(log ? log.textContent : '', true, false);
 					ticks = 0;
 					state.updateTimer = setTimeout(tick, 2000);
 					return;
@@ -899,6 +933,7 @@
 					state.updateTimer = null;
 					state.busy = false;
 					if (stateEl) stateEl.textContent = d.code === 0 ? '完成' : ('失败（错误码 ' + d.code + '）');
+					updateProgressBar('', false, d.code === 0);
 					refreshStatus(true);
 					showToast(d.code === 0 ? '内核安装/更新完成' : '安装失败，请查看日志', d.code === 0 ? 'ok' : 'bad');
 					if (d.code === 0) setTimeout(hideProgress, 3000);
