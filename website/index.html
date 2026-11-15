@@ -510,7 +510,7 @@ footer{padding:58px 0 28px;border-top:1px solid var(--border);background:rgba(25
         <article class="feature reveal">
           <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></div>
           <h3>一键装内核</h3>
-          <p>自动识别 CPU 架构，从官方源下载最新稳定版；支持 GitHub 反代与 fake-IP 环境。</p>
+          <p>自动识别 CPU 架构，从官方源下载最新稳定版或测试版；支持 GitHub 反代与 fake-IP，下载进度实时可见，有新版会在概览提示。</p>
         </article>
         <article class="feature reveal d1">
           <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></svg></div>
@@ -536,6 +536,16 @@ footer{padding:58px 0 28px;border-top:1px solid var(--border);background:rgba(25
           <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg></div>
           <h3>配置可维护</h3>
           <p>高级配置保存前自动 --check-config 并留备份；内置中文界面、11 个过滤规则和 1 个白名单。</p>
+        </article>
+        <article class="feature reveal d1">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg></div>
+          <h3>暗黑主题</h3>
+          <p>概览右上角一键切换暗色 / 浅色，选择保存在浏览器本地；首屏直接按主题渲染，刷新不再闪浅色。</p>
+        </article>
+        <article class="feature reveal d2">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></div>
+          <h3>旧版清理</h3>
+          <p>自动检测旧版 luci-app-adguardhome、旧 LuCI 文件与旧内核，可一键清理；文件先备份，配置与统计保留。</p>
         </article>
       </div>
     </div>
@@ -634,7 +644,7 @@ footer{padding:58px 0 28px;border-top:1px solid var(--border);background:rgba(25
         <article class="step reveal">
           <div class="step-num">01</div>
           <h3>安装内核</h3>
-          <p>概览页点「安装/更新内核」，插件自动识别架构并从官方源下载，失败会回退 GitHub 直连。</p>
+          <p>概览页点「安装/更新内核」，插件自动识别架构并从官方源下载，进度实时显示；失败会回退 GitHub 直连，有新版会在版本旁提示。</p>
           <span class="step-tag"><i></i>约 1–3 分钟</span>
         </article>
         <article class="step reveal d1">
@@ -752,7 +762,7 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
           </div>
         </div>
       </div>
-      <p class="compat-note">实测环境：iStoreOS 24.10 / 25.12 x86_64、Kwrt aarch64；内核基线 AdGuard Home v0.107.80。</p>
+      <p class="compat-note">实测环境：iStoreOS 24.10 / 25.12 x86_64、Kwrt aarch64；内核实测 AdGuard Home v0.107.80 与 v1.0.0-b.2。</p>
     </div>
   </section>
 
