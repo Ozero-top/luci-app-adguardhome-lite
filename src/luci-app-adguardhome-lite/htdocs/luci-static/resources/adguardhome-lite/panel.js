@@ -245,7 +245,7 @@
 
 		if (p && p.update && p.latest) {
 			tip.href = p.url || '#';
-			tip.textContent = '发现新版本 v' + p.latest + '，前往更新';
+			tip.textContent = '发现新版本 v' + p.latest + (p.beta ? '（测试版）' : '') + '，前往更新';
 			tip.hidden = false;
 		} else {
 			tip.hidden = true;
