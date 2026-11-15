@@ -2,14 +2,26 @@
 # AdGuard Home 助手 - 检查内核是否有新版本（含预发布）
 # 由控制器在缓存过期时后台调用，结果写入 /var/run/adguardhome_lite_core_update
 #
-# 数据源优先用 GitHub Releases API：只有它的 prerelease 字段能准确区分通道。
-# 不能只按版本号里的 -b 判断，因为稳定版序列里也会出现 0.107.80-b.1 这类预发布标签。
-# API 不可用时回退 releases.atom（仅最近 10 条），再按 -b.x 粗略区分。
+# 通道判定以 GitHub Releases API 的 prerelease 字段为准：正式版通道只取
+# prerelease=false 的最新条目，测试通道取 prerelease=true 的最新条目。
+# 版本号里的 -b 只作为 Atom 兜底时的近似判断（官方可能调整命名）。
+# API 不可用时回退 releases.atom（仅最近 10 条）。
 
 CACHE="/var/run/adguardhome_lite_core_update"
+LOCK="/var/run/adguardhome_lite_core_update.lock"
 REPO="AdguardTeam/AdGuardHome"
 API="https://api.github.com/repos/$REPO/releases?per_page=30"
 FEED="https://github.com/$REPO/releases.atom"
+
+# 避免多个页面同时刷新时重复请求 GitHub，触发限流
+# 异常退出可能残留锁目录，超过 10 分钟视为失效
+if [ -d "$LOCK" ] && [ -n "$(find "$LOCK" -mmin +10 2>/dev/null)" ]; then
+    rmdir "$LOCK" 2>/dev/null
+fi
+if ! mkdir "$LOCK" 2>/dev/null; then
+    exit 0
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
 
 fetch() {
     curl -fsS --connect-timeout 6 -m 20 "$1" 2>/dev/null
@@ -69,7 +81,7 @@ if [ -z "$stable" ] && [ -z "$beta" ]; then
     fi
 fi
 
-# 全部失败时保留旧结果，等待下一个 24 小时周期重试
+# 全部失败时不写缓存，控制器会在一小时后重试
 [ -n "$stable" ] || [ -n "$beta" ] || exit 0
 
 stable=${stable#v}

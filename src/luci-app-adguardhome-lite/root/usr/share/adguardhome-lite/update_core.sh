@@ -52,6 +52,15 @@ fi
 
 load_conf
 
+# 页面已确认的目标通道与版本（由 LuCI 传入），优先于 UCI 当前值，
+# 保证「提示的版本」和「实际安装的版本」一致
+target_channel="$1"
+target_ver="$2"
+target_ver=${target_ver#v}
+case "$target_channel" in
+    stable|beta) channel="$target_channel" ;;
+esac
+
 [ -n "$binpath" ] || die "内核路径为空，请到“基础设置”中检查配置。"
 [ -n "$webport" ] || webport="13800"
 
@@ -94,24 +103,35 @@ case "$github_proxy" in
         ;;
 esac
 
-# 稳定版下载链：反代优先，其次官方 CDN，最后 GitHub 直连
-if [ -n "$proxy_host" ]; then
+# 稳定版下载链：页面已确认版本时按 tag 直连，其次官方 CDN 兜底
+if [ -n "$target_ver" ] && [ "$channel" != "beta" ]; then
+    tagged_url="https://github.com/AdguardTeam/AdGuardHome/releases/download/v${target_ver}/AdGuardHome_linux_${arch}.tar.gz"
+    if [ -n "$proxy_host" ]; then
+        stable_list="https://${proxy_host}/${tagged_url} ${tagged_url} ${release_url}"
+    else
+        stable_list="${tagged_url} ${release_url}"
+    fi
+elif [ -n "$proxy_host" ]; then
     stable_list="https://${proxy_host}/${github_url} $release_url $github_url"
 else
     stable_list="$release_url $github_url"
 fi
 
-# 测试版优先取 GitHub 预发布标签（releases.atom 不含 API 限流，可走反代），官方 beta 通道作兜底
+# 测试版优先使用页面已确认的版本；没有时再取 GitHub 预发布标签（atom 可走反代），官方 beta 通道作兜底
 beta_tag=""
 beta_github=""
 if [ "$channel" = "beta" ]; then
+    beta_tag="$target_ver"
+fi
+if [ "$channel" = "beta" ] && [ -z "$beta_tag" ]; then
     atom_url="https://github.com/AdguardTeam/AdGuardHome/releases.atom"
     FEED_FILE="/tmp/adguardhome_lite_releases_$$.xml"
     atom_urls="$atom_url"
     [ -n "$proxy_host" ] && atom_urls="$atom_url https://${proxy_host}/${atom_url}"
     for _fu in $atom_urls; do
         if download_file "$_fu" "$FEED_FILE" >/dev/null 2>&1 && [ -s "$FEED_FILE" ]; then
-            beta_tag=$(grep -o 'releases/tag/[^"]*' "$FEED_FILE" | sed 's#releases/tag/##' | grep -m 1 -- '-b\.')
+            beta_tag=$(grep -o 'releases/tag/[^"]*' "$FEED_FILE" | sed 's#releases/tag/##' | grep -m 1 -E -- '-b\.?[0-9]')
+            beta_tag=${beta_tag#v}
             [ -n "$beta_tag" ] && break
         fi
         rm -f "$FEED_FILE"
@@ -121,7 +141,7 @@ fi
 
 if [ "$channel" = "beta" ]; then
     if [ -n "$beta_tag" ]; then
-        beta_github="https://github.com/AdguardTeam/AdGuardHome/releases/download/${beta_tag}/AdGuardHome_linux_${arch}.tar.gz"
+        beta_github="https://github.com/AdguardTeam/AdGuardHome/releases/download/v${beta_tag}/AdGuardHome_linux_${arch}.tar.gz"
         if [ -n "$proxy_host" ]; then
             url_list="https://${proxy_host}/${beta_github} $beta_github $static_url"
         else

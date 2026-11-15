@@ -366,37 +366,73 @@ local function core_version(binpath)
     return ver
 end
 
-local function version_parts(v)
+-- 版本号拆成「基础版本 + 预发布后缀」：1.0.0-b.2 → base {1,0,0}，pre "b"，pre_num 2
+local function version_info(v)
+    local s = tostring(v or ""):lower()
+    s = s:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^v", "")
+    local base, rest = s:match("^(%d[%d%.]*)%s*(.*)$")
+    if not base then
+        return nil
+    end
+    base = base:gsub("%.$", "")
+
     local parts = {}
-    for n in tostring(v or ""):gmatch("%d+") do
+    for n in base:gmatch("%d+") do
         parts[#parts + 1] = tonumber(n)
     end
-    return parts
+
+    local pre, pre_num = rest:match("^[%.%-_~]*([%a]+)[%.%-_~]*(%d*)")
+    return {
+        parts = parts,
+        pre = pre or "",
+        pre_num = tonumber(pre_num or "") or 0
+    }
 end
 
 local function version_newer(latest, current)
-    if latest == "" or current == "" then
+    local a, b = version_info(latest), version_info(current)
+    if not a or not b then
         return false
     end
 
-    local a, b = version_parts(latest), version_parts(current)
-    for i = 1, math.max(#a, #b) do
-        local x, y = a[i] or 0, b[i] or 0
+    for i = 1, math.max(#a.parts, #b.parts) do
+        local x, y = a.parts[i] or 0, b.parts[i] or 0
         if x ~= y then
             return x > y
         end
     end
-    return false
+
+    -- 基础版本相同时：正式版大于预发布版，预发布之间按通道名与序号比较
+    if a.pre == "" and b.pre == "" then
+        return false
+    end
+    if a.pre == "" then
+        return true
+    end
+    if b.pre == "" then
+        return false
+    end
+    if a.pre ~= b.pre then
+        return a.pre > b.pre
+    end
+    return a.pre_num > b.pre_num
+end
+
+-- 缓存里的版本可能带 v 前缀或空白，统一后再比较
+local function clean_tag(v)
+    return (tostring(v or ""):gsub("%s+", ""):gsub("^[vV]", ""))
 end
 
 -- 内核更新检查：按「内核更新通道」取对应最新版本，结果缓存 24 小时
 local function core_update_info(binpath, channel)
     local cache = fs.readfile(CORE_UPDATE) or ""
-    local stable = cache:match("stable=([^\n]*)") or ""
-    local beta_tag = cache:match("beta=([^\n]*)") or ""
+    local stable = clean_tag(cache:match("stable=([^\n]*)"))
+    local beta_tag = clean_tag(cache:match("beta=([^\n]*)"))
     local checked = tonumber(cache:match("time=(%d+)"))
 
-    if not checked or (os.time() - checked) > 86400 then
+    -- 拿到结果才缓存一天；检查失败时只缓存一小时，尽快重试
+    local ttl = (stable ~= "" and beta_tag ~= "") and 86400 or 3600
+    if not checked or (os.time() - checked) > ttl then
         -- 先写占位时间，避免每次轮询都重复启动检查任务
         fs.writefile(CORE_UPDATE, "stable=" .. stable .. "\nbeta=" .. beta_tag .. "\ntime=" .. os.time() .. "\n")
         sys.exec("sh " .. SHARE .. "/check_core_update.sh >/dev/null 2>&1 &")
@@ -467,11 +503,13 @@ end
 -- 插件更新检查：结果缓存 24 小时，过期后在后台重新检查，不阻塞状态接口
 local function plugin_update_info()
     local cache = fs.readfile(PLUGIN_UPDATE) or ""
-    local latest = cache:match("latest=([^\n]*)") or ""
+    local latest = clean_tag(cache:match("latest=([^\n]*)"))
     local beta = cache:match("beta=(%d)") == "1"
     local checked = tonumber(cache:match("time=(%d+)"))
 
-    if not checked or (os.time() - checked) > 86400 then
+    -- 拿到结果才缓存一天；检查失败时只缓存一小时，尽快重试
+    local ttl = (latest ~= "") and 86400 or 3600
+    if not checked or (os.time() - checked) > ttl then
         -- 先写占位时间，避免每次轮询都重复启动检查任务
         fs.writefile(PLUGIN_UPDATE, "latest=" .. latest .. "\nbeta=" .. (beta and "1" or "0") .. "\ntime=" .. os.time() .. "\n")
         sys.exec("sh " .. SHARE .. "/check_plugin_update.sh >/dev/null 2>&1 &")
@@ -1166,9 +1204,18 @@ function action_core_install()
         return
     end
 
+    -- 把页面已确认的通道与版本传给安装脚本，保证提示的版本就是实际安装的版本
+    local channel = cfg("channel", "stable")
+    local info = core_update_info(cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome"), channel)
+    local cmd = "sh " .. SHARE .. "/update_core.sh"
+    if info.latest ~= "" then
+        local target_channel = info.beta and "beta" or "stable"
+        cmd = cmd .. " " .. string.format("%q", target_channel) .. " " .. string.format("%q", info.latest)
+    end
+
     fs.writefile(RUN .. "_update.log", "正在启动内核安装任务...\n")
     fs.remove(RUN .. "_update.code")
-    sys.exec("sh " .. SHARE .. "/update_core.sh >" .. RUN .. "_update.log 2>&1 &")
+    sys.exec(cmd .. " >" .. RUN .. "_update.log 2>&1 &")
 
     http.prepare_content("application/json")
     http.write_json({ ok = true })
