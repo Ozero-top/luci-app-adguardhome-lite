@@ -356,7 +356,9 @@ local function core_version(binpath)
         return ""
     end
 
-    local ver = out:match("[vV][%d%.]+") or ""
+    -- 版本号可能带预发布后缀（v1.0.0-b.2），不能只取数字和小数点
+    local ver = out:match("[vV]%d[%w%.%-]*") or ""
+    ver = ver:gsub("[^%w%.%-]+$", "")
     if ver ~= "" then
         fs.writefile(VERSION_CACHE, ver)
     end
