@@ -50,6 +50,11 @@ case "$dns_mode" in
         upstream="127.0.0.1:1745"
         upstream_note="DNSMasq（1745）"
         ;;
+    passwall)
+        # AGH 占 53，查询交给 PassWall 自己的 DNS 做分流；PassWall 未启用时回退 DNSMasq
+        upstream="$(passwall_upstream_dns)"
+        upstream_note="PassWall DNS（$upstream）"
+        ;;
     openclash)
         # Clash 串联：DNSMasq 把查询转发给 AdGuard Home，再交给 Clash 的 DNS
         upstream="127.0.0.1:$clash_dns_port"
@@ -84,8 +89,8 @@ yaml_set_list "$configpath" "upstream_dns" "$upstream"
 # 记录自动写入的上游，后续切换模式时只改动插件自己写入的值
 uci -q set "$CONF.main.auto_upstream=$upstream"
 
-# 本地 PTR 解析只允许接管 53 模式指向 DNSMasq，其它模式会形成查询环
-if [ "$dns_mode" = "takeover" ]; then
+# 本地 PTR 解析只允许接管 53 / PassWall 前置指向 DNSMasq，其它模式会形成查询环
+if [ "$dns_mode" = "takeover" ] || [ "$dns_mode" = "passwall" ]; then
     yaml_set_scalar "$configpath" "use_private_ptr_resolvers" "true"
     yaml_set_list "$configpath" "local_ptr_upstreams" "127.0.0.1:1745"
 else

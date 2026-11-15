@@ -55,8 +55,9 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 ### DNS 接管
 
-- **四种接管方式**：接管 53、DNSMasq 上游、Clash 前置、仅面板（「Clash 串联」已下线，旧配置自动迁移）。
+- **五种接管方式**：接管 53、PassWall 前置、DNSMasq 上游、Clash 前置、仅面板（「Clash 串联」已下线，旧配置自动迁移）。
 - **Clash 共存**：推荐「接管 53 + Clash DNS 劫持/转发」。插件自建 `agh_dns_redirect` 链收回设备的 53 查询，Clash 劫持指向 `53`、`1745` 还是 `7874` 都绕不过过滤；也支持「Clash → AdGuard Home → 真实 DNS」的前置链路。
+- **PassWall 共存**：不用关闭 PassWall 的 DNS 劫持。选「PassWall 前置」时插件把收回链提到 `priority -102`，先于 PassWall 的劫持生效，上游自动指向 PassWall 自己的 DNS（默认从 `11400` 起的动态端口），过滤、逐设备统计与国内外分流同时保留。
 - **缓存与上游**：DNS 缓存默认开启（16MB，可关闭）；首次生成默认关闭 DNSSEC、使用并行上游，之后保存不再覆盖用户在 AGH 面板的修改。
 - **上游可编辑**：默认按接管方式自动写入，也可固定自定义列表，支持 DoH/DoT/DoQ 与 `[/域名/]IP` 条件转发；加密预设不会覆盖自定义上游。
 - **不覆盖自定义配置**：`http_proxy`、本地 PTR、上游 DNS 只更新插件自己写入的值，用户手改的代理、反向解析和上游保持原样。
@@ -169,14 +170,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.2-B1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.2-B2_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.2-B1` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.2-B2` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -194,7 +195,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.2-B1 -m https://gh-proxy.org
+sh install.sh -v 1.3.2-B2 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会在 `apk` 的已安装列表里留记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
@@ -226,6 +227,7 @@ sh install.sh -v 1.3.2-B1 -m https://gh-proxy.org
 | 方式 | 完整链路 | 适用场景 |
 |---|---|---|
 | **接管 53 端口**（默认） | 客户端 → 53 AdGuard Home → 1745 DNSMasq → 7874 Clash DNS / 上游 DNS | 想逐设备统计；装了 Clash、开着 DNS 劫持/转发也能用（插件自动收回 53） |
+| PassWall 前置 | 客户端 → 53 AdGuard Home → 11400 起 PassWall DNS → 分流 | 装了 PassWall、不想关它的 DNS 劫持，又想保留过滤与逐设备统计 |
 | DNSMasq 上游 | 客户端 → 53 DNSMasq → 5333 AdGuard Home → 自动上游 | 不想让 AdGuard Home 占 53，且没有程序抢 53 |
 | Clash 前置 | 客户端 → Clash 劫持 → 7874 Clash DNS → 5335 AdGuard Home → 真实 DNS | 不想让 AdGuard Home 占 53、不需要逐设备统计 |
 | 仅面板模式 | 不接管 DNS，仅提供管理面板 | 先体验面板或手动接管 |
@@ -235,6 +237,7 @@ sh install.sh -v 1.3.2-B1 -m https://gh-proxy.org
 | 目标 | 推荐 |
 |---|---|
 | 逐设备统计、所有域名先过滤，同时保留 fake-IP 与分流 | 「接管 53」+ Clash DNS 劫持/转发 |
+| 不用 Clash，用 PassWall 做分流 | 「PassWall 前置」 |
 | 不使用 Clash | 「接管 53」 |
 | 不想让 AdGuard Home 占 53，也不在乎逐设备统计 | 「Clash 前置」 |
 
@@ -268,6 +271,22 @@ nft list chain inet fw4 dstnat | grep 'Clash DNS Hijack'
 - 有 `agh_dns_redirect` 链（`priority -101`）：正常，它在 Clash 的劫持规则之前生效；
 - Clash 自己的劫持写成 `:1745` 或 `:7874` 都没关系，前面的自定义链已经先接住了；
 - 没有 `agh_dns_redirect` 且劫持直接指向 `:7874`：查询会跳过 AdGuard Home，重新选一次「接管 53 端口」。
+
+### PassWall 前置
+
+PassWall 默认开着 DNS 劫持，会把局域网 53 查询收到自己的 DNS（端口从 `11400` 起动态分配）。选「PassWall 前置」时不需要关闭它：
+
+```text
+客户端 → 53 AdGuard Home（过滤、记录真实设备 IP）
+      → 127.0.0.1:<PassWall DNS 端口>（国内外分流）→ 真实 DNS
+```
+
+- 插件自建的 `agh_dns_redirect` 链使用 `priority -102`（比 PassWall 的 `-101` 更靠前），设备的 53 查询先进入 AdGuard Home；
+- 系统 DNSMasq 仍移到 `1745`；AdGuard Home 上游由插件写成 `127.0.0.1:<端口>`，端口从 PassWall 运行时变量 `/tmp/etc/passwall/var` 读取；
+- PassWall 未启用时上游回退为 `127.0.0.1:1745`，不会因为上游指向不存在的端口而断网；
+- 该模式不支持「排除接口 / 客户端」：排除的设备会直接落到 PassWall 的劫持上，仍有分流，但不经过 AdGuard Home。
+
+PassWall 重启后若因端口占用换了 DNS 端口，概览会提示「上游未指向当前 PassWall DNS」，重新保存一次「PassWall 前置」即可。
 
 ### 排除接口与客户端（仅「接管 53」）
 
@@ -315,14 +334,15 @@ DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，
 
 </details>
 
-### 与 Clash 的启动顺序
+### 与 Clash / PassWall 的启动顺序
 
-开机顺序固定为 **DNSMasq（19）→ AdGuard Home（95）→ Clash（99）**：前置模式下 Clash 的上游写着 `127.0.0.1:5335`，必须等 AdGuard Home 先监听；接管 53 时 AdGuard Home 又依赖先启动的 DNSMasq（1745）。插件已注册 `START=95`，无需手动调整。
+开机顺序固定为 **DNSMasq（19）→ AdGuard Home（95）→ Clash / PassWall（99）**：前置模式下 Clash 的上游写着 `127.0.0.1:5335`，必须等 AdGuard Home 先监听；接管 53 时 AdGuard Home 又依赖先启动的 DNSMasq（1745）。插件已注册 `START=95`，无需手动调整。
 
 | DNS 接管方式 | 顺序要求 | 说明 |
 |---|---|---|
 | Clash 前置 | 无要求 | AdGuard Home 上游是真实 DNS，不依赖 Clash |
 | 接管 53 端口 | 可与 Clash 劫持同用 | 自定义链先收回 53，再经 DNSMasq（1745）交给 Clash（7874） |
+| PassWall 前置 | PassWall 启动后才分流 | 收回链先占 53，上游指向 PassWall DNS；PassWall 未启动时按默认端口 `11400` 写入，不阻塞上网 |
 | DNSMasq 上游 / 仅面板 | 无要求 | 不涉及 53 端口劫持 |
 
 - 想逐设备统计：用「接管 53」，Clash 的 DNS 劫持/转发保持开启即可；

@@ -53,10 +53,44 @@ load_conf() {
     esac
 
     case "$dns_mode" in
-        takeover) dnsport="53" ;;
+        takeover|passwall) dnsport="53" ;;
         clashfirst) dnsport="5335" ;;
         *) dnsport="5333" ;;
     esac
+}
+
+# PassWall 是否启用（停止 PassWall 会残留 inet passwall 表，不能看表判断）
+passwall_enabled() {
+    [ "$(uci -q get passwall.@global[0].enabled 2>/dev/null)" = "1" ]
+}
+
+# PassWall 的 DNS 端口是动态分配的（get_new_port 11400），
+# 真实端口只在运行时写入 /tmp/etc/passwall*/var 的 ACL_default_dns_port。
+# 运行时变量不存在（PassWall 尚未启动）时按默认起始端口 11400 推断。
+passwall_dns_port() {
+    for _pwv in /tmp/etc/passwall/var /tmp/etc/passwall_tmp/var; do
+        [ -f "$_pwv" ] || continue
+        _pwp=$(awk -F= '/ACL_default_dns_port=/{print $2; exit}' "$_pwv" 2>/dev/null | tr -d "\"'[:space:]")
+        case "$_pwp" in
+            ''|*[!0-9]*) _pwp="" ;;
+        esac
+        if [ -n "$_pwp" ]; then
+            echo "$_pwp"
+            return 0
+        fi
+    done
+
+    echo "11400"
+}
+
+# PassWall 模式下 AdGuard Home 的上游：交给 PassWall 自己的 DNS 做分流与去污染。
+# PassWall 未启用时回退到本机 DNSMasq（1745），避免上游指向不存在的端口导致断网。
+passwall_upstream_dns() {
+    if passwall_enabled; then
+        echo "127.0.0.1:$(passwall_dns_port)"
+    else
+        echo "127.0.0.1:1745"
+    fi
 }
 
 # 加密上游地址：预设值或用户自定义；关闭时返回空

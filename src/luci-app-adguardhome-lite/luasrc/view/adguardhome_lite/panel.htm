@@ -236,13 +236,14 @@
 						</label>
 					</div>
 
-					<p class="agh-hint"> <b>想统计每台设备、让所有域名都先过滤 → 选「接管 53 端口」</b>；装了 Clash、开着 DNS 劫持也能用，插件会把设备的 53 查询收回 53，不会再被 Clash 抢走。<b>不想让 AdGuard Home 占 53，或不在乎逐设备统计 → 选「Clash 前置」</b>（这种模式下面板里来源全是 127.0.0.1）。切换时会自动恢复原来的 DNS 设置，不会叠加。</p>
+					<p class="agh-hint"> <b>想统计每台设备、让所有域名都先过滤 → 选「接管 53 端口」</b>；装了 Clash、开着 DNS 劫持也能用，插件会把设备的 53 查询收回 53，不会再被 Clash 抢走。<b>装了 PassWall、又不想关它的 DNS 劫持 → 选「PassWall 前置」</b>：AdGuard Home 占 53 先过滤，再交给 PassWall 自己的 DNS 分流。<b>不想让 AdGuard Home 占 53，或不在乎逐设备统计 → 选「Clash 前置」</b>（这种模式下面板里来源全是 127.0.0.1）。切换时会自动恢复原来的 DNS 设置，不会叠加。</p>
 
 				<div class="agh-form-grid agh-form-grid-3">
 						<div class="agh-field">
 							<label for="agh-set-dns-mode">DNS 接管方式</label>
 							<select id="agh-set-dns-mode">
 								<option value="takeover">接管 53 端口（默认，DNSMasq 移到 1745）</option>
+								<option value="passwall">PassWall 前置（AGH 53 → PassWall DNS 分流，保留劫持）</option>
 								<option value="upstream">DNSMasq 上游（AdGuard Home 监听 5333）</option>
 								<option value="clashfirst">Clash 前置（Clash 7874 → AGH 5335 → 真实 DNS）</option>
 								<option value="none">仅面板模式（不接管 DNS）</option>
@@ -678,9 +679,9 @@
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>二、四种 DNS 接管方式，到底选哪个？</h3>
+					<h3>二、五种 DNS 接管方式，到底选哪个？</h3>
 				</div>
-				<p class="agh-hint">记住一句话：<b>想看到每台设备、让所有域名都先过滤 → 「接管 53 端口」</b>（装了 Clash、开着 DNS 劫持也照样能用）；<b>不想让 AdGuard Home 占 53 端口 → 「Clash 前置」</b>。剩下两种只在特殊情况用。</p>
+				<p class="agh-hint">记住一句话：<b>想看到每台设备、让所有域名都先过滤 → 「接管 53 端口」</b>（装了 Clash、开着 DNS 劫持也照样能用）；<b>装了 PassWall → 「PassWall 前置」</b>（不用关 PassWall 的 DNS 劫持）；<b>不想让 AdGuard Home 占 53 端口 → 「Clash 前置」</b>。剩下两种只在特殊情况用。</p>
 				<div class="agh-table-wrap">
 					<table class="agh-table">
 						<thead>
@@ -691,6 +692,11 @@
 								<td>装了 Clash（DNS 劫持/转发开着），还想看到每台设备</td>
 								<td><b>接管 53 端口</b></td>
 								<td>插件会在 Clash 的劫持之前把设备的 53 查询收回 53，先交给 AdGuard Home 过滤，再经 DNSMasq（1745）→ Clash（7874）分流。</td>
+							</tr>
+							<tr>
+								<td>装了 PassWall（DNS 劫持开着），还想看到每台设备</td>
+								<td><b>PassWall 前置</b></td>
+								<td>插件在 PassWall 的劫持之前把设备的 53 查询收回 53，先交给 AdGuard Home 过滤，剩下的再转给 PassWall 自己的 DNS（从 11400 起的动态端口）做国内外分流。</td>
 							</tr>
 							<tr>
 								<td>没装 Clash</td>
@@ -734,6 +740,9 @@
 					<li><b>Clash 前置：</b>设备先被 Clash 的劫持规则拉进 Clash 的 DNS（7874），Clash 再把域名丢给 AdGuard Home（5335）过滤，AdGuard Home 最后去问运营商/公共 DNS。<br>
 					<b>什么时候用：</b>不想让 AdGuard Home 占 53 端口，或者只关心过滤、不在乎每台设备各自的统计。<br>
 					<b>要注意：</b>Clash 内核必须运行；插件会自动把 Clash 的上游改成 127.0.0.1:5335，Clash 重启或「一键设置」后如果失效，回来重新保存一次即可。这个模式下面板里看到的来源都是 Clash（127.0.0.1），看不到每台设备的名字，属于正常现象。</li>
+					<li><b>PassWall 前置：</b>设备查询先被插件收回 53 交给 AdGuard Home 过滤，剩下的再交给 PassWall 自己的 DNS 做国内外分流；PassWall 的 DNS 劫持保持开启即可，不需要关闭。<br>
+					<b>什么时候用：</b>已经在用 PassWall 做分流，又想保留 AdGuard Home 的过滤与逐设备统计。<br>
+					<b>要注意：</b>插件按 PassWall 运行时端口自动设置上游（默认从 11400 起分配），PassWall 重启后如果换了端口，回来重新保存一次设置即可；该模式不支持“不参与接管”的接口/客户端排除，排除的设备会直接走 PassWall。</li>
 					<li><b>仅面板模式：</b>什么 DNS 都不改，只把 13800 控制台开起来。<br>
 					<b>什么时候用：</b>只想先看看界面，或者你已经有别的 DNS 方案（比如另一台软路由）。</li>
 				</ul>

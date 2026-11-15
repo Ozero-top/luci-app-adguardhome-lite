@@ -7,6 +7,8 @@ config adguardhome_lite 'main'
 
 	# DNS 接管方式：
 	#   takeover   = 接管 53 端口（默认，DNSMasq 移到 1745，与默认配置的 53 端口一致）
+	#   passwall   = PassWall 前置（AdGuard Home 占 53，上游指向 PassWall DNS，
+	#                收回链优先级 -102 先于 PassWall 的 -101 生效；需 PassWall 已安装）
 	#   upstream   = DNSMasq 上游（AdGuard Home 监听 5333，零端口冲突）
 	#   openclash  = Clash 串联（已下线：dnsmasq 会优先命中 Clash 的上游，
 	#                AdGuard Home 实际收不到查询；旧配置会自动迁移为 takeover）

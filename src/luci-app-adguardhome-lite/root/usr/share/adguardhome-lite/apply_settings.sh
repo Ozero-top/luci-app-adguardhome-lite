@@ -95,6 +95,14 @@ if [ -s "$configpath" ]; then
                 fi
                 ;;
             upstream) _target_up="$(detect_upstream_dns)" ;;
+            passwall)
+                _target_up="$(passwall_upstream_dns)"
+                if ! passwall_enabled; then
+                    log_msg "PassWall 未启用，AdGuard Home 上游回退到本机 DNSMasq（1745）。"
+                elif [ ! -f /tmp/etc/passwall/var ] && [ ! -f /tmp/etc/passwall_tmp/var ]; then
+                    log_msg "PassWall 尚未启动，暂按默认端口 11400 设置上游；若 PassWall 实际端口不同，请在其启动后重新保存一次设置。"
+                fi
+                ;;
             *) _target_up="127.0.0.1:$(dnsmasq_port)" ;;
         esac
 
@@ -108,7 +116,7 @@ if [ -s "$configpath" ]; then
         _is_auto=0
         [ -n "$_auto_up" ] && [ "$_cur_up" = "$_auto_up" ] && _is_auto=1
         case "$_cur_up" in
-            "127.0.0.1"|"127.0.0.1:53"|"127.0.0.1:1745"|"127.0.0.1:$clash_dns_port"|"127.0.0.1:5335"|"223.5.5.5 119.29.29.29"|"$_self_ip")
+            "127.0.0.1"|"127.0.0.1:53"|"127.0.0.1:1745"|"127.0.0.1:$clash_dns_port"|"127.0.0.1:5335"|127.0.0.1:114[0-9][0-9]|"223.5.5.5 119.29.29.29"|"$_self_ip")
                 _is_auto=1
                 ;;
         esac

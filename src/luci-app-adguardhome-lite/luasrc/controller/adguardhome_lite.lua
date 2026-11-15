@@ -581,6 +581,24 @@ local function openclash_upstream_agh(port)
     return found
 end
 
+local function passwall_enabled()
+    return (uci:get("passwall", "@global[0]", "enabled") or "") == "1"
+end
+
+-- PassWall 的 DNS 端口由 get_new_port 动态分配，真实端口只写在运行时变量文件里
+local function passwall_dns_port()
+    for _, f in ipairs({ "/tmp/etc/passwall/var", "/tmp/etc/passwall_tmp/var" }) do
+        local content = fs.readfile(f)
+        if content then
+            local port = content:match("ACL_default_dns_port=[\"']?(%d+)")
+            if port and port ~= "" then
+                return port
+            end
+        end
+    end
+    return "11400"
+end
+
 local function read_number(path)
     local v = fs.readfile(path)
     if not v then
@@ -719,7 +737,7 @@ function action_status()
         dns_mode = "takeover"
     end
     local dnsport = 5333
-    if dns_mode == "takeover" then
+    if dns_mode == "takeover" or dns_mode == "passwall" then
         dnsport = 53
     elseif dns_mode == "clashfirst" then
         dnsport = 5335
@@ -754,10 +772,14 @@ function action_status()
         openclash_upstream_agh = openclash_upstream_agh(dnsport),
         clash_dns_port = uci:get("openclash", "config", "dns_port") or "",
         dnsmasq_port = uci:get("dhcp", "@dnsmasq[0]", "port") or "53",
-        -- 只有「接管 53」才需要检查收回规则，其它模式跳过 nft 调用
-        dns_redirect = (dns_mode == "takeover")
+        -- 只有「接管 53」和「PassWall 前置」需要检查收回规则，其它模式跳过 nft 调用
+        dns_redirect = (dns_mode == "takeover" or dns_mode == "passwall")
             and (sys.call("nft list chain inet fw4 agh_dns_redirect 2>/dev/null | grep -q 'redirect to :53'") == 0)
             or false,
+        passwall_enabled = passwall_enabled(),
+        passwall_dns_port = passwall_dns_port(),
+        upstream_current = yaml_list_values(configpath, "upstream_dns"),
+        upstream_source = cfg("upstream_source", "auto"),
         agh_bypassed = cfg("agh_bypassed", "0"),
         update_running = update_running(),
         action_running = action_running(),
@@ -1361,6 +1383,10 @@ function action_settings_get()
             if self_ip ~= "" and cur_up == self_ip then
                 managed = true
             end
+            -- PassWall 的 DNS 端口动态变化，按端口段识别插件写入的上游
+            if not managed and cur_up:match("^127%.0%.0%.1:114%d%d$") then
+                managed = true
+            end
 
             crypto_blocked = not managed
         end
@@ -1403,6 +1429,9 @@ function action_settings_get()
         bypass_clients = join_words(uci:get(CONF, "main", "bypass_clients")),
         devices = net_devices(),
         openclash_installed = uci:get("openclash", "config") ~= nil,
+        passwall_installed = uci:get("passwall", "@global[0]", "enabled") ~= nil,
+        passwall_enabled = passwall_enabled(),
+        passwall_dns_port = passwall_dns_port(),
         admin_user = cfg("adminuser", "admin"),
         admin_pass = cfg("adminpass", "admin123"),
         config_path = configpath,
@@ -1500,7 +1529,7 @@ function action_settings_save()
     end
 
     local allowed_modes = {
-        takeover = true, upstream = true, none = true, clashfirst = true
+        takeover = true, upstream = true, none = true, clashfirst = true, passwall = true
     }
     local allowed_bins = {
         ["/usr/bin/AdGuardHome/AdGuardHome"] = true,
