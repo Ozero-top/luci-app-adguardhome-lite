@@ -79,6 +79,7 @@ if [ -n "$tmp_free" ] && [ "$tmp_free" -lt 45000 ]; then
 fi
 
 static_url="$base_url/AdGuardHome_linux_${arch}.tar.gz"
+release_url="https://static.adguard.com/adguardhome/release/AdGuardHome_linux_${arch}.tar.gz"
 github_url="https://github.com/AdguardTeam/AdGuardHome/releases/latest/download/AdGuardHome_linux_${arch}.tar.gz"
 
 # GitHub 反代白名单，避免 UCI 中被写入任意地址
@@ -89,37 +90,80 @@ case "$github_proxy" in
         ;;
 esac
 
-url_list=""
-if [ "$channel" = "beta" ]; then
-    # 测试版只用官方 beta 通道，避免备用地址误装稳定版
-    url_list="$static_url"
-    log_msg "测试版使用官方 beta 下载通道。"
+# 稳定版下载链：反代优先，其次官方 CDN，最后 GitHub 直连
+if [ -n "$proxy_host" ]; then
+    stable_list="https://${proxy_host}/${github_url} $release_url $github_url"
 else
-    if [ -n "$proxy_host" ]; then
-        url_list="https://${proxy_host}/${github_url} $static_url $github_url"
-        log_msg "已启用 GitHub 反代：$proxy_host（优先使用）"
+    stable_list="$release_url $github_url"
+fi
+
+# 测试版优先取 GitHub 预发布标签（releases.atom 不含 API 限流，可走反代），官方 beta 通道作兜底
+beta_tag=""
+beta_github=""
+if [ "$channel" = "beta" ]; then
+    atom_url="https://github.com/AdguardTeam/AdGuardHome/releases.atom"
+    FEED_FILE="/tmp/adguardhome_lite_releases_$$.xml"
+    atom_urls="$atom_url"
+    [ -n "$proxy_host" ] && atom_urls="$atom_url https://${proxy_host}/${atom_url}"
+    for _fu in $atom_urls; do
+        if download_file "$_fu" "$FEED_FILE" >/dev/null 2>&1 && [ -s "$FEED_FILE" ]; then
+            beta_tag=$(grep -o 'releases/tag/[^"]*' "$FEED_FILE" | sed 's#releases/tag/##' | grep -m 1 -- '-b\.')
+            [ -n "$beta_tag" ] && break
+        fi
+        rm -f "$FEED_FILE"
+    done
+    rm -f "$FEED_FILE"
+fi
+
+if [ "$channel" = "beta" ]; then
+    if [ -n "$beta_tag" ]; then
+        beta_github="https://github.com/AdguardTeam/AdGuardHome/releases/download/${beta_tag}/AdGuardHome_linux_${arch}.tar.gz"
+        if [ -n "$proxy_host" ]; then
+            url_list="https://${proxy_host}/${beta_github} $beta_github $static_url"
+        else
+            url_list="$beta_github $static_url"
+        fi
+        log_msg "测试版使用 GitHub 预发布版本：$beta_tag"
     else
-        url_list="$static_url $github_url"
+        url_list="$static_url"
+        [ -n "$proxy_host" ] && url_list="$url_list https://${proxy_host}/${static_url}"
+        log_msg "未能获取测试版标签，使用官方 beta 下载通道。"
     fi
+else
+    url_list="$stable_list"
+    [ -n "$proxy_host" ] && log_msg "已启用 GitHub 反代：$proxy_host（优先使用）"
 fi
 
 ARCHIVE="/tmp/adguardhome_lite_update_$$.tar.gz"
-download_ok="0"
-for _url in $url_list; do
-    [ -n "$_url" ] || continue
-    log_msg "下载地址：$_url"
-    if download_file "$_url" "$ARCHIVE"; then
-        # 部分反代失败时会返回 HTTP 200 的 HTML 错误页，必须校验压缩包内容
-        if [ -s "$ARCHIVE" ] && tar -tzf "$ARCHIVE" >/dev/null 2>&1; then
-            download_ok="1"
-            break
+
+try_download() {
+    for _url in $1; do
+        [ -n "$_url" ] || continue
+        log_msg "下载地址：$_url"
+        if download_file "$_url" "$ARCHIVE"; then
+            # 部分反代失败时会返回 HTTP 200 的 HTML 错误页，必须校验压缩包内容
+            if [ -s "$ARCHIVE" ] && tar -tzf "$ARCHIVE" >/dev/null 2>&1; then
+                return 0
+            fi
+            log_msg "下载内容不是有效的内核压缩包，尝试下一个..."
+        else
+            log_msg "该地址下载失败，尝试下一个..."
         fi
-        log_msg "下载内容不是有效的内核压缩包，尝试下一个..."
-    else
-        log_msg "该地址下载失败，尝试下一个..."
+        rm -f "$ARCHIVE"
+    done
+    return 1
+}
+
+download_ok="0"
+if try_download "$url_list"; then
+    download_ok="1"
+elif [ "$channel" = "beta" ]; then
+    log_msg "测试版通道不可用，回退到稳定版安装..."
+    channel_name="稳定版"
+    if try_download "$stable_list"; then
+        download_ok="1"
     fi
-    rm -f "$ARCHIVE"
-done
+fi
 
 [ "$download_ok" = "1" ] || die "下载失败，请检查路由器网络、DNS，或在“基础设置”中更换 GitHub 反代。"
 
@@ -140,8 +184,10 @@ newver=$("$newbin" --version 2>/dev/null | awk '
     NR == 1 {
         for (i = 1; i <= NF; i++) {
             if ($i ~ /^[vV][0-9]/) {
-                gsub(/[^vV0-9.].*/, "", $i)
-                print $i
+                v = $i
+                # 保留 -b.2 这类预发布后缀，只去掉标点等尾部字符
+                sub(/[^0-9A-Za-z.-].*$/, "", v)
+                print v
                 exit
             }
         }
@@ -162,6 +208,12 @@ newsize=$(wc -c < "$newbin" 2>/dev/null | tr -d ' ')
 [ -n "$newsize" ] || die "无法读取新内核大小。"
 
 targetdir=$(dirname "$binpath")
+# 旧版本可能把内核直接放在该路径，导致同名文件挡住目录创建，先备份再建目录
+if [ -e "$targetdir" ] && [ ! -d "$targetdir" ]; then
+    backup="${targetdir}.bak-$(date +%Y%m%d%H%M%S)"
+    mv "$targetdir" "$backup" || die "内核路径冲突：$targetdir 不是目录且无法备份。"
+    log_msg "检测到同名文件，已备份为：$backup"
+fi
 mkdir -p "$targetdir" || die "无法创建内核目录：$targetdir"
 
 avail=$(free_kb "$targetdir")
@@ -175,6 +227,18 @@ was_running=0
 is_agh_running && was_running=1
 was_enabled=$(uci -q get "$CONF.main.enabled" 2>/dev/null)
 [ -n "$was_enabled" ] || was_enabled="0"
+
+# 测试版属于大版本预发布，升级前先备份配置，便于回滚
+cfg_bak=""
+if [ "$channel" = "beta" ] && [ -s "$configpath" ]; then
+    cfg_bak="${configpath}.bak-$(date +%Y%m%d%H%M%S)"
+    if cp -p "$configpath" "$cfg_bak" 2>/dev/null; then
+        log_msg "测试版升级前已备份配置：$cfg_bak"
+    else
+        cfg_bak=""
+        log_msg "提示：配置备份失败，继续升级（原文件未被修改）。"
+    fi
+fi
 
 log_msg "正在停止服务并替换内核..."
 /etc/init.d/adguardhome_lite stop >/dev/null 2>&1
@@ -224,6 +288,9 @@ if [ "$was_enabled" = "1" ] || [ "$was_running" = "1" ]; then
         if [ -n "$backup" ] && [ -f "$backup" ]; then
             mv -f "$backup" "$binpath" 2>/dev/null
             /etc/init.d/adguardhome_lite start >/dev/null 2>&1
+            if [ -n "$cfg_bak" ]; then
+                die "新内核启动失败，已回滚到旧版本。如配置也需要回退，执行：cp -f $cfg_bak $configpath"
+            fi
             die "新内核启动失败，已回滚到旧版本。请查看运行日志。"
         fi
         die "新内核启动失败，且没有可回滚的旧版本。请查看运行日志。"
@@ -236,4 +303,7 @@ uci -q set "$CONF.main.core_version=$newver" 2>/dev/null
 uci -q commit "$CONF" 2>/dev/null
 
 log_msg "AdGuard Home 内核安装/更新成功：$newver"
+if [ -n "$cfg_bak" ]; then
+    log_msg "升级前的配置备份：$cfg_bak（回退配置：cp -f $cfg_bak $configpath）"
+fi
 exit 0

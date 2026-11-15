@@ -28,8 +28,8 @@ import tempfile
 SOURCE_DATE_EPOCH = 1794096000  # 2026-11-08 00:00:00 UTC，保证构建结果可复现
 
 PKG_NAME = "luci-app-adguardhome-lite"
-PKG_VERSION = "1.3.1"
-PKG_RELEASE = "1"
+PKG_VERSION = "1.3.2"
+PKG_RELEASE = "B1"
 PKG_MAINTAINER = "Ozero-top"
 
 # 文本文件统一转换为 LF，避免 Windows 换行导致脚本无法执行

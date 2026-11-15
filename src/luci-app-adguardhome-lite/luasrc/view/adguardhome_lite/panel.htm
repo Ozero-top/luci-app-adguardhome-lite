@@ -8,7 +8,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>AdGuard Home 助手</title>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261115f">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261115j">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -29,6 +29,8 @@
 				retention:    "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[retention_save]])%>",
 				yamlGet:      "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[yaml_get]])%>",
 				yamlSave:     "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[yaml_save]])%>",
+				legacyScan:   "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[legacy_scan]])%>",
+				legacyClean:  "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[legacy_clean]])%>",
 				luci:         "<%=url([[admin]])%>"
 			}
 		};
@@ -46,6 +48,7 @@
 			<p>一个页面完成内核安装、DNS 接管和过滤统计，常用参数都在插件内配置，无需再进面板。</p>
 		</div>
 		<div class="agh-hero-actions">
+			<button type="button" id="agh-theme-toggle" class="agh-theme-btn" title="切换暗色 / 浅色主题">切换为暗色</button>
 			<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
 			<a href="#" id="agh-header-console" class="agh-badge agh-badge-link is-disabled" target="_blank" rel="noopener" aria-disabled="true">打开控制台</a>
 			<span class="agh-hero-badge">v0.107.80+</span>
@@ -162,6 +165,19 @@
 				</div>
 			</div>
 
+			<div class="agh-card" id="agh-legacy-card" style="display:none">
+				<div class="agh-card-head">
+					<h3>检测到旧版残留</h3>
+					<span id="agh-legacy-count" class="agh-pill agh-pill-warn">0 项</span>
+				</div>
+				<p class="agh-hint">系统中仍有旧版 luci-app-adguardhome 或旧内核文件，可能与当前插件冲突，建议清理。</p>
+				<ul class="agh-tips" id="agh-legacy-list"></ul>
+				<div class="agh-actions">
+					<button type="button" id="agh-legacy-clean" class="agh-btn agh-btn-primary">一键清理</button>
+				</div>
+				<p class="agh-hint agh-mt-8">清理会先停止并禁用旧服务，文件备份到 <code>/etc/adguardhome_lite/legacy-backup-时间戳/</code>；<code>/etc/AdGuardHome.yaml</code> 与统计数据会保留。</p>
+			</div>
+
 			<div class="agh-card">
 				<div class="agh-card-head">
 					<h3>新手提示</h3>
@@ -235,6 +251,7 @@
 								<option value="stable">稳定版（推荐）</option>
 								<option value="beta">测试版（谨慎使用）</option>
 							</select>
+							<p class="agh-hint agh-mt-8">测试版取自 GitHub 预发布标签（可走上方反代），失败时依次回退官方测试通道与稳定版；升级前会自动备份 /etc/AdGuardHome.yaml。</p>
 						</div>
 
 						<div class="agh-field">
@@ -778,6 +795,6 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261115b"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261115e"></script>
 </body>
 </html>

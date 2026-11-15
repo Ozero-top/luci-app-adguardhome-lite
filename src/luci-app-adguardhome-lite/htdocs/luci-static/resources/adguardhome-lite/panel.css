@@ -1208,3 +1208,176 @@ code {
 #agh-tab-logs .agh-card[data-logpanel].is-active {
 	display: block;
 }
+
+/* 主题切换按钮 */
+.agh-theme-btn {
+	display: inline-flex;
+	align-items: center;
+	padding: 5px 11px;
+	border-radius: 999px;
+	border: 1px solid var(--agh-border);
+	background: var(--agh-surface-2);
+	color: var(--agh-muted);
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+	transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.agh-theme-btn:hover {
+	color: var(--agh-primary);
+	border-color: var(--agh-primary);
+}
+
+/* 测试版内核标识 */
+.agh-beta-tag {
+	display: inline-block;
+	margin-left: 4px;
+	padding: 1px 6px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1.6;
+	color: #8a5a00;
+	background: #fff3d4;
+	border: 1px solid #e6c987;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+body.agh-dark .agh-beta-tag {
+	color: #e0c58e;
+	background: #2b2517;
+	border-color: #574a2c;
+}
+
+/* 暗色主题：对齐 AdGuard Home 原生暗色（近黑底 + 灰阶卡片 + 薄荷绿高亮） */
+body.agh-dark {
+	--agh-bg: #141517;
+	--agh-surface: #1d1f22;
+	--agh-surface-2: #24262a;
+	--agh-text: #e3e5e8;
+	--agh-muted: #969ba1;
+	--agh-border: #2f3237;
+	--agh-primary: #5cc47d;
+	--agh-primary-2: #7bd89a;
+	--agh-primary-soft: #1f2b23;
+	--agh-accent: #c2a86f;
+	--agh-accent-soft: #2a261c;
+	--agh-success: #5cc47d;
+	--agh-success-soft: #1c2a22;
+	--agh-danger: #e07a6b;
+	--agh-danger-soft: #2e211e;
+	--agh-warning: #d8b06a;
+	--agh-warning-soft: #2b2618;
+	--agh-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+	color-scheme: dark;
+	background:
+		radial-gradient(900px 460px at 8% -10%, rgba(92, 196, 125, 0.08), transparent 60%),
+		radial-gradient(800px 400px at 100% 0%, rgba(255, 255, 255, 0.03), transparent 55%),
+		var(--agh-bg);
+}
+
+body.agh-dark .agh-hero {
+	background: linear-gradient(135deg, #202327, #1a1c1f 62%);
+	border-color: var(--agh-border);
+}
+
+body.agh-dark .agh-hero h2,
+body.agh-dark .agh-card-head h3,
+body.agh-dark .agh-card h2,
+body.agh-dark .agh-step-title,
+body.agh-dark .agh-field label {
+	color: #e8eaec;
+}
+
+body.agh-dark .agh-tabs {
+	background: rgba(29, 31, 34, 0.92);
+}
+
+body.agh-dark .agh-tab.is-active {
+	color: #102016;
+	box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+body.agh-dark .agh-btn-primary {
+	color: #102016;
+}
+
+body.agh-dark .agh-btn-primary:hover {
+	background: #6fd391;
+}
+
+body.agh-dark .agh-btn-secondary:hover,
+body.agh-dark .agh-ghost-btn:hover,
+body.agh-dark .agh-mini-btn:hover {
+	border-color: #3c4249;
+}
+
+body.agh-dark .agh-hero-badge,
+body.agh-dark .agh-hero-version-badge,
+body.agh-dark .agh-step-index,
+body.agh-dark .agh-step-no,
+body.agh-dark .agh-switch-state.is-on,
+body.agh-dark .agh-subtab.is-active,
+body.agh-dark .agh-pill-ok {
+	border-color: #36503f;
+}
+
+body.agh-dark .agh-badge {
+	color: #d9c496;
+	border-color: #574a2c;
+}
+
+body.agh-dark .agh-badge-link:hover {
+	background: #322b1c;
+}
+
+body.agh-dark .agh-update-tip {
+	color: #e6c98c;
+	background: #2c2718;
+	border-color: #574a2c;
+}
+
+body.agh-dark .agh-pill-bad,
+body.agh-dark .agh-btn-danger {
+	border-color: #5a3a33;
+}
+
+body.agh-dark .agh-btn-danger:hover {
+	background: #3a2621;
+}
+
+body.agh-dark .agh-pill-warn {
+	border-color: #574a2c;
+}
+
+body.agh-dark .agh-log,
+body.agh-dark .agh-code {
+	background: #111315;
+}
+
+body.agh-dark .agh-switch span {
+	background: #3a3f45;
+}
+
+body.agh-dark .agh-switch span::after {
+	background: #e6e8ea;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+body.agh-dark .agh-table th {
+	color: #a9aeb4;
+}
+
+body.agh-dark .agh-toast.is-ok {
+	border-color: #34513c;
+}
+
+body.agh-dark .agh-toast.is-bad {
+	border-color: #5a3a33;
+}
+
+body.agh-dark .agh-toast.is-warn {
+	border-color: #574a2c;
+}

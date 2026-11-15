@@ -33,6 +33,29 @@
 		return document.getElementById(id);
 	}
 
+	var THEME_KEY = 'agh-theme';
+
+	function applyTheme(theme) {
+		var dark = theme === 'dark';
+		document.body.classList.toggle('agh-dark', dark);
+		var btn = $('agh-theme-toggle');
+		if (btn) btn.textContent = dark ? '切换为浅色' : '切换为暗色';
+		try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) { /* 隐私模式下忽略 */ }
+	}
+
+	function initTheme() {
+		var saved = '';
+		try { saved = localStorage.getItem(THEME_KEY) || ''; } catch (e) { /* 忽略 */ }
+		if (saved !== 'dark' && saved !== 'light') {
+			saved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+		}
+		applyTheme(saved);
+	}
+
+	function toggleTheme() {
+		applyTheme(document.body.classList.contains('agh-dark') ? 'light' : 'dark');
+	}
+
 	// 开关旁边的状态文字，可按开关自定义开/关文案
 	function updateSwitchStates() {
 		var nodes = document.querySelectorAll('.agh-switch-state');
@@ -191,6 +214,21 @@
 		return channel === 'beta' ? '测试版' : '稳定版';
 	}
 
+	// AdGuard Home 预发布版本号形如 v1.0.0-b.2
+	function isBetaVersion(version) {
+		return /(^|-)b\.?\d/i.test(String(version || ''));
+	}
+
+	function renderCoreVersion(d) {
+		if (!d.core) return '<span class="agh-bad">未安装</span>';
+		var version = d.version || '已安装';
+		var html = '<span class="agh-ok">' + esc(version) + '</span>';
+		if (isBetaVersion(d.version)) {
+			html += ' <span class="agh-beta-tag">测试版</span>';
+		}
+		return html;
+	}
+
 	function setBusy(value) {
 		state.busy = value;
 		updateSteps(state.status);
@@ -276,7 +314,7 @@
 
 		var rows = [
 			['服务状态', d.running ? '<span class="agh-ok">运行中</span>' : '<span class="agh-bad">已停止</span>'],
-			['内核版本', d.core ? '<span class="agh-ok">' + esc(d.version || '已安装') + '</span>' : '<span class="agh-bad">未安装</span>'],
+			['内核版本', renderCoreVersion(d)],
 			['DNS 接管', esc(modeLabel(d.dns_mode)) + ((d.mode_applied && d.mode_applied !== d.dns_mode) ? ' <span class="agh-warn">（待应用）</span>' : '')],
 			['当前链路', '<span class="agh-path">' + esc(modeChain(d)) + '</span>'],
 			['更新通道', esc(channelLabel(d.channel))]
@@ -361,9 +399,13 @@
 		}
 		var coreHint = $('agh-core-hint');
 		if (coreHint) {
-			coreHint.textContent = d.core
-				? '已安装，当前版本：' + (d.version || '未知')
-				: (d.update_running ? '正在安装...' : '尚未安装内核');
+			if (d.core) {
+				var hintText = '已安装，当前版本：' + (d.version || '未知');
+				if (isBetaVersion(d.version)) hintText += '（测试版，升级大版本前会自动备份配置）';
+				coreHint.textContent = hintText;
+			} else {
+				coreHint.textContent = d.update_running ? '正在安装...' : '尚未安装内核';
+			}
 		}
 
 		if (enableBtn) {
@@ -500,6 +542,45 @@
 		} finally {
 			if (btn) btn.disabled = false;
 			refreshStatus(true);
+		}
+	}
+
+	function renderLegacy(d) {
+		var card = $('agh-legacy-card');
+		if (!card) return;
+		var items = (d && d.items) || [];
+		if (!items.length || d.ok === false) {
+			card.style.display = 'none';
+			return;
+		}
+		card.style.display = '';
+		$('agh-legacy-count').textContent = items.length + ' 项';
+		$('agh-legacy-list').innerHTML = items.map(function (it) {
+			return '<li><b>' + esc(it.name) + '</b>：<code>' + esc(it.path) + '</code><br><span class="agh-hint">' + esc(it.note) + '</span></li>';
+		}).join('');
+	}
+
+	async function loadLegacyScan() {
+		try {
+			var d = await apiGet(U.legacyScan);
+			renderLegacy(d);
+		} catch (err) {
+			/* 旧版扫描失败不打扰正常使用 */
+		}
+	}
+
+	async function cleanLegacy() {
+		if (!window.confirm('将停止并禁用旧服务、删除旧版插件文件，删除前自动备份。确定继续？')) return;
+		var btn = $('agh-legacy-clean');
+		if (btn) btn.disabled = true;
+		try {
+			var d = await apiPost(U.legacyClean, {});
+			showToast('已清理 ' + (d.removed || 0) + ' 项，备份：' + (d.backup || '-'), 'ok');
+			await loadLegacyScan();
+		} catch (err) {
+			handleApiError(err);
+		} finally {
+			if (btn) btn.disabled = false;
 		}
 	}
 
@@ -1458,6 +1539,8 @@
 
 		if ($('agh-refresh-status')) $('agh-refresh-status').onclick = function () { refreshStatus(); };
 		if ($('agh-stats-clear')) $('agh-stats-clear').onclick = clearStats;
+		if ($('agh-theme-toggle')) $('agh-theme-toggle').onclick = toggleTheme;
+		if ($('agh-legacy-clean')) $('agh-legacy-clean').onclick = cleanLegacy;
 		if ($('agh-install-btn')) $('agh-install-btn').onclick = installCore;
 		if ($('agh-enable-btn')) $('agh-enable-btn').onclick = function () {
 			postService('bootstrap', '将启动 AdGuard Home 并接管路由器 DNS。确定继续？');
@@ -1595,12 +1678,14 @@
 	}
 
 	function init() {
+		initTheme();
 		initEvents();
 		updateSwitchStates();
 		var hash = (window.location.hash || '#overview').replace('#', '');
 		if (!hash) hash = 'overview';
 		switchTab(hash, false);
 		refreshStatus();
+		loadLegacyScan();
 		setInterval(function () {
 			if (document.hidden || state.busy) return;
 			refreshStatus(true);

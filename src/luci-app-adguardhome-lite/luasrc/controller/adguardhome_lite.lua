@@ -613,6 +613,8 @@ function index()
     entry({ "admin", "services", "adguardhome_lite", "settings_save" }, call("action_settings_save")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "yaml_get" }, call("action_yaml_get")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "yaml_save" }, call("action_yaml_save")).leaf = true
+    entry({ "admin", "services", "adguardhome_lite", "legacy_scan" }, call("action_legacy_scan")).leaf = true
+    entry({ "admin", "services", "adguardhome_lite", "legacy_clean" }, call("action_legacy_clean")).leaf = true
 end
 
 function action_status()
@@ -1622,4 +1624,32 @@ function action_logs()
     http.write(update)
     http.write("\n\n===== 最近一次服务操作日志 =====\n")
     http.write(action)
+end
+
+-- 旧版残留扫描：只读，返回 JSON 清单
+function action_legacy_scan()
+    local out = sys.exec("sh " .. SHARE .. "/legacy_cleanup.sh scan 2>/dev/null") or ""
+    out = out:match("({.*})") or ""
+
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+    if out == "" then
+        http.write('{"ok":false,"error":"扫描失败，请查看系统日志"}')
+        return
+    end
+    http.write(out)
+end
+
+-- 旧版残留清理：先备份，再删除旧插件文件、移动旧内核
+function action_legacy_clean()
+    local out = sys.exec("sh " .. SHARE .. "/legacy_cleanup.sh clean 2>/dev/null") or ""
+    out = out:match("({.*})") or ""
+
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+    if out == "" then
+        http.write('{"ok":false,"error":"清理失败，请查看系统日志"}')
+        return
+    end
+    http.write(out)
 end

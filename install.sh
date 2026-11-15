@@ -9,10 +9,12 @@
 #   curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
 #
 # 常用参数：
-#   -v VERSION   指定版本（默认 1.3.1），可写 latest 取最新 Release
+#   -v VERSION   指定版本（默认 1.3.2-B1），可写 latest 取最新 Release
 #   -m URL       指定 GitHub 反代（可重复），默认依次尝试 gh-proxy.org / ghfast.top / gh-proxy.com
 #   --no-deps    不自动安装依赖
 #   --src DIR    从本地源码目录安装（开发调试用）
+#   --keep-old   只检测旧版残留，不自动清理
+#   --purge-old  清理时一并删除旧统计数据（保留 /etc/AdGuardHome.yaml）
 #   --uninstall  卸载插件（保留配置与内核）
 #   --purge      卸载并删除配置、内核、统计数据
 #   -h           显示帮助
@@ -21,12 +23,14 @@ set -u
 
 REPO="Ozero-top/luci-app-adguardhome-lite"
 PKG="luci-app-adguardhome-lite"
-VERSION="1.3.1"
+VERSION="1.3.2-B1"
 MIRRORS=""
 NO_DEPS=0
 SRC_DIR=""
 FORCE=0
 ACTION="install"
+KEEP_OLD=0
+PURGE_OLD=0
 
 RAW_BASE="https://raw.githubusercontent.com/$REPO/main"
 
@@ -38,11 +42,13 @@ usage() {
 	cat <<'EOF'
 AdGuard Home 助手 安装脚本
 
-  -v VERSION   指定版本号（默认 1.3.1，latest 表示最新 Release）
+  -v VERSION   指定版本号（默认 1.3.2-B1，latest 表示最新 Release）
   -f, --force  强制更新：忽略版本标签，直接用 main 分支最新代码覆盖安装
   -m URL       指定 GitHub 反代，可重复，例如 -m https://gh-proxy.org
   --no-deps    跳过依赖安装
   --src DIR    从本地源码目录安装（开发调试用）
+  --keep-old   只检测旧版残留，不自动清理
+  --purge-old  清理时一并删除旧内核与统计数据（保留 /etc/AdGuardHome.yaml）
   --uninstall  卸载（保留 /etc/config/adguardhome_lite 与 /etc/AdGuardHome）
   --purge      卸载并删除配置、内核与统计数据
   -h, --help   显示帮助
@@ -56,6 +62,8 @@ while [ $# -gt 0 ]; do
 		--no-deps) NO_DEPS=1 ;;
 		-f|--force) FORCE=1 ;;
 		--src) shift; [ $# -gt 0 ] || die "--src 需要目录"; SRC_DIR="$1" ;;
+		--keep-old) KEEP_OLD=1 ;;
+		--purge-old) PURGE_OLD=1 ;;
 		--uninstall) ACTION="uninstall" ;;
 		--purge) ACTION="purge" ;;
 		-h|--help) usage; exit 0 ;;
@@ -76,6 +84,93 @@ fi
 clear_luci_cache() {
 	rm -f /tmp/luci-indexcache /tmp/luci-indexcache.* 2>/dev/null
 	rm -f /tmp/luci-modulecache/* 2>/dev/null
+}
+
+# 旧版 luci-app-adguardhome（非本插件）留下的文件
+OLD_LEGACY_FILES="/usr/lib/lua/luci/controller/adguardhome.lua
+/usr/lib/lua/luci/model/cbi/adguardhome.lua
+/usr/lib/lua/luci/view/adguardhome
+/www/luci-static/resources/view/adguardhome
+/usr/share/luci/menu.d/luci-app-adguardhome.json
+/usr/share/rpcd/acl.d/luci-app-adguardhome.json"
+
+legacy_pkg_installed() {
+	case "$PKG_MGR" in
+		apk) apk info -e "$1" >/dev/null 2>&1 ;;
+		opkg) opkg list-installed "$1" 2>/dev/null | grep -q "^$1 " ;;
+		*) return 1 ;;
+	esac
+}
+
+detect_legacy() {
+	LEGACY_FOUND=0
+	for p in luci-app-adguardhome luci-i18n-adguardhome-zh-cn; do
+		if legacy_pkg_installed "$p"; then
+			log "  - 旧插件包：$p"
+			LEGACY_FOUND=1
+		fi
+	done
+	for f in /etc/init.d/adguardhome $OLD_LEGACY_FILES; do
+		[ -e "$f" ] || continue
+		log "  - 旧文件：$f"
+		LEGACY_FOUND=1
+	done
+	for k in /usr/bin/AdGuardHome /usr/sbin/AdGuardHome; do
+		[ -f "$k" ] || continue
+		log "  - 旧内核：$k"
+		LEGACY_FOUND=1
+	done
+}
+
+cleanup_legacy() {
+	log "==> 检测旧版 AdGuard Home 残留"
+	detect_legacy
+	if [ "$LEGACY_FOUND" = "0" ]; then
+		return 0
+	fi
+	if [ "$KEEP_OLD" = "1" ]; then
+		warn "已跳过清理（--keep-old），如与当前插件冲突请手动处理"
+		return 0
+	fi
+
+	bk="/etc/adguardhome_lite/legacy-backup-$(date +%Y%m%d%H%M%S)"
+	mkdir -p "$bk" 2>/dev/null
+
+	if [ -x /etc/init.d/adguardhome ]; then
+		log "==> 停止并禁用旧服务"
+		/etc/init.d/adguardhome stop >/dev/null 2>&1
+		/etc/init.d/adguardhome disable >/dev/null 2>&1
+		/etc/init.d/dnsmasq restart >/dev/null 2>&1
+	fi
+
+	for p in luci-app-adguardhome luci-i18n-adguardhome-zh-cn; do
+		legacy_pkg_installed "$p" || continue
+		log "==> 卸载旧插件包：$p"
+		case "$PKG_MGR" in
+			apk) apk del "$p" >/dev/null 2>&1 ;;
+			opkg) opkg remove --force-depends "$p" >/dev/null 2>&1 ;;
+		esac
+	done
+
+	for f in $OLD_LEGACY_FILES; do
+		[ -e "$f" ] || continue
+		mkdir -p "$bk$(dirname "$f")" 2>/dev/null
+		cp -a "$f" "$bk$f" >/dev/null 2>&1
+		rm -rf "$f"
+	done
+
+	for k in /usr/bin/AdGuardHome /usr/sbin/AdGuardHome; do
+		[ -f "$k" ] || continue
+		mkdir -p "$bk$(dirname "$k")" 2>/dev/null
+		mv "$k" "$bk$k" >/dev/null 2>&1
+	done
+
+	if [ "$PURGE_OLD" = "1" ]; then
+		rm -rf /etc/AdGuardHome
+		log "==> 已删除旧统计数据（/etc/AdGuardHome.yaml 予以保留）"
+	fi
+
+	log "旧版残留已清理，备份目录：$bk"
 }
 
 uninstall() {
@@ -251,6 +346,7 @@ main_install() {
 
 	[ -n "$SRC_DIR" ] && log "==> 使用本地源码：$SRC_DIR"
 	[ "$FORCE" = "1" ] && log "==> 强制更新：忽略版本标签，安装 main 分支最新代码"
+	cleanup_legacy
 	install_deps
 	# 强制更新直接从 main 安装，不需要再查询最新 Release 标签
 	[ "$FORCE" = "1" ] || resolve_version "$tmp"
