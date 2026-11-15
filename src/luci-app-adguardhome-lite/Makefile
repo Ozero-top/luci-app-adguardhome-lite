@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-adguardhome-lite
 PKG_VERSION:=1.3.2
-PKG_RELEASE:=B1
+PKG_RELEASE:=B2
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_MAINTAINER:=Ozero-top
 

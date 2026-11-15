@@ -159,6 +159,8 @@ agh_nft_rule_present() {
     _rules="$(nft list chain inet fw4 agh_dns_redirect 2>/dev/null)" || return 1
     echo "$_rules" | grep -q 'DNS Redirect v4' || return 1
     echo "$_rules" | grep -q 'DNS Redirect v6' || return 1
+    # PassWall 模式不写排除规则，检查时也跳过
+    [ "$dns_mode" = "passwall" ] && return 0
     # 配置了排除项就必须真的存在对应规则，否则会误判为已生效
     [ -n "$(bypass_ifaces)" ] && {
         echo "$_rules" | grep -q 'AGH bypass iface to-dnsmasq' || return 1
@@ -236,10 +238,17 @@ agh_nft_ensure() {
     have_cmd nft || return 0
 
     _wan="$(agh_nft_wan_iface)"
-    _bypass="$(agh_nft_bypass_lines)"
-    _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 Clash 的 DNS 劫持绕过。
+    # PassWall 模式不写排除规则：排除的客户端直接落到 PassWall 自己的劫持上，
+    # 仍然走 PassWall DNS 分流，只是不经过 AdGuard Home 过滤。
+    _bypass=""
+    [ "$dns_mode" = "passwall" ] || _bypass="$(agh_nft_bypass_lines)"
+    # PassWall 的 DNS 劫持链优先级为 -101，这里必须再靠前一位（-102），
+    # 否则同一优先级下谁先生效不确定，查询可能被 PassWall 抢走。
+    _prio="-101"
+    [ "$dns_mode" = "passwall" ] && _prio="-102"
+    _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 Clash / PassWall 的 DNS 劫持绕过。
 chain agh_dns_redirect {
-    type nat hook prerouting priority -101; policy accept;
+    type nat hook prerouting priority $_prio; policy accept;
 ${_bypass}
     meta nfproto ipv4 ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v4\"
     meta nfproto ipv6 iifname != \"$_wan\" meta l4proto { tcp, udp } th dport 53 counter redirect to :53 comment \"AdGuard Home DNS Redirect v6\"
@@ -269,6 +278,13 @@ ${_bypass}
     # 文件变化或规则不完整时都必须重载，否则旧链不会更新
     if [ "$_changed" = "0" ] && agh_nft_rule_present; then
         return 0
+    fi
+
+    # 链已存在但声明（优先级/规则）变化时，restart 会报
+    # 「Chain already exists ... with different declaration」并整份规则不重建，
+    # 必须先删掉旧链，让 fw4 按新文件重新创建。
+    if [ "$_changed" = "1" ]; then
+        nft delete chain inet fw4 agh_dns_redirect 2>/dev/null
     fi
     agh_nft_reload
     agh_nft_rule_present && return 0
@@ -307,6 +323,11 @@ mode_is_applied() {
         takeover)
             [ "$(dnsmasq_port)" = "1745" ] || return 1
             ;;
+        passwall)
+            [ "$(dnsmasq_port)" = "1745" ] || return 1
+            # 收回 53 的规则优先级必须高于 PassWall，规则缺失就重新应用
+            agh_nft_rule_present || return 1
+            ;;
         openclash)
             openclash_forward_present || return 1
             grep -q "^  port: $dnsport$" "$configpath" || return 1
@@ -332,6 +353,7 @@ mode_is_applied() {
 mode_name() {
     case "$dns_mode" in
         takeover) echo "接管 53 端口模式（DNSMasq 移至 1745）" ;;
+        passwall) echo "PassWall 前置模式（AGH 53 → PassWall DNS 分流）" ;;
         openclash) echo "Clash 串联模式（已下线）" ;;
         clashfirst) echo "Clash 前置模式（Clash 7874 → AdGuard Home 5335 → 真实 DNS）" ;;
         none) echo "仅面板模式（不接管 DNS）" ;;
@@ -341,7 +363,7 @@ mode_name() {
 
 apply_mode() {
     case "$dns_mode" in
-        upstream|takeover|none|openclash|clashfirst) ;;
+        upstream|takeover|none|openclash|clashfirst|passwall) ;;
         *) dns_mode="upstream" ;;
     esac
 
@@ -364,7 +386,7 @@ apply_mode() {
         return 0
     fi
 
-    if [ "$dns_mode" = "takeover" ]; then
+    if [ "$dns_mode" = "takeover" ] || [ "$dns_mode" = "passwall" ]; then
         agh_nft_ensure
     else
         agh_nft_clear
@@ -434,6 +456,17 @@ apply_mode() {
             if ! set_dnsmasq_port 1745; then
                 cancel_dns_mode_apply "无法将 DNSMasq 端口写为 1745，已取消本次 DNS 接管。"
                 return 1
+            fi
+            ;;
+        passwall)
+            # 与「接管 53 端口」相同：DNSMasq 让出 53 移到 1745，
+            # AdGuard Home 占用 53，上游指向 PassWall 自己的 DNS 做分流。
+            if ! set_dnsmasq_port 1745; then
+                cancel_dns_mode_apply "无法将 DNSMasq 端口写为 1745，已取消本次 DNS 接管。"
+                return 1
+            fi
+            if ! passwall_enabled; then
+                log_msg "PassWall 未启用：查询会经 AdGuard Home 转给本机 DNSMasq（1745），不走 PassWall 分流。"
             fi
             ;;
         openclash)
@@ -633,6 +666,9 @@ show_status() {
     echo "openclash_custom_dns=$(get_uci openclash.config.enable_custom_dns)"
     echo "agh_bypassed=$(get_uci "$CONF.main.agh_bypassed")"
     echo "openclash_forward=$(openclash_forward_present && echo yes || echo no)"
+    echo "passwall_enabled=$(passwall_enabled && echo yes || echo no)"
+    echo "passwall_dns_redirect=$(get_uci passwall.@global[0].dns_redirect)"
+    echo "passwall_dns_port=$(passwall_dns_port)"
 }
 
 case "$ACTION" in

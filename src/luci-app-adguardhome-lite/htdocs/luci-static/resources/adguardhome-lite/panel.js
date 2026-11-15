@@ -23,6 +23,9 @@
 		busy: false,
 		passShown: false,
 		openclash: false,
+		passwall: false,
+		passwallEnabled: false,
+		passwallDnsPort: '',
 		updateTimer: null,
 		actionTimer: null,
 		logTimer: null,
@@ -193,6 +196,7 @@
 
 	function modeLabel(mode) {
 		if (mode === 'takeover') return '接管 53 端口';
+		if (mode === 'passwall') return 'PassWall 前置（AGH → PassWall DNS）';
 		if (mode === 'openclash') return 'Clash 串联（已下线）';
 		if (mode === 'clashfirst') return 'Clash 前置（Clash → AGH → 真实 DNS）';
 		if (mode === 'none') return '仅面板（不接管 DNS）';
@@ -205,6 +209,9 @@
 			return d.openclash_running
 				? '客户端 → 53 AdGuard Home → 1745 DNSMasq → Clash / WAN DNS'
 				: '客户端 → 53 AdGuard Home → 1745 DNSMasq → WAN DNS';
+		}
+		if (d.dns_mode === 'passwall') {
+			return '客户端 → 53 AdGuard Home → ' + (d.passwall_dns_port || '11400') + ' PassWall DNS → 分流';
 		}
 		if (d.dns_mode === 'openclash') return '客户端 → 53 DNSMasq → 5333 AdGuard Home → ' + cdp + ' Clash DNS';
 		if (d.dns_mode === 'clashfirst') return '客户端 → Clash 劫持 → ' + cdp + ' Clash DNS → 5335 AdGuard Home → 真实 DNS';
@@ -398,6 +405,21 @@
 
 		if (d.dns_mode === 'takeover' && d.openclash_hijack && !d.dns_redirect) {
 			rows.push(['配置建议', '<span class="agh-warn">检测到 Clash DNS 劫持，但把查询收回 53 的规则没有生效，查询可能绕过 AdGuard Home。请在「基础设置」重新保存一次「接管 53 端口」，或检查防火墙状态。</span>']);
+		}
+		if (d.dns_mode === 'passwall') {
+			if (!d.passwall_enabled) {
+				rows.push(['配置建议', '<span class="agh-warn">未检测到启用中的 PassWall，查询会经 AdGuard Home 转给本机 DNSMasq（1745），不走 PassWall 分流。</span>']);
+			} else if (!d.dns_redirect) {
+				rows.push(['配置建议', '<span class="agh-warn">把查询收回 53 的规则没有生效，查询可能被 PassWall 的劫持抢走。请在「基础设置」重新保存一次「PassWall 前置」。</span>']);
+			} else {
+				var pswPort = String(d.passwall_dns_port || '');
+				var tgt = pswPort ? '127.0.0.1:' + pswPort : '';
+				var ups = String(d.upstream_current || '');
+				if (tgt && d.upstream_source !== 'custom' && ups.indexOf(tgt) < 0) {
+					rows.push(['配置建议', '<span class="agh-warn">AdGuard Home 上游未指向当前 PassWall DNS（' + esc(tgt) +
+						'），可能是 PassWall 重启后更换了端口。请重新保存一次「PassWall 前置」。</span>']);
+				}
+			}
 		}
 		if (d.dns_mode === 'openclash' && d.openclash_hijack_port &&
 			d.openclash_hijack_port !== '53' && d.openclash_hijack_port !== String(d.dns_port)) {
@@ -1133,11 +1155,16 @@
 		var note = $('agh-upstream-lan-note');
 		if (note) {
 			var modeEl = $('agh-set-dns-mode');
-			var show = on && modeEl && modeEl.value === 'takeover';
+			var modeVal = modeEl ? modeEl.value : '';
+			var show = on && (modeVal === 'takeover' || modeVal === 'passwall');
 			note.hidden = !show;
-			note.textContent = show
-				? '当前是「接管 53 端口」：自定义上游会绕过本机 DNSMasq(1745)，路由器与 DHCP 主机名（如 xxx.lan）将无法解析。需要保留本地解析时，请在列表末尾加上 127.0.0.1:1745。'
-				: '';
+			if (!show) {
+				note.textContent = '';
+			} else if (modeVal === 'passwall') {
+				note.textContent = '当前是「PassWall 前置」：自定义上游会绕过 PassWall 的 DNS，国内外分流将失效；需要分流时请把来源保持为「自动」。';
+			} else {
+				note.textContent = '当前是「接管 53 端口」：自定义上游会绕过本机 DNSMasq(1745)，路由器与 DHCP 主机名（如 xxx.lan）将无法解析。需要保留本地解析时，请在列表末尾加上 127.0.0.1:1745。';
+			}
 		}
 	}
 
@@ -1220,6 +1247,14 @@
 				: 'Clash 前置（未安装 Clash，不可用）';
 		}
 
+		var passwallOption = document.querySelector('#agh-set-dns-mode option[value="passwall"]');
+		if (passwallOption) {
+			passwallOption.disabled = !state.passwall;
+			passwallOption.textContent = state.passwall
+				? 'PassWall 前置（AGH 53 → PassWall DNS 分流，保留劫持）'
+				: 'PassWall 前置（未安装 PassWall，不可用）';
+		}
+
 		var modeNote = $('agh-dns-mode-note');
 		if (modeNote) {
 			var text = '';
@@ -1227,6 +1262,10 @@
 				text = '检测到 Clash：该模式会改写 DNSMasq 上游，重启 Clash 后可能被覆盖，建议改用「接管 53 端口」。';
 			} else if (!state.openclash && mode === 'clashfirst') {
 				text = 'Clash 未安装，「Clash 前置」模式不会生效，请改用「接管 53 端口」。';
+			} else if (mode === 'passwall' && !state.passwallEnabled) {
+				text = 'PassWall 当前未启用：AdGuard Home 会把查询转给本机 DNSMasq（1745）。启用 PassWall 后重新保存一次设置即可走分流。';
+			} else if (mode === 'passwall') {
+				text = 'PassWall DNS 端口：' + (state.passwallDnsPort || '11400') + '，保存后自动写入 AdGuard Home 上游。';
 			}
 			modeNote.textContent = text;
 			modeNote.style.display = text ? '' : 'none';
@@ -1292,6 +1331,9 @@
 			var bypassClients = $('agh-set-bypass-clients');
 			if (bypassClients) bypassClients.value = d.bypass_clients || '';
 			state.openclash = !!d.openclash_installed;
+			state.passwall = !!d.passwall_installed;
+			state.passwallEnabled = !!d.passwall_enabled;
+			state.passwallDnsPort = d.passwall_dns_port || '';
 			applyModeLocks(d.dns_mode);
 			var path = $('agh-yaml-path');
 			if (path && d.config_path) path.textContent = d.config_path;
