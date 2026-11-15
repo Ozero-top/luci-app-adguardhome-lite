@@ -48,6 +48,8 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 - **三步上手**：安装内核 → 一键启用 → 打开控制台，每步都有状态提示和失败原因。
 - **官方内核**：自动识别 CPU 架构，默认下载 AdGuard 官方最新稳定版；可选测试版，取 GitHub 预发布标签，失败依次回退官方测试通道与稳定版，升级前自动备份 `AdGuardHome.yaml`。
+- **下载可见**：安装进度实时显示下载百分比 / 已下载大小与用时，日志记录每个地址的尝试结果。
+- **更新提示**：概览内核版本旁按当前通道提示「可更新」，稳定版只看正式版、测试版可提示预发布，点击可直接跳转到安装按钮。
 - **下载兜底**：可选 `gh-proxy.org`、`ghproxy.cc`、`ghproxy.com`、`ghfast.top` 反代，失败自动回退官方 CDN 与 GitHub 直连。
 - **fake-IP 兼容**：路由器使用 fake-IP DNS 时，自动解析真实 IP，再以 `curl --resolve` 下载。
 
@@ -75,7 +77,9 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 ### 维护与安全
 
-- **版本提示**：页面标题下显示插件版本，有新版本时给出提示，每 24 小时后台检查一次。
+- **版本提示**：页面标题下显示插件版本，插件与内核有新版本时都会提示（测试版只提示测试版用户），每 24 小时后台检查一次。
+- **旧版清理**：概览自动检测旧版 `luci-app-adguardhome`、旧 LuCI 文件与旧内核，可一键清理，文件先备份到 `/etc/adguardhome_lite/legacy-backup-时间戳/`。
+- **暗色主题**：概览右上角一键切换暗色 / 浅色，选择保存在浏览器本地，刷新不再闪浅色。
 - **安全可控**：默认密码 `admin123`，可在插件内重置；停止服务或卸载时自动恢复 DNSMasq 设置。
 - **配置可维护**：内置 YAML 模板（11 个订阅，默认按 512MB 档启用 6 个；白名单默认关闭；日志/统计保留 30 天）；高级配置保存前自动 `--check-config` 并留备份。
 
@@ -89,7 +93,7 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 | 25.12 及 apk 系统 | iStoreOS 25.12、OpenWrt 25.12 使用 `apk`，不能装 `.ipk`，请用 [脚本安装](#脚本安装2512--apk-系统) |
 | 旧固件 | OpenWrt 22.03 及更早的原生 Lua LuCI 使用 `legacy` 版本（不依赖 `luci-compat`） |
 | 架构 | x86_64 / 386、ARM64、ARM v5/v6/v7/v8、MIPS / MIPSel / MIPS64 / MIPS64el、RISC-V 64、PPC64LE（暂不支持 LoongArch） |
-| 实测环境 | Kwrt aarch64、iStoreOS 24.10 / 25.12 x86_64；内核 AdGuard Home v0.107.80 |
+| 实测环境 | Kwrt aarch64、iStoreOS 24.10 / 25.12 x86_64；内核实测 AdGuard Home v0.107.80 与 v1.0.0-b.2 |
 
 > ⚠️ 与旧版 `luci-app-adguardhome` 冲突，安装前先卸载旧插件及中文语言包。
 
@@ -149,7 +153,7 @@ wget -qO- https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/
 curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
 ```
 
-脚本会依次尝试 `gh-proxy.org`、`ghfast.top`、`gh-proxy.com` 和 GitHub 直连，`curl` 与 `wget` 都支持。
+脚本会依次尝试 `gh-proxy.org`、`ghfast.top`、`gh-proxy.com` 和 GitHub 直连，`curl` 与 `wget` 都支持。脚本安装前会自动检测并清理旧版 `luci-app-adguardhome`、旧 LuCI 文件与旧内核（备份到 `/etc/adguardhome_lite/legacy-backup-时间戳/`），可用 `--keep-old` 跳过清理。
 
 **强制更新**（不升版也能覆盖同版本文件，直接装 main 分支最新代码）：
 
@@ -176,6 +180,9 @@ opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.2-B1_all.ipk
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
+| `--keep-old` | 只检测旧版残留，不自动清理 |
+| `--purge-old` | 清理旧版时一并删除旧统计数据（保留 `/etc/AdGuardHome.yaml`） |
+| `--src DIR` | 从本地源码目录安装（开发调试用） |
 | `--uninstall` | 卸载插件，恢复 DNSMasq 原始设置，保留配置与内核 |
 | `--purge` | 卸载并删除 `/etc/config/adguardhome_lite`、内核与统计数据 |
 
@@ -354,7 +361,7 @@ curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite
 
 检查网络和系统时间；国内网络在「基础设置 → 插件配置」启用 GitHub 反代；fake-IP 环境插件会自动解析真实 IP 并用 `curl --resolve` 下载；空间不足时把内核位置改到内置存储，或清理闪存。
 
-测试版依次尝试 GitHub 预发布（含反代）→ 官方测试通道 → 稳定版，安装日志会记录每个地址的结果；概览页内核版本旁有「测试版」标识。
+测试版依次尝试 GitHub 预发布（含反代）→ 官方测试通道 → 稳定版，安装日志会记录每个下载地址的尝试结果；安装进度会显示下载百分比或已下载大小，概览页内核版本旁有「测试版」标识与「可更新」提示。
 
 ### Q5：启用后不能上网怎么办？
 

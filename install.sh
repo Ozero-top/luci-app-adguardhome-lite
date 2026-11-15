@@ -18,6 +18,8 @@
 #   --uninstall  卸载插件（保留配置与内核）
 #   --purge      卸载并删除配置、内核、统计数据
 #   -h           显示帮助
+#
+# 安装前会自动检测并清理旧版 luci-app-adguardhome 与旧内核，可用 --keep-old 跳过。
 
 set -u
 
@@ -48,7 +50,7 @@ AdGuard Home 助手 安装脚本
   --no-deps    跳过依赖安装
   --src DIR    从本地源码目录安装（开发调试用）
   --keep-old   只检测旧版残留，不自动清理
-  --purge-old  清理时一并删除旧内核与统计数据（保留 /etc/AdGuardHome.yaml）
+  --purge-old  清理时一并删除旧统计数据（保留 /etc/AdGuardHome.yaml）
   --uninstall  卸载（保留 /etc/config/adguardhome_lite 与 /etc/AdGuardHome）
   --purge      卸载并删除配置、内核与统计数据
   -h, --help   显示帮助
