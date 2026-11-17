@@ -653,76 +653,7 @@ function index()
     entry({ "admin", "services", "adguardhome_lite", "selftest" }, call("action_selftest")).leaf = true
 end
 
-function action_status()
-    local binpath = cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome")
-    local configpath = cfg("config", "/etc/AdGuardHome.yaml")
-    local workdir = cfg("workdir", "/etc/AdGuardHome")
-    local dns_mode = cfg("dns_mode", "takeover")
-    -- 「Clash 串联」已下线，历史配置在界面上按「接管 53 端口」展示
-    if dns_mode == "openclash" then
-        dns_mode = "takeover"
-    end
-    local dnsport = 5333
-    if dns_mode == "takeover" or dns_mode == "passwall" then
-        dnsport = 53
-    elseif dns_mode == "clashfirst" then
-        dnsport = 5335
-    end
-    local webport = tonumber(cfg("webport", "13800")) or 13800
-    local password = cfg("adminpass", "admin123")
-    local hijack_port = openclash_hijack_port()
 
-    local data = {
-        core = fs.access(binpath, "x") and true or false,
-        version = core_version(binpath),
-        running = service_running(binpath),
-        enabled = is_enabled(),
-        dns_mode = dns_mode,
-        dns_port = dnsport,
-        web_port = webport,
-        config_path = configpath,
-        config_exists = fs.access(configpath) and true or false,
-        workdir = workdir,
-        admin_user = cfg("adminuser", "admin"),
-        admin_pass = password,
-        channel = cfg("channel", "stable"),
-        core_update = core_update_info(binpath, cfg("channel", "stable")),
-        core_channel = cfg("core_channel", ""),
-        github_proxy = cfg("github_proxy", "gh-proxy.org"),
-        mode_applied = cfg("mode_applied", "none"),
-        openclash_hijack = hijack_port ~= "",
-        openclash_hijack_port = hijack_port,
-        openclash_running = openclash_running(),
-        openclash_redirect = uci:get("openclash", "config", "enable_redirect_dns") or "",
-        openclash_custom_dns = uci:get("openclash", "config", "enable_custom_dns") or "",
-        openclash_upstream_agh = openclash_upstream_agh(dnsport),
-        clash_dns_port = uci:get("openclash", "config", "dns_port") or "",
-        dnsmasq_port = uci:get("dhcp", "@dnsmasq[0]", "port") or "53",
-        -- 只有「接管 53」和「PassWall 前置」需要检查收回规则，其它模式跳过 nft 调用
-        dns_redirect = (dns_mode == "takeover" or dns_mode == "passwall")
-            and (sys.call("nft list chain inet fw4 agh_dns_redirect 2>/dev/null | grep -q 'redirect to :53'") == 0)
-            or false,
-        passwall_enabled = passwall_enabled(),
-        passwall_dns_port = passwall_dns_port(),
-        upstream_current = yaml_list_values(configpath, "upstream_dns"),
-        upstream_source = cfg("upstream_source", "auto"),
-        agh_bypassed = cfg("agh_bypassed", "0"),
-        update_running = update_running(),
-        action_running = action_running(),
-        action_code = read_number(RUN .. "_action.code"),
-        last_apply = state_value("last_apply"),
-        last_update = state_value("last_update"),
-        last_fallback = state_value("last_fallback"),
-        plugin = plugin_update_info()
-    }
-
-    -- 统计跟着状态一起返回，前端一次请求即可刷新两块内容
-    data.stats = collect_stats()
-
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json(data)
-end
 
 -- 从 AdGuard Home 本地接口读取过滤统计，插件页面无需打开控制台。
 -- 结果缓存 8 秒：页面 10 秒轮询时每次都能拿到新数据，又不会重复请求。
@@ -792,30 +723,10 @@ collect_stats = function()
     return data
 end
 
-function action_stats()
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json(collect_stats())
-end
+
 
 -- 清空 AdGuard Home 统计：调用官方 /control/stats_reset，并删除插件侧缓存
-function action_stats_clear()
-    if not require_post() then
-        return
-    end
 
-    local code = agh_request("/control/stats_reset", "POST")
-
-    if code ~= "200" then
-        json_error("清空统计失败，AdGuard Home 可能未运行。")
-        return
-    end
-
-    sys.call("rm -f " .. STATS_CACHE)
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json({ ok = true })
-end
 
 -- 历史调用名保持不变，内部统一走 netrc 凭据方式
 local agh_api = agh_request
@@ -834,935 +745,130 @@ local function interval_days(value, default)
     return n
 end
 
-function action_filters_get()
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
 
-    local code, resp = agh_api("/control/filtering/status", "GET")
-    if code ~= "200" then
-        http.write_json({ ok = false, error = "读取过滤规则失败，请确认 AdGuard Home 正在运行。" })
-        return
-    end
 
-    local okc, jsonc = pcall(require, "luci.jsonc")
-    local data = okc and jsonc.parse(resp) or nil
-    if not data then
-        http.write_json({ ok = false, error = "解析过滤规则失败。" })
-        return
-    end
 
-    -- AGH 的 /control/status 不返回这三个开关的状态，直接读 YAML 才准确。
-    local fconfig = cfg("config", "/etc/AdGuardHome.yaml")
-    local safesearch = yaml_safe_search_enabled(fconfig)
-    local parental = (yaml_section_scalar(fconfig, "filtering", "parental_enabled") or "") == "true"
-    local safebrowsing = (yaml_section_scalar(fconfig, "filtering", "safebrowsing_enabled") or "") == "true"
 
-    -- AdGuard Home 把黑名单和白名单分成两个数组，这里合并返回并标记来源，
-    -- 否则白名单订阅在插件里既看不到也删不掉。
-    local filters = {}
-    for _, f in ipairs(data.filters or {}) do
-        if type(f) == "table" then
-            f.whitelist = false
-            filters[#filters + 1] = f
-        end
-    end
-    for _, f in ipairs(data.whitelist_filters or {}) do
-        if type(f) == "table" then
-            f.whitelist = true
-            filters[#filters + 1] = f
-        end
-    end
 
-    http.write_json({
-        ok = true,
-        -- AGH 返回的字段名是 enabled，不是 filtering_enabled
-        filtering_enabled = (data.enabled == true) or (data.filtering_enabled == true),
-        filters = filters,
-        user_rules = data.user_rules or {},
-        safesearch = safesearch,
-        parental = parental,
-        safebrowsing = safebrowsing
-    })
-end
 
-function action_filters_save()
-    if not require_post() then
-        return
-    end
 
-    local act = http.formvalue("action") or ""
-    local okc, jsonc = pcall(require, "luci.jsonc")
-    if not okc then
-        json_error("缺少 luci-lib-jsonc，无法操作过滤规则。")
-        return
-    end
 
-    local path, body
-    if act == "add" then
-        local url = (http.formvalue("url") or ""):gsub("^%s+", ""):gsub("%s+$", "")
-        local name = (http.formvalue("name") or ""):gsub("^%s+", ""):gsub("%s+$", "")
-        local whitelist = http.formvalue("whitelist") == "1"
-        if url == "" then
-            json_error("请填写订阅地址。")
-            return
-        end
-        -- AdGuard Home 只接受 http(s) 订阅地址，file:// 会在它那边报错
-        if not url:match("^https?://%S+$") then
-            json_error("订阅地址需以 http:// 或 https:// 开头。")
-            return
-        end
-        if name == "" then
-            name = url
-        end
-        path = "/control/filtering/add_url"
-        body = jsonc.stringify({ name = name, url = url, whitelist = whitelist })
-    elseif act == "toggle" then
-        local url = http.formvalue("url") or ""
-        local name = http.formvalue("name") or url
-        local enabled = http.formvalue("enabled") == "1"
-        local whitelist = http.formvalue("whitelist") == "1"
-        if url == "" then
-            json_error("缺少规则地址。")
-            return
-        end
-        path = "/control/filtering/set_url"
-        body = jsonc.stringify({
-            url = url,
-            whitelist = whitelist,
-            data = { name = name, url = url, enabled = enabled, whitelist = whitelist }
-        })
-    elseif act == "remove" then
-        local url = http.formvalue("url") or ""
-        local whitelist = http.formvalue("whitelist") == "1"
-        if url == "" then
-            json_error("缺少规则地址。")
-            return
-        end
-        path = "/control/filtering/remove_url"
-        body = jsonc.stringify({ url = url, whitelist = whitelist })
-    elseif act == "rules" then
-        local raw = http.formvalue("rules") or ""
-        local rules = {}
-        for line in (raw .. "\n"):gmatch("([^\n]*)\n") do
-            line = line:gsub("^%s+", ""):gsub("%s+$", "")
-            if line ~= "" then
-                rules[#rules + 1] = line
-            end
-        end
-        path = "/control/filtering/set_rules"
-        body = jsonc.stringify({ rules = rules })
-    elseif act == "trim" then
-        -- 按设备内存档位自动启停黑名单订阅，白名单与自定义规则不动
-        local tier = tonumber(http.formvalue("tier")) or 2048
-        local budget
-        if tier <= 512 then
-            budget = 250000
-        elseif tier <= 1024 then
-            budget = 800000
-        end
 
-        local _, sresp = agh_api("/control/filtering/status", "GET")
-        local st = jsonc.parse(sresp)
-        if not st or type(st.filters) ~= "table" then
-            json_error("读取规则列表失败，请确认 AdGuard Home 正在运行。")
-            return
-        end
 
-        local lists = {}
-        for _, f in ipairs(st.filters) do
-            if not f.whitelist then
-                lists[#lists + 1] = f
-            end
-        end
-        table.sort(lists, function(a, b)
-            return (tonumber(a.rules_count) or 0) < (tonumber(b.rules_count) or 0)
-        end)
 
-        local kept, changed = 0, 0
-        for _, f in ipairs(lists) do
-            local cnt = tonumber(f.rules_count) or 0
-            local enable = (budget == nil) or (kept + cnt <= budget)
-            if enable then
-                kept = kept + cnt
-            end
-            if (not not f.enabled) ~= enable then
-                agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
-                    url = f.url,
-                    whitelist = false,
-                    data = { name = f.name or f.url, url = f.url, enabled = enable, whitelist = false }
-                }))
-                changed = changed + 1
-            end
-        end
 
-        http.header("Cache-Control", "no-store")
-        http.prepare_content("application/json")
-        http.write_json({ ok = true, tier = tier, changed = changed, kept = kept })
-        return
-    elseif act == "feature" then
-        local feature = http.formvalue("feature") or ""
-        local value = http.formvalue("value") == "1"
-        local allowed = { filtering = true, safesearch = true, parental = true, safebrowsing = true }
-        if not allowed[feature] then
-            json_error("不支持的开关。")
-            return
-        end
 
-        if feature == "filtering" then
-            -- filtering 没有单独的 enable/disable，走 config 接口
-            local _, sresp = agh_api("/control/filtering/status", "GET")
-            local st = jsonc.parse(sresp)
-            local interval = st and tonumber(st.interval) or 24
-            path = "/control/filtering/config"
-            body = jsonc.stringify({ enabled = value, interval = interval })
-        else
-            path = string.format("/control/%s/%s", feature, value and "enable" or "disable")
-        end
-    else
-        json_error("不支持的操作。")
-        return
-    end
 
-    local code, resp = agh_api(path, "POST", body)
-    if code ~= "200" then
-        local detail = tostring(resp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-        if #detail > 120 then
-            detail = detail:sub(1, 120) .. "..."
-        end
-        if detail == "" then
-            json_error("操作失败，AdGuard Home 可能未运行。")
-        else
-            json_error("操作失败：" .. detail)
-        end
-        return
-    end
 
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json({ ok = true })
-end
 
-function action_querylog_get()
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
 
-    local code, resp = agh_api("/control/querylog?limit=20", "GET")
-    if code ~= "200" then
-        http.write_json({ ok = false, error = "读取查询日志失败，请确认 AdGuard Home 正在运行。" })
-        return
-    end
 
-    local okc, jsonc = pcall(require, "luci.jsonc")
-    local data = okc and jsonc.parse(resp) or nil
-    local items = {}
-    if data and data.data then
-        for _, e in ipairs(data.data) do
-            local q = e.question or {}
-            local first = q[1] or q
-            local client = e.client or ""
-            if e.client_info and e.client_info.name and e.client_info.name ~= "" then
-                client = e.client_info.name
-            end
-            items[#items + 1] = {
-                time = e.time or "",
-                client = client,
-                domain = first.name or "",
-                qtype = first.type or "",
-                status = e.status or (e.result and e.result.status) or "",
-                reason = e.reason or "",
-                upstream = e.upstream or ""
-            }
-        end
-    end
 
-    http.write_json({ ok = true, data = items })
-end
 
-function action_retention_save()
-    if not require_post() then
-        return
-    end
 
-    local days = tonumber(http.formvalue("days") or "30")
-    local query_days = tonumber(http.formvalue("query_days") or "30")
-    if not days or days ~= math.floor(days) or days < 1 or days > 3650 then
-        json_error("统计保留天数必须是 1-3650 之间的整数。")
-        return
-    end
-    if not query_days or query_days ~= math.floor(query_days) or query_days < 1 or query_days > 3650 then
-        json_error("查询日志保留天数必须是 1-3650 之间的整数。")
-        return
-    end
 
-    local configpath = cfg("config", "/etc/AdGuardHome.yaml")
-    if not fs.access(configpath) then
-        json_error("尚未生成 AdGuard Home 配置文件。")
-        return
-    end
 
-    if not yaml_set_section_scalar(configpath, "statistics", "interval", days .. "d")
-        or not yaml_set_section_scalar(configpath, "querylog", "interval", query_days .. "d") then
-        json_error("写入保留周期失败。")
-        return
-    end
 
-    start_action("sh " .. SHARE .. "/apply_settings.sh")
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json({ ok = true })
-end
 
-function action_core_install()
-    if not require_post() then
-        return
-    end
-
-    if update_running() then
-        json_error("内核正在安装或更新，请等待当前任务完成。", 409)
-        return
-    end
-
-    -- 把页面已确认的通道与版本传给安装脚本，保证提示的版本就是实际安装的版本
-    local channel = cfg("channel", "stable")
-    local info = core_update_info(cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome"), channel)
-    local cmd = "sh " .. SHARE .. "/update_core.sh"
-    if info.latest ~= "" then
-        local target_channel = info.beta and "beta" or "stable"
-        cmd = cmd .. " " .. string.format("%q", target_channel) .. " " .. string.format("%q", info.latest)
-    end
-
-    fs.writefile(RUN .. "_update.log", "正在启动内核安装任务...\n")
-    fs.remove(RUN .. "_update.code")
-    sys.exec(cmd .. " >" .. RUN .. "_update.log 2>&1 &")
-
-    http.prepare_content("application/json")
-    http.write_json({ ok = true })
-end
-
-function action_core_progress()
-    local log = fs.readfile(RUN .. "_update.log") or ""
-    if #log > 24000 then
-        log = string.sub(log, -24000)
-    end
-
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json({
-        running = update_running(),
-        log = log,
-        code = read_number(RUN .. "_update.code")
-    })
-end
-
-function action_service()
-    if not require_post() then
-        return
-    end
-
-    if update_running() then
-        json_error("内核正在安装或更新，请稍候再操作服务。", 409)
-        return
-    end
-
-    local act = http.formvalue("action") or ""
-    local allowed = {
-        start = true, stop = true, restart = true,
-        enable = true, disable = true, bootstrap = true
-    }
-    if not allowed[act] then
-        json_error("不支持的操作。")
-        return
-    end
-
-    if act == "enable" or act == "bootstrap" or act == "start" then
-        uci:set(CONF, "main", "enabled", "1")
-        uci:commit(CONF)
-        start_action("sh " .. SHARE .. "/apply_settings.sh")
-    elseif act == "disable" or act == "stop" then
-        uci:set(CONF, "main", "enabled", "0")
-        uci:commit(CONF)
-        start_action("sh " .. SHARE .. "/apply_settings.sh")
-    elseif act == "restart" then
-        start_action("/etc/init.d/adguardhome_lite restart")
-    end
-
-    http.prepare_content("application/json")
-    http.write_json({ ok = true })
-end
-
-function action_password()
-    if not require_post() then
-        return
-    end
-
-    local hash = http.formvalue("hash") or ""
-    local password = http.formvalue("password") or ""
-
-    if #password < 8 then
-        json_error("新密码至少需要 8 个字符。")
-        return
-    end
-    if password:match("%c") then
-        json_error("新密码不能包含换行等控制字符。")
-        return
-    end
-    if #hash < 50 or not hash:match("^%$2[aby]%$%d%d%$[%w%./]+$") then
-        json_error("密码哈希格式不正确，请刷新页面后重试。")
-        return
-    end
-    if not fs.access(cfg("config", "/etc/AdGuardHome.yaml")) then
-        json_error("配置文件尚未生成，请先启用服务。")
-        return
-    end
-
-    local hashfile = RUN .. "_new_hash"
-    local passfile = RUN .. "_new_pass"
-    fs.writefile(hashfile, hash)
-    fs.writefile(passfile, password)
-    sys.call("chmod 600 " .. hashfile .. " " .. passfile .. " >/dev/null 2>&1")
-
-    start_action("sh " .. SHARE .. "/set_password.sh")
-
-    http.prepare_content("application/json")
-    http.write_json({ ok = true })
-end
-
-function action_settings_get()
-    local binpath = cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome")
-    local configpath = cfg("config", "/etc/AdGuardHome.yaml")
-    local mode = cfg("dns_mode", "takeover")
-    if mode == "openclash" then
-        mode = "takeover"
-    end
-
-    local cache_enabled = cache_option(configpath, "cache_enabled", "1")
-    local cache_size_mb = tonumber(cache_option(configpath, "cache_size_mb", "16")) or 16
-    local cache_ttl_min = tonumber(cache_option(configpath, "cache_ttl_min", "0")) or 0
-    local cache_ttl_max = tonumber(cache_option(configpath, "cache_ttl_max", "0")) or 0
-    local cache_optimistic = cache_option(configpath, "cache_optimistic", "0")
-
-    local dns_crypto = cfg("dns_crypto", "off")
-    local dns_crypto_custom = cfg("dns_crypto_custom", "")
-
-    -- 加密预设只在「Clash 前置」且上游由插件管理时才会写入；
-    -- 用户自定义上游时给界面提示，避免以为已经生效。
-    local crypto_blocked = false
-    if dns_crypto ~= "off" and dns_crypto ~= "" and mode == "clashfirst" then
-        if cfg("upstream_source", "auto") == "custom" then
-            crypto_blocked = true
-        else
-            local cur_up = yaml_list_values(configpath, "upstream_dns")
-            local auto_up = uci:get(CONF, "main", "auto_upstream") or ""
-            local self_ip = uci:get("network", "lan", "ipaddr") or ""
-            local clash_port = cfg("clash_dns_port", "7874")
-            local managed = false
-
-            if auto_up ~= "" and cur_up == auto_up then
-                managed = true
-            end
-
-            local known = {
-                "",
-                "127.0.0.1",
-                "127.0.0.1:53",
-                "127.0.0.1:1745",
-                "127.0.0.1:5335",
-                "127.0.0.1:" .. clash_port,
-                "223.5.5.5 119.29.29.29"
-            }
-            for _, v in ipairs(known) do
-                if cur_up == v then
-                    managed = true
-                    break
-                end
-            end
-            if self_ip ~= "" and cur_up == self_ip then
-                managed = true
-            end
-            -- PassWall 的 DNS 端口动态变化，按端口段识别插件写入的上游
-            if not managed and cur_up:match("^127%.0%.0%.1:114%d%d$") then
-                managed = true
-            end
-
-            crypto_blocked = not managed
-        end
-    end
-
-    local upstream_source = cfg("upstream_source", "auto")
-    if upstream_source ~= "custom" then
-        upstream_source = "auto"
-    end
-    local upstream_custom = cfg("upstream_custom", "")
-    local upstream_current = yaml_list_values(configpath, "upstream_dns")
-    local stats_retention_days = interval_days(yaml_section_scalar(configpath, "statistics", "interval"), 30)
-    local querylog_retention_days = interval_days(yaml_section_scalar(configpath, "querylog", "interval"), 30)
-
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json({
-        ok = true,
-        enabled = is_enabled(),
-        dns_mode = mode,
-        webport = tonumber(cfg("webport", "13800")) or 13800,
-        binpath = binpath,
-        workdir = cfg("workdir", "/etc/AdGuardHome"),
-        channel = cfg("channel", "stable"),
-        github_proxy = cfg("github_proxy", "gh-proxy.org"),
-        cache_enabled = cache_enabled == "1",
-        cache_size_mb = cache_size_mb,
-        cache_ttl_min = cache_ttl_min,
-        cache_ttl_max = cache_ttl_max,
-        cache_optimistic = cache_optimistic == "1",
-        dns_crypto = dns_crypto,
-        dns_crypto_custom = dns_crypto_custom,
-        crypto_blocked = crypto_blocked,
-        upstream_source = upstream_source,
-        upstream_custom = upstream_custom,
-        upstream_current = upstream_current,
-        stats_retention_days = stats_retention_days,
-        querylog_retention_days = querylog_retention_days,
-        bypass_ifaces = join_words(uci:get(CONF, "main", "bypass_ifaces")),
-        bypass_clients = join_words(uci:get(CONF, "main", "bypass_clients")),
-        devices = net_devices(),
-        openclash_installed = uci:get("openclash", "config") ~= nil,
-        passwall_installed = uci:get("passwall", "@global[0]", "enabled") ~= nil,
-        passwall_enabled = passwall_enabled(),
-        passwall_dns_port = passwall_dns_port(),
-        admin_user = cfg("adminuser", "admin"),
-        admin_pass = cfg("adminpass", "admin123"),
-        config_path = configpath,
-        core = fs.access(binpath, "x") and true or false,
-        version = core_version(binpath),
-        running = service_running(binpath)
-    })
-end
-
-function action_settings_save()
-    if not require_post() then
-        return
-    end
-    if update_running() then
-        json_error("内核正在安装或更新，请等待完成后再保存设置。", 409)
-        return
-    end
-
-    local enabled = http.formvalue("enabled") or "0"
-    local mode = http.formvalue("dns_mode") or "takeover"
-    local webport = http.formvalue("webport") or "13800"
-    local binpath = http.formvalue("binpath") or "/usr/bin/AdGuardHome/AdGuardHome"
-    local workdir = http.formvalue("workdir") or "/etc/AdGuardHome"
-    local channel = http.formvalue("channel") or "stable"
-    local proxy = http.formvalue("github_proxy") or "gh-proxy.org"
-    local cache_enabled = http.formvalue("cache_enabled") or "1"
-    local cache_size_raw = http.formvalue("cache_size_mb") or "16"
-    local cache_ttl_min_raw = http.formvalue("cache_ttl_min") or "0"
-    local cache_ttl_max_raw = http.formvalue("cache_ttl_max") or "0"
-    local cache_optimistic = http.formvalue("cache_optimistic") or "0"
-    local dns_crypto = http.formvalue("dns_crypto") or "off"
-    local dns_crypto_custom = http.formvalue("dns_crypto_custom") or ""
-    dns_crypto_custom = dns_crypto_custom:gsub("^%s+", ""):gsub("%s+$", "")
-    local bypass_ifaces_raw = http.formvalue("bypass_ifaces") or ""
-    local bypass_clients_raw = http.formvalue("bypass_clients") or ""
-
-    if cache_enabled ~= "0" and cache_enabled ~= "1" then
-        json_error("DNS 缓存开关参数不正确。")
-        return
-    end
-    if cache_optimistic ~= "0" and cache_optimistic ~= "1" then
-        json_error("乐观缓存参数不正确。")
-        return
-    end
-
-    local cache_size_mb = tonumber(cache_size_raw)
-    if not cache_size_mb or cache_size_mb ~= math.floor(cache_size_mb) or cache_size_mb < 1 or cache_size_mb > 256 then
-        json_error("缓存大小必须是 1-256MB 之间的整数。")
-        return
-    end
-
-    local cache_ttl_min = tonumber(cache_ttl_min_raw)
-    local cache_ttl_max = tonumber(cache_ttl_max_raw)
-    if not cache_ttl_min or cache_ttl_min ~= math.floor(cache_ttl_min) or cache_ttl_min < 0 or cache_ttl_min > 604800 then
-        json_error("最小 TTL 必须是 0-604800 秒之间的整数。")
-        return
-    end
-    if not cache_ttl_max or cache_ttl_max ~= math.floor(cache_ttl_max) or cache_ttl_max < 0 or cache_ttl_max > 604800 then
-        json_error("最大 TTL 必须是 0-604800 秒之间的整数。")
-        return
-    end
-    if cache_ttl_max > 0 and cache_ttl_min > cache_ttl_max then
-        json_error("最小 TTL 不能大于最大 TTL；最大 TTL 为 0 表示不限制。")
-        return
-    end
-    if cache_enabled == "0" then
-        cache_optimistic = "0"
-    end
-
-    local allowed_crypto = {
-        off = true, alidns = true, dnspod = true, cloudflare = true, custom = true
-    }
-    if not allowed_crypto[dns_crypto] then
-        json_error("加密上游参数不正确。")
-        return
-    end
-    if dns_crypto == "custom" then
-        if dns_crypto_custom == "" then
-            json_error("请填写自定义加密上游地址。")
-            return
-        end
-        local valid_scheme = dns_crypto_custom:match("^https://%S+$")
-            or dns_crypto_custom:match("^tls://%S+$")
-            or dns_crypto_custom:match("^quic://%S+$")
-            or dns_crypto_custom:match("^sdns://%S+$")
-        if not valid_scheme then
-            json_error("自定义加密上游需以 https://、tls://、quic:// 或 sdns:// 开头，且不能包含空格。")
-            return
-        end
-    end
-
-    if enabled ~= "0" and enabled ~= "1" then
-        json_error("启用状态参数不正确。")
-        return
-    end
-
-    local allowed_modes = {
-        takeover = true, upstream = true, none = true, clashfirst = true, passwall = true
-    }
-    local allowed_bins = {
-        ["/usr/bin/AdGuardHome/AdGuardHome"] = true,
-        ["/tmp/AdGuardHome/AdGuardHome"] = true
-    }
-    local allowed_works = {
-        ["/etc/AdGuardHome"] = true,
-        ["/tmp/AdGuardHome"] = true
-    }
-    local allowed_channels = { stable = true, beta = true }
-    local allowed_proxies = {
-        none = true, ["gh-proxy.org"] = true, ["ghproxy.cc"] = true,
-        ["ghproxy.com"] = true, ["ghfast.top"] = true
-    }
-
-    if not allowed_modes[mode] then
-        json_error("DNS 接管方式不正确。")
-        return
-    end
-    if not allowed_bins[binpath] then
-        json_error("内核安装位置不正确。")
-        return
-    end
-    if not allowed_works[workdir] then
-        json_error("工作目录不正确。")
-        return
-    end
-    if not allowed_channels[channel] then
-        json_error("更新通道不正确。")
-        return
-    end
-    if not allowed_proxies[proxy] then
-        json_error("GitHub 反代选项不正确。")
-        return
-    end
-
-    local upstream_source = http.formvalue("upstream_source") or "auto"
-    local upstream_custom = http.formvalue("upstream_custom") or ""
-    upstream_custom = upstream_custom:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-
-    if upstream_source ~= "auto" and upstream_source ~= "custom" then
-        json_error("上游 DNS 来源参数不正确。")
-        return
-    end
-    if upstream_source == "custom" then
-        if upstream_custom == "" then
-            json_error("请填写自定义上游 DNS，或把来源改回「自动」。")
-            return
-        end
-        if #upstream_custom > 1024 then
-            json_error("自定义上游 DNS 过长，请精简后再保存。")
-            return
-        end
-        for item in upstream_custom:gmatch("%S+") do
-            local addr = item:gsub("^%[[^%]]*%]", "")
-            local valid = addr:match("^https://%S+$")
-                or addr:match("^tls://%S+$")
-                or addr:match("^quic://%S+$")
-                or addr:match("^sdns://%S+$")
-                or addr:match("^[%w%._:%-]+$")
-            if not valid then
-                json_error("上游 DNS 格式不正确：" .. item)
-                return
-            end
-        end
-    end
-
-    local ifaces, iface_seen = {}, {}
-    for _, name in ipairs(split_words(bypass_ifaces_raw)) do
-        if name == "lo" then
-            json_error("不能把 lo（回环接口）设为排除接口。")
-            return
-        end
-        if not valid_iface_name(name) then
-            json_error("接口名不合法：" .. name .. "（仅支持字母、数字、下划线、点和短横线，最长 15 字符）。")
-            return
-        end
-        if not iface_seen[name] then
-            iface_seen[name] = true
-            ifaces[#ifaces + 1] = name
-        end
-    end
-
-    local clients, client_seen = {}, {}
-    for _, spec in ipairs(split_words(bypass_clients_raw)) do
-        if not valid_client_spec(spec) then
-            json_error("客户端地址不合法：" .. spec .. "（支持 IPv4 / IPv6 地址或 CIDR）。")
-            return
-        end
-        if not client_seen[spec] then
-            client_seen[spec] = true
-            clients[#clients + 1] = spec
-        end
-    end
-
-    if #ifaces > 32 or #clients > 64 then
-        json_error("排除项过多，接口最多 32 个、客户端最多 64 个。")
-        return
-    end
-
-    local port = tonumber(webport)
-    if not port or port ~= math.floor(port) or port < 1 or port > 65535 then
-        json_error("管理面板端口必须是 1-65535 之间的整数。")
-        return
-    end
-    if port == 53 or port == 1745 or port == 5333 or port == 5335 then
-        json_error("管理面板端口不能使用 53、1745、5333 或 5335。")
-        return
-    end
-
-    if enabled == "1" and not fs.access(binpath, "x") then
-        json_error("所选位置尚未安装内核，请先到概览页安装内核。")
-        return
-    end
-
-    uci:set(CONF, "main", "enabled", enabled)
-    uci:set(CONF, "main", "dns_mode", mode)
-    uci:set(CONF, "main", "webport", tostring(port))
-    uci:set(CONF, "main", "binpath", binpath)
-    uci:set(CONF, "main", "workdir", workdir)
-    uci:set(CONF, "main", "channel", channel)
-    uci:set(CONF, "main", "github_proxy", proxy)
-    uci:set(CONF, "main", "upstream_source", upstream_source)
-    uci:set(CONF, "main", "upstream_custom", upstream_custom)
-    uci:set(CONF, "main", "cache_enabled", cache_enabled)
-    uci:set(CONF, "main", "cache_size_mb", tostring(cache_size_mb))
-    uci:set(CONF, "main", "cache_ttl_min", tostring(cache_ttl_min))
-    uci:set(CONF, "main", "cache_ttl_max", tostring(cache_ttl_max))
-    uci:set(CONF, "main", "cache_optimistic", cache_optimistic)
-    uci:set(CONF, "main", "dns_crypto", dns_crypto)
-    uci:set(CONF, "main", "dns_crypto_custom", dns_crypto_custom)
-    uci:delete(CONF, "main", "bypass_ifaces")
-    for i = 1, #ifaces do
-        uci:add_list(CONF, "main", "bypass_ifaces", ifaces[i])
-    end
-    uci:delete(CONF, "main", "bypass_clients")
-    for i = 1, #clients do
-        uci:add_list(CONF, "main", "bypass_clients", clients[i])
-    end
-    uci:commit(CONF)
-
-    -- 运行中优先通过 AdGuard Home API 在线应用缓存设置；失败则由 apply_settings.sh 回退到文件写入
-    uci:delete(CONF, "main", "cache_api_applied")
-    if service_running(binpath) then
-        agh_client()
-        local size_bytes = (cache_enabled == "1") and (cache_size_mb * 1024 * 1024) or 0
-        local optimistic = (cache_enabled == "1" and cache_optimistic == "1")
-        local ok = agh.patch_dns_config({
-            cache_size = size_bytes,
-            cache_ttl_min = cache_ttl_min,
-            cache_ttl_max = cache_ttl_max,
-            cache_optimistic = optimistic
-        })
-        if ok then
-            local dns_conf = agh.get_dns_config()
-            ok = dns_conf ~= nil and tonumber(dns_conf.cache_size) == size_bytes
-        end
-        if ok then
-            uci:set(CONF, "main", "cache_api_applied", "1")
-            uci:set(CONF, "main", "cache_applied", string.format(
-                "%s|%s|%s|%s|%s",
-                cache_enabled, cache_size_mb, cache_ttl_min, cache_ttl_max, cache_optimistic))
-        end
-    end
-    uci:commit(CONF)
-
-    start_action("sh " .. SHARE .. "/apply_settings.sh")
-
-    http.prepare_content("application/json")
-    http.write_json({ ok = true })
-end
-
-function action_yaml_get()
-    local configpath = cfg("config", "/etc/AdGuardHome.yaml")
-    local yaml = fs.readfile(configpath) or ""
-
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json({
-        ok = true,
-        path = configpath,
-        enabled = is_enabled(),
-        running = service_running(cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome")),
-        yaml = yaml
-    })
-end
-
-function action_yaml_save()
-    if not require_post() then
-        return
-    end
-
-    local yaml = http.formvalue("yaml")
-    if not yaml then
-        json_error("未收到配置内容。")
-        return
-    end
-    if #yaml > 1048576 then
-        json_error("配置文件过大，最大支持 1MB。")
-        return
-    end
-
-    yaml = yaml:gsub("\r\n", "\n")
-    local configpath = cfg("config", "/etc/AdGuardHome.yaml")
-    local binpath = cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome")
-    if not fs.access(binpath, "x") then
-        json_error("尚未安装内核，无法校验配置。")
-        return
-    end
-
-    local tmp = "/tmp/adguardhome_lite_yaml_test.yaml"
-    fs.writefile(tmp, yaml)
-    local rc = sys.call(string.format("%q --check-config -c %q >/var/run/adguardhome_lite_yaml_check.log 2>&1", binpath, tmp))
-    if rc ~= 0 then
-        local err = fs.readfile("/var/run/adguardhome_lite_yaml_check.log") or "未知错误"
-        if #err > 1000 then
-            err = string.sub(err, -1000)
-        end
-        json_error("配置校验失败：\n" .. err, 422)
-        return
-    end
-
-    local old = fs.readfile(configpath) or ""
-    fs.writefile(configpath .. ".bak", old)
-    if not fs.writefile(configpath, yaml) then
-        json_error("写入配置文件失败。")
-        return
-    end
-    sys.call("chmod 600 " .. configpath .. " >/dev/null 2>&1")
-
-    if is_enabled() then
-        start_action("/etc/init.d/adguardhome_lite restart")
-    end
-
-    http.prepare_content("application/json")
-    http.write_json({ ok = true })
-end
-
-function action_logs()
-    local level = (http.formvalue("level") or ""):lower()
-    local syslog = sys.exec("logread 2>/dev/null | grep -i 'adguard' | tail -n 300") or ""
-    local update = fs.readfile(RUN .. "_update.log") or ""
-    local action = fs.readfile(RUN .. "_action.log") or ""
-
-    if level == "error" or level == "warn" or level == "info" then
-        local tag = "[" .. level:upper() .. "]"
-        local filtered = {}
-        for line in (syslog .. "\n"):gmatch("([^\n]*)\n") do
-            if line:find(tag, 1, true) then
-                filtered[#filtered + 1] = line
-            end
-        end
-        syslog = table.concat(filtered, "\n")
-        if syslog ~= "" then
-            syslog = syslog .. "\n"
-        end
-    end
-
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("text/plain; charset=utf-8")
-    http.write("===== 持久化状态（重启后保留） =====\n")
-    http.write("上次应用：" .. (state_value("last_apply") ~= "" and state_value("last_apply") or "无记录") .. "\n")
-    http.write("上次更新：" .. (state_value("last_update") ~= "" and state_value("last_update") or "无记录") .. "\n")
-    http.write("上次 DNS 回退：" .. (state_value("last_fallback") ~= "" and state_value("last_fallback") or "无记录") .. "\n")
-    http.write("\n===== 系统日志（包含 AdGuard 关键字，最近 300 行"
-        .. (level ~= "" and ("，筛选 " .. level:upper()) or "") .. "） =====\n")
-    http.write(syslog)
-    http.write("\n\n===== 内核安装/更新日志 =====\n")
-    http.write(update)
-    http.write("\n\n===== 最近一次服务操作日志 =====\n")
-    http.write(action)
-end
 
 -- DNS 自检：只读检查内核、进程、面板端口与 DNS 查询链路，不修改任何配置
-function action_selftest()
-    local binpath = cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome")
-    local configpath = cfg("config", "/etc/AdGuardHome.yaml")
-    local mode = cfg("dns_mode", "takeover")
-    local webport = tonumber(cfg("webport", "13800")) or 13800
 
-    -- 优先使用配置文件中实际写入的端口，避免「设置已改但尚未应用」时误报
-    local dnsport = 5333
-    if mode == "takeover" or mode == "passwall" or mode == "openclash" then
-        dnsport = 53
-    elseif mode == "clashfirst" then
-        dnsport = 5335
-    end
-    local yaml_port_raw = (yaml_section_scalar(configpath, "dns", "port") or ""):gsub('"', "")
-    local yaml_port = tonumber(yaml_port_raw)
-    if yaml_port and yaml_port > 0 then
-        dnsport = yaml_port
-    end
-
-    local result = selftest.run({
-        binpath = binpath,
-        configpath = configpath,
-        webport = webport,
-        dnsport = dnsport,
-        running = service_running(binpath),
-        version = core_version(binpath),
-        mode = mode,
-        mode_applied = cfg("mode_applied", "none")
-    })
-
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    http.write_json(result)
-end
 
 -- 旧版残留扫描：只读，返回 JSON 清单
-function action_legacy_scan()
-    local out = sys.exec("sh " .. SHARE .. "/legacy_cleanup.sh scan 2>/dev/null") or ""
-    out = out:match("({.*})") or ""
 
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    if out == "" then
-        http.write('{"ok":false,"error":"扫描失败，请查看系统日志"}')
-        return
-    end
-    http.write(out)
-end
 
 -- 旧版残留清理：先备份，再删除旧插件文件、移动旧内核
-function action_legacy_clean()
-    if not require_post() then
-        return
-    end
 
-    local out = sys.exec("sh " .. SHARE .. "/legacy_cleanup.sh clean 2>/dev/null") or ""
-    out = out:match("({.*})") or ""
+-- ===== 动作层：具体实现已拆分到 model/adguardhome_lite/actions/ =====
+local dashboard_actions = require "luci.model.adguardhome_lite.actions.dashboard"
+local core_actions = require "luci.model.adguardhome_lite.actions.core"
+local service_actions = require "luci.model.adguardhome_lite.actions.service"
+local settings_actions = require "luci.model.adguardhome_lite.actions.settings"
+local rules_actions = require "luci.model.adguardhome_lite.actions.rules"
+local logs_actions = require "luci.model.adguardhome_lite.actions.logs"
+local legacy_actions = require "luci.model.adguardhome_lite.actions.legacy"
 
-    http.header("Cache-Control", "no-store")
-    http.prepare_content("application/json")
-    if out == "" then
-        http.write('{"ok":false,"error":"清理失败，请查看系统日志"}')
-        return
-    end
-    http.write(out)
+local function action_ctx()
+    return {
+        fs = fs,
+        http = http,
+        sys = sys,
+        uci = uci,
+        util = util,
+        codes = codes,
+        agh = agh,
+        selftest = selftest,
+        split_words = split_words,
+        join_words = join_words,
+        valid_iface_name = valid_iface_name,
+        valid_client_spec = valid_client_spec,
+        version_newer = version_newer,
+        clean_tag = clean_tag,
+        CONF = CONF,
+        SHARE = SHARE,
+        RUN = RUN,
+        STATS_CACHE = STATS_CACHE,
+        VERSION_CACHE = VERSION_CACHE,
+        CORE_UPDATE = CORE_UPDATE,
+        PLUGIN_UPDATE = PLUGIN_UPDATE,
+        INSTALL_VERSION = INSTALL_VERSION,
+        RELEASE_URL = RELEASE_URL,
+        collect_stats = collect_stats,
+        read_cache = read_cache,
+        cfg = cfg,
+        CACHE_YAML_KEYS = CACHE_YAML_KEYS,
+        yaml_cache_scalar = yaml_cache_scalar,
+        yaml_list_values = yaml_list_values,
+        yaml_safe_search_enabled = yaml_safe_search_enabled,
+        yaml_section_scalar = yaml_section_scalar,
+        yaml_set_section_scalar = yaml_set_section_scalar,
+        cache_option = cache_option,
+        IGNORED_IFACE_PATTERNS = IGNORED_IFACE_PATTERNS,
+        iface_ignored = iface_ignored,
+        net_devices = net_devices,
+        is_enabled = is_enabled,
+        core_version = core_version,
+        core_update_info = core_update_info,
+        plugin_version = plugin_version,
+        plugin_update_info = plugin_update_info,
+        service_running = service_running,
+        openclash_hijack_port = openclash_hijack_port,
+        openclash_running = openclash_running,
+        openclash_upstream_agh = openclash_upstream_agh,
+        passwall_enabled = passwall_enabled,
+        passwall_dns_port = passwall_dns_port,
+        read_number = read_number,
+        update_running = update_running,
+        action_running = action_running,
+        start_action = start_action,
+        check_token = check_token,
+        require_post = require_post,
+        default_reason = default_reason,
+        json_error = json_error,
+        state_value = state_value,
+        agh_client = agh_client,
+        agh_request = agh_request,
+        agh_api = agh_api,
+        interval_days = interval_days
+    }
 end
+
+function action_status() return dashboard_actions.status(action_ctx()) end
+function action_stats() return dashboard_actions.stats(action_ctx()) end
+function action_stats_clear() return dashboard_actions.stats_clear(action_ctx()) end
+function action_core_install() return core_actions.core_install(action_ctx()) end
+function action_core_progress() return core_actions.core_progress(action_ctx()) end
+function action_service() return service_actions.service(action_ctx()) end
+function action_password() return service_actions.password(action_ctx()) end
+function action_selftest() return service_actions.selftest(action_ctx()) end
+function action_settings_get() return settings_actions.settings_get(action_ctx()) end
+function action_settings_save() return settings_actions.settings_save(action_ctx()) end
+function action_yaml_get() return settings_actions.yaml_get(action_ctx()) end
+function action_yaml_save() return settings_actions.yaml_save(action_ctx()) end
+function action_filters_get() return rules_actions.filters_get(action_ctx()) end
+function action_filters_save() return rules_actions.filters_save(action_ctx()) end
+function action_querylog_get() return rules_actions.querylog_get(action_ctx()) end
+function action_retention_save() return rules_actions.retention_save(action_ctx()) end
+function action_logs() return logs_actions.logs(action_ctx()) end
+function action_legacy_scan() return legacy_actions.legacy_scan(action_ctx()) end
+function action_legacy_clean() return legacy_actions.legacy_clean(action_ctx()) end

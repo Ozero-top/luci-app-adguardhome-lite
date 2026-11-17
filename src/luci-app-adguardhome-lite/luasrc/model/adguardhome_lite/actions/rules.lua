@@ -1,0 +1,288 @@
+-- AdGuard Home 助手 - rules 动作
+-- 依赖由控制器通过 ctx 注入，保持原有行为不变。
+
+local M = {}
+
+function M.filters_get(ctx)
+    local fs, http, sys, uci, util, codes, agh, selftest, split_words, join_words, valid_iface_name, valid_client_spec, version_newer, clean_tag, CONF, SHARE, RUN, STATS_CACHE, VERSION_CACHE, CORE_UPDATE, PLUGIN_UPDATE, INSTALL_VERSION, RELEASE_URL, collect_stats, read_cache, cfg, CACHE_YAML_KEYS, yaml_cache_scalar, yaml_list_values, yaml_safe_search_enabled, yaml_section_scalar, yaml_set_section_scalar, cache_option, IGNORED_IFACE_PATTERNS, iface_ignored, net_devices, is_enabled, core_version, core_update_info, plugin_version, plugin_update_info, service_running, openclash_hijack_port, openclash_running, openclash_upstream_agh, passwall_enabled, passwall_dns_port, read_number, update_running, action_running, start_action, check_token, require_post, default_reason, json_error, state_value, agh_client, agh_request, agh_api, interval_days = ctx.fs, ctx.http, ctx.sys, ctx.uci, ctx.util, ctx.codes, ctx.agh, ctx.selftest, ctx.split_words, ctx.join_words, ctx.valid_iface_name, ctx.valid_client_spec, ctx.version_newer, ctx.clean_tag, ctx.CONF, ctx.SHARE, ctx.RUN, ctx.STATS_CACHE, ctx.VERSION_CACHE, ctx.CORE_UPDATE, ctx.PLUGIN_UPDATE, ctx.INSTALL_VERSION, ctx.RELEASE_URL, ctx.collect_stats, ctx.read_cache, ctx.cfg, ctx.CACHE_YAML_KEYS, ctx.yaml_cache_scalar, ctx.yaml_list_values, ctx.yaml_safe_search_enabled, ctx.yaml_section_scalar, ctx.yaml_set_section_scalar, ctx.cache_option, ctx.IGNORED_IFACE_PATTERNS, ctx.iface_ignored, ctx.net_devices, ctx.is_enabled, ctx.core_version, ctx.core_update_info, ctx.plugin_version, ctx.plugin_update_info, ctx.service_running, ctx.openclash_hijack_port, ctx.openclash_running, ctx.openclash_upstream_agh, ctx.passwall_enabled, ctx.passwall_dns_port, ctx.read_number, ctx.update_running, ctx.action_running, ctx.start_action, ctx.check_token, ctx.require_post, ctx.default_reason, ctx.json_error, ctx.state_value, ctx.agh_client, ctx.agh_request, ctx.agh_api, ctx.interval_days
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+
+    local code, resp = agh_api("/control/filtering/status", "GET")
+    if code ~= "200" then
+        http.write_json({ ok = false, error = "读取过滤规则失败，请确认 AdGuard Home 正在运行。" })
+        return
+    end
+
+    local okc, jsonc = pcall(require, "luci.jsonc")
+    local data = okc and jsonc.parse(resp) or nil
+    if not data then
+        http.write_json({ ok = false, error = "解析过滤规则失败。" })
+        return
+    end
+
+    -- AGH 的 /control/status 不返回这三个开关的状态，直接读 YAML 才准确。
+    local fconfig = cfg("config", "/etc/AdGuardHome.yaml")
+    local safesearch = yaml_safe_search_enabled(fconfig)
+    local parental = (yaml_section_scalar(fconfig, "filtering", "parental_enabled") or "") == "true"
+    local safebrowsing = (yaml_section_scalar(fconfig, "filtering", "safebrowsing_enabled") or "") == "true"
+
+    -- AdGuard Home 把黑名单和白名单分成两个数组，这里合并返回并标记来源，
+    -- 否则白名单订阅在插件里既看不到也删不掉。
+    local filters = {}
+    for _, f in ipairs(data.filters or {}) do
+        if type(f) == "table" then
+            f.whitelist = false
+            filters[#filters + 1] = f
+        end
+    end
+    for _, f in ipairs(data.whitelist_filters or {}) do
+        if type(f) == "table" then
+            f.whitelist = true
+            filters[#filters + 1] = f
+        end
+    end
+
+    http.write_json({
+        ok = true,
+        -- AGH 返回的字段名是 enabled，不是 filtering_enabled
+        filtering_enabled = (data.enabled == true) or (data.filtering_enabled == true),
+        filters = filters,
+        user_rules = data.user_rules or {},
+        safesearch = safesearch,
+        parental = parental,
+        safebrowsing = safebrowsing
+    })
+end
+
+function M.filters_save(ctx)
+    local fs, http, sys, uci, util, codes, agh, selftest, split_words, join_words, valid_iface_name, valid_client_spec, version_newer, clean_tag, CONF, SHARE, RUN, STATS_CACHE, VERSION_CACHE, CORE_UPDATE, PLUGIN_UPDATE, INSTALL_VERSION, RELEASE_URL, collect_stats, read_cache, cfg, CACHE_YAML_KEYS, yaml_cache_scalar, yaml_list_values, yaml_safe_search_enabled, yaml_section_scalar, yaml_set_section_scalar, cache_option, IGNORED_IFACE_PATTERNS, iface_ignored, net_devices, is_enabled, core_version, core_update_info, plugin_version, plugin_update_info, service_running, openclash_hijack_port, openclash_running, openclash_upstream_agh, passwall_enabled, passwall_dns_port, read_number, update_running, action_running, start_action, check_token, require_post, default_reason, json_error, state_value, agh_client, agh_request, agh_api, interval_days = ctx.fs, ctx.http, ctx.sys, ctx.uci, ctx.util, ctx.codes, ctx.agh, ctx.selftest, ctx.split_words, ctx.join_words, ctx.valid_iface_name, ctx.valid_client_spec, ctx.version_newer, ctx.clean_tag, ctx.CONF, ctx.SHARE, ctx.RUN, ctx.STATS_CACHE, ctx.VERSION_CACHE, ctx.CORE_UPDATE, ctx.PLUGIN_UPDATE, ctx.INSTALL_VERSION, ctx.RELEASE_URL, ctx.collect_stats, ctx.read_cache, ctx.cfg, ctx.CACHE_YAML_KEYS, ctx.yaml_cache_scalar, ctx.yaml_list_values, ctx.yaml_safe_search_enabled, ctx.yaml_section_scalar, ctx.yaml_set_section_scalar, ctx.cache_option, ctx.IGNORED_IFACE_PATTERNS, ctx.iface_ignored, ctx.net_devices, ctx.is_enabled, ctx.core_version, ctx.core_update_info, ctx.plugin_version, ctx.plugin_update_info, ctx.service_running, ctx.openclash_hijack_port, ctx.openclash_running, ctx.openclash_upstream_agh, ctx.passwall_enabled, ctx.passwall_dns_port, ctx.read_number, ctx.update_running, ctx.action_running, ctx.start_action, ctx.check_token, ctx.require_post, ctx.default_reason, ctx.json_error, ctx.state_value, ctx.agh_client, ctx.agh_request, ctx.agh_api, ctx.interval_days
+    if not require_post() then
+        return
+    end
+
+    local act = http.formvalue("action") or ""
+    local okc, jsonc = pcall(require, "luci.jsonc")
+    if not okc then
+        json_error("缺少 luci-lib-jsonc，无法操作过滤规则。", nil, "rules_not_supported")
+        return
+    end
+
+    local path, body
+    if act == "add" then
+        local url = (http.formvalue("url") or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        local name = (http.formvalue("name") or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        local whitelist = http.formvalue("whitelist") == "1"
+        if url == "" then
+            json_error("请填写订阅地址。", nil, "invalid_rule_source")
+            return
+        end
+        -- AdGuard Home 只接受 http(s) 订阅地址，file:// 会在它那边报错
+        if not url:match("^https?://%S+$") then
+            json_error("订阅地址需以 http:// 或 https:// 开头。", nil, "invalid_rule_source")
+            return
+        end
+        if name == "" then
+            name = url
+        end
+        path = "/control/filtering/add_url"
+        body = jsonc.stringify({ name = name, url = url, whitelist = whitelist })
+    elseif act == "toggle" then
+        local url = http.formvalue("url") or ""
+        local name = http.formvalue("name") or url
+        local enabled = http.formvalue("enabled") == "1"
+        local whitelist = http.formvalue("whitelist") == "1"
+        if url == "" then
+            json_error("缺少规则地址。", nil, "invalid_rule_source")
+            return
+        end
+        path = "/control/filtering/set_url"
+        body = jsonc.stringify({
+            url = url,
+            whitelist = whitelist,
+            data = { name = name, url = url, enabled = enabled, whitelist = whitelist }
+        })
+    elseif act == "remove" then
+        local url = http.formvalue("url") or ""
+        local whitelist = http.formvalue("whitelist") == "1"
+        if url == "" then
+            json_error("缺少规则地址。", nil, "invalid_rule_source")
+            return
+        end
+        path = "/control/filtering/remove_url"
+        body = jsonc.stringify({ url = url, whitelist = whitelist })
+    elseif act == "rules" then
+        local raw = http.formvalue("rules") or ""
+        local rules = {}
+        for line in (raw .. "\n"):gmatch("([^\n]*)\n") do
+            line = line:gsub("^%s+", ""):gsub("%s+$", "")
+            if line ~= "" then
+                rules[#rules + 1] = line
+            end
+        end
+        path = "/control/filtering/set_rules"
+        body = jsonc.stringify({ rules = rules })
+    elseif act == "trim" then
+        -- 按设备内存档位自动启停黑名单订阅，白名单与自定义规则不动
+        local tier = tonumber(http.formvalue("tier")) or 2048
+        local budget
+        if tier <= 512 then
+            budget = 250000
+        elseif tier <= 1024 then
+            budget = 800000
+        end
+
+        local _, sresp = agh_api("/control/filtering/status", "GET")
+        local st = jsonc.parse(sresp)
+        if not st or type(st.filters) ~= "table" then
+            json_error("读取规则列表失败，请确认 AdGuard Home 正在运行。", nil, "rule_fetch_failed")
+            return
+        end
+
+        local lists = {}
+        for _, f in ipairs(st.filters) do
+            if not f.whitelist then
+                lists[#lists + 1] = f
+            end
+        end
+        table.sort(lists, function(a, b)
+            return (tonumber(a.rules_count) or 0) < (tonumber(b.rules_count) or 0)
+        end)
+
+        local kept, changed = 0, 0
+        for _, f in ipairs(lists) do
+            local cnt = tonumber(f.rules_count) or 0
+            local enable = (budget == nil) or (kept + cnt <= budget)
+            if enable then
+                kept = kept + cnt
+            end
+            if (not not f.enabled) ~= enable then
+                agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
+                    url = f.url,
+                    whitelist = false,
+                    data = { name = f.name or f.url, url = f.url, enabled = enable, whitelist = false }
+                }))
+                changed = changed + 1
+            end
+        end
+
+        http.header("Cache-Control", "no-store")
+        http.prepare_content("application/json")
+        http.write_json({ ok = true, tier = tier, changed = changed, kept = kept })
+        return
+    elseif act == "feature" then
+        local feature = http.formvalue("feature") or ""
+        local value = http.formvalue("value") == "1"
+        local allowed = { filtering = true, safesearch = true, parental = true, safebrowsing = true }
+        if not allowed[feature] then
+            json_error("不支持的开关。", nil, "rule_toggle_failed")
+            return
+        end
+
+        if feature == "filtering" then
+            -- filtering 没有单独的 enable/disable，走 config 接口
+            local _, sresp = agh_api("/control/filtering/status", "GET")
+            local st = jsonc.parse(sresp)
+            local interval = st and tonumber(st.interval) or 24
+            path = "/control/filtering/config"
+            body = jsonc.stringify({ enabled = value, interval = interval })
+        else
+            path = string.format("/control/%s/%s", feature, value and "enable" or "disable")
+        end
+    else
+        json_error("不支持的操作。", nil, "rule_action_failed")
+        return
+    end
+
+    local code, resp = agh_api(path, "POST", body)
+    if code ~= "200" then
+        local detail = tostring(resp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+        if #detail > 120 then
+            detail = detail:sub(1, 120) .. "..."
+        end
+        if detail == "" then
+            json_error("操作失败，AdGuard Home 可能未运行。", nil, "rule_action_failed")
+        else
+            json_error("操作失败：" .. detail, nil, "rule_action_failed")
+        end
+        return
+    end
+
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+    http.write_json({ ok = true })
+end
+
+function M.querylog_get(ctx)
+    local fs, http, sys, uci, util, codes, agh, selftest, split_words, join_words, valid_iface_name, valid_client_spec, version_newer, clean_tag, CONF, SHARE, RUN, STATS_CACHE, VERSION_CACHE, CORE_UPDATE, PLUGIN_UPDATE, INSTALL_VERSION, RELEASE_URL, collect_stats, read_cache, cfg, CACHE_YAML_KEYS, yaml_cache_scalar, yaml_list_values, yaml_safe_search_enabled, yaml_section_scalar, yaml_set_section_scalar, cache_option, IGNORED_IFACE_PATTERNS, iface_ignored, net_devices, is_enabled, core_version, core_update_info, plugin_version, plugin_update_info, service_running, openclash_hijack_port, openclash_running, openclash_upstream_agh, passwall_enabled, passwall_dns_port, read_number, update_running, action_running, start_action, check_token, require_post, default_reason, json_error, state_value, agh_client, agh_request, agh_api, interval_days = ctx.fs, ctx.http, ctx.sys, ctx.uci, ctx.util, ctx.codes, ctx.agh, ctx.selftest, ctx.split_words, ctx.join_words, ctx.valid_iface_name, ctx.valid_client_spec, ctx.version_newer, ctx.clean_tag, ctx.CONF, ctx.SHARE, ctx.RUN, ctx.STATS_CACHE, ctx.VERSION_CACHE, ctx.CORE_UPDATE, ctx.PLUGIN_UPDATE, ctx.INSTALL_VERSION, ctx.RELEASE_URL, ctx.collect_stats, ctx.read_cache, ctx.cfg, ctx.CACHE_YAML_KEYS, ctx.yaml_cache_scalar, ctx.yaml_list_values, ctx.yaml_safe_search_enabled, ctx.yaml_section_scalar, ctx.yaml_set_section_scalar, ctx.cache_option, ctx.IGNORED_IFACE_PATTERNS, ctx.iface_ignored, ctx.net_devices, ctx.is_enabled, ctx.core_version, ctx.core_update_info, ctx.plugin_version, ctx.plugin_update_info, ctx.service_running, ctx.openclash_hijack_port, ctx.openclash_running, ctx.openclash_upstream_agh, ctx.passwall_enabled, ctx.passwall_dns_port, ctx.read_number, ctx.update_running, ctx.action_running, ctx.start_action, ctx.check_token, ctx.require_post, ctx.default_reason, ctx.json_error, ctx.state_value, ctx.agh_client, ctx.agh_request, ctx.agh_api, ctx.interval_days
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+
+    local code, resp = agh_api("/control/querylog?limit=20", "GET")
+    if code ~= "200" then
+        http.write_json({ ok = false, error = "读取查询日志失败，请确认 AdGuard Home 正在运行。" })
+        return
+    end
+
+    local okc, jsonc = pcall(require, "luci.jsonc")
+    local data = okc and jsonc.parse(resp) or nil
+    local items = {}
+    if data and data.data then
+        for _, e in ipairs(data.data) do
+            local q = e.question or {}
+            local first = q[1] or q
+            local client = e.client or ""
+            if e.client_info and e.client_info.name and e.client_info.name ~= "" then
+                client = e.client_info.name
+            end
+            items[#items + 1] = {
+                time = e.time or "",
+                client = client,
+                domain = first.name or "",
+                qtype = first.type or "",
+                status = e.status or (e.result and e.result.status) or "",
+                reason = e.reason or "",
+                upstream = e.upstream or ""
+            }
+        end
+    end
+
+    http.write_json({ ok = true, data = items })
+end
+
+function M.retention_save(ctx)
+    local fs, http, sys, uci, util, codes, agh, selftest, split_words, join_words, valid_iface_name, valid_client_spec, version_newer, clean_tag, CONF, SHARE, RUN, STATS_CACHE, VERSION_CACHE, CORE_UPDATE, PLUGIN_UPDATE, INSTALL_VERSION, RELEASE_URL, collect_stats, read_cache, cfg, CACHE_YAML_KEYS, yaml_cache_scalar, yaml_list_values, yaml_safe_search_enabled, yaml_section_scalar, yaml_set_section_scalar, cache_option, IGNORED_IFACE_PATTERNS, iface_ignored, net_devices, is_enabled, core_version, core_update_info, plugin_version, plugin_update_info, service_running, openclash_hijack_port, openclash_running, openclash_upstream_agh, passwall_enabled, passwall_dns_port, read_number, update_running, action_running, start_action, check_token, require_post, default_reason, json_error, state_value, agh_client, agh_request, agh_api, interval_days = ctx.fs, ctx.http, ctx.sys, ctx.uci, ctx.util, ctx.codes, ctx.agh, ctx.selftest, ctx.split_words, ctx.join_words, ctx.valid_iface_name, ctx.valid_client_spec, ctx.version_newer, ctx.clean_tag, ctx.CONF, ctx.SHARE, ctx.RUN, ctx.STATS_CACHE, ctx.VERSION_CACHE, ctx.CORE_UPDATE, ctx.PLUGIN_UPDATE, ctx.INSTALL_VERSION, ctx.RELEASE_URL, ctx.collect_stats, ctx.read_cache, ctx.cfg, ctx.CACHE_YAML_KEYS, ctx.yaml_cache_scalar, ctx.yaml_list_values, ctx.yaml_safe_search_enabled, ctx.yaml_section_scalar, ctx.yaml_set_section_scalar, ctx.cache_option, ctx.IGNORED_IFACE_PATTERNS, ctx.iface_ignored, ctx.net_devices, ctx.is_enabled, ctx.core_version, ctx.core_update_info, ctx.plugin_version, ctx.plugin_update_info, ctx.service_running, ctx.openclash_hijack_port, ctx.openclash_running, ctx.openclash_upstream_agh, ctx.passwall_enabled, ctx.passwall_dns_port, ctx.read_number, ctx.update_running, ctx.action_running, ctx.start_action, ctx.check_token, ctx.require_post, ctx.default_reason, ctx.json_error, ctx.state_value, ctx.agh_client, ctx.agh_request, ctx.agh_api, ctx.interval_days
+    if not require_post() then
+        return
+    end
+
+    local days = tonumber(http.formvalue("days") or "30")
+    local query_days = tonumber(http.formvalue("query_days") or "30")
+    if not days or days ~= math.floor(days) or days < 1 or days > 3650 then
+        json_error("统计保留天数必须是 1-3650 之间的整数。", nil, "invalid_retention")
+        return
+    end
+    if not query_days or query_days ~= math.floor(query_days) or query_days < 1 or query_days > 3650 then
+        json_error("查询日志保留天数必须是 1-3650 之间的整数。", nil, "invalid_retention")
+        return
+    end
+
+    local configpath = cfg("config", "/etc/AdGuardHome.yaml")
+    if not fs.access(configpath) then
+        json_error("尚未生成 AdGuard Home 配置文件。", nil, "config_missing")
+        return
+    end
+
+    if not yaml_set_section_scalar(configpath, "statistics", "interval", days .. "d")
+        or not yaml_set_section_scalar(configpath, "querylog", "interval", query_days .. "d") then
+        json_error("写入保留周期失败。", nil, "retention_save_failed")
+        return
+    end
+
+    start_action("sh " .. SHARE .. "/apply_settings.sh")
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+    http.write_json({ ok = true })
+end
+
+return M
