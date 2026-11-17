@@ -539,7 +539,7 @@ ensure_safe_dnsmasq_layout() {
         log_msg "Clash 把 53 劫持到 $_hj，DNSMasq 在该端口提供服务，解析链路正常。"
     else
         _bp="1"
-        log_msg "Clash 把 53 直接劫持到 $_hj，查询不再经过 DNSMasq，AdGuard Home 会被绕过。"
+        log_event warn dns_hijack_conflict "Clash 把 53 直接劫持到 $_hj，查询不再经过 DNSMasq，AdGuard Home 会被绕过。"
         if [ "$_hj" = "$clash_dns_port" ]; then
             log_msg "建议改用「Clash 前置」模式：让 Clash 把上游 DNS 交给 AdGuard Home。"
         fi
@@ -674,7 +674,7 @@ revert_mode() {
         _chk_port="$(get_uci dhcp.@dnsmasq[0].port)"
         [ -n "$_chk_port" ] || _chk_port="53"
         if ! nslookup -timeout=2 -retry=1 -port="$_chk_port" www.baidu.com 127.0.0.1 >/dev/null 2>&1; then
-            log_msg "提示：DNSMasq（端口 $_chk_port）解析仍失败，请检查 Clash 运行状态或 WAN DNS。"
+            log_event warn dns_revert_failed "DNSMasq（端口 $_chk_port）解析仍失败，请检查 Clash 运行状态或 WAN DNS。"
         fi
         log_msg "已恢复 DNSMasq 原始设置"
     fi

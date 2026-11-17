@@ -18,6 +18,7 @@
 		yamlLoaded: false,
 		settingsSubtab: 'svc',
 		logSubtab: 'sys',
+		logLevel: '',
 		rulesDirty: false,
 		stepsCollapsed: null,
 		busy: false,
@@ -1574,7 +1575,8 @@
 		var box = $('agh-log-box');
 		if (!box) return;
 		try {
-			var text = await apiText(U.logs);
+			var url = U.logs + (state.logLevel ? ('?level=' + encodeURIComponent(state.logLevel)) : '');
+			var text = await apiText(url);
 			box.textContent = text || '暂无相关日志。';
 			box.scrollTop = box.scrollHeight;
 		} catch (err) {
@@ -1864,6 +1866,12 @@
 		if ($('agh-yaml-editor')) $('agh-yaml-editor').oninput = updateYamlCount;
 
 		if ($('agh-log-refresh')) $('agh-log-refresh').onclick = loadLogs;
+		if ($('agh-log-level')) {
+			$('agh-log-level').onchange = function () {
+				state.logLevel = this.value || '';
+				loadLogs();
+			};
+		}
 		if ($('agh-log-download')) $('agh-log-download').onclick = downloadLogs;
 		if ($('agh-log-auto')) {
 			$('agh-log-auto').onchange = function () {

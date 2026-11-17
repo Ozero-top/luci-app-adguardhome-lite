@@ -654,6 +654,11 @@
 				<div class="agh-card-head">
 					<h3>运行日志</h3>
 					<div class="agh-inline">
+						<select id="agh-log-level" class="agh-select">
+							<option value="">全部级别</option>
+							<option value="error">仅错误</option>
+							<option value="warn">仅警告</option>
+						</select>
 						<button type="button" id="agh-log-refresh" class="agh-ghost-btn agh-small-btn">刷新</button>
 						<label class="agh-inline agh-check-label">
 							<input type="checkbox" id="agh-log-auto">
@@ -836,7 +841,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261117d"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261117e"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

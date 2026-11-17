@@ -25,11 +25,11 @@ while true; do
     DEAD=$(( DEAD + 5 ))
     [ "$DEAD" -lt 30 ] && continue
 
-    log_msg "AdGuard Home 连续 30 秒未运行，正在回退 DNS 接管并恢复 DNSMasq..."
+    log_event error agh_not_running "AdGuard Home 连续 30 秒未运行，正在回退 DNS 接管并恢复 DNSMasq..."
     state_write last_fallback "agh_not_running_30s"
 
     if ! /usr/share/adguardhome-lite/dns_mode.sh revert; then
-        log_msg "DNS 接管回退失败，稍后重试。"
+        log_event error dns_revert_failed "DNS 接管回退失败，稍后重试。"
         DEAD=0
         continue
     fi

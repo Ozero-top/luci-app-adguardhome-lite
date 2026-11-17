@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "luci-app-adguardhome-lite"
 CTRL = SRC / "luasrc" / "controller" / "adguardhome_lite.lua"
 VIEW = SRC / "luasrc" / "view" / "adguardhome_lite" / "panel.htm"
+AGH = SRC / "luasrc" / "model" / "adguardhome_lite" / "agh.lua"
 
 MUTATIONS = [
     "action_stats_clear",
@@ -49,8 +50,9 @@ class RoutesTest(unittest.TestCase):
             self.assertIn("require_post()", match.group(1), "%s 未校验 POST 令牌" % name)
 
     def test_password_not_in_process_arguments(self):
-        self.assertNotIn("-u %q", self.controller, "凭据不应出现在 curl -u 参数中")
-        self.assertIn("--netrc-file", self.controller)
+        agh = AGH.read_text(encoding="utf-8")
+        self.assertNotIn("-u %q", agh, "凭据不应出现在 curl -u 参数中")
+        self.assertIn("--netrc-file", agh)
 
 
 if __name__ == "__main__":

@@ -44,6 +44,13 @@ check("split", table.concat(util.split_words("a bb  ccc"), ","), "a,bb,ccc")
 check("join table", util.join_words({"a", "bb"}), "a bb")
 check("join scalar", util.join_words(nil), "")
 
+-- reason code 注册表
+local codes = require "model.adguardhome_lite.codes"
+check("known code", codes.known("update_busy"), true)
+check("unknown code", codes.known("not_a_code"), false)
+check("warn level", codes.level("update_busy"), "warn")
+check("default level", codes.level("not_a_code"), "error")
+
 if failed > 0 then
     io.stderr:write(string.format("%d/%d checks failed\n", failed, total))
     os.exit(1)

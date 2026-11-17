@@ -11,8 +11,12 @@ RESULT="/var/run/adguardhome_lite_update.code"
 ARCHIVE=""
 EXTRACT=""
 
+# 失败原因码：用于状态文件与面板过滤
+ERR_REASON="core_update_failed"
+
 die() {
-    log_msg "错误：$*"
+    ERR_REASON="${2:-core_update_failed}"
+    log_event error "$ERR_REASON" "$1"
     exit 1
 }
 
@@ -32,7 +36,7 @@ finish() {
     if [ "$rc" = "0" ]; then
         state_write last_update "ok:${newver:-unknown}:$(date '+%Y-%m-%dT%H:%M:%S')"
     else
-        state_write last_update "failed:$rc:$(date '+%Y-%m-%dT%H:%M:%S')"
+        state_write last_update "failed:${ERR_REASON:-core_update_failed}:$(date '+%Y-%m-%dT%H:%M:%S')"
     fi
     cleanup
     exit "$rc"
@@ -49,8 +53,8 @@ rm -f "$RESULT"
 LOCK_KIND=""
 FLOCK_FILE="/var/run/adguardhome_lite_update.flock"
 if have_cmd flock; then
-    exec 9>"$FLOCK_FILE" 2>/dev/null || die "无法创建更新锁文件。"
-    flock -n 9 || die "已有内核更新任务正在运行，请稍候。"
+    exec 9>"$FLOCK_FILE" 2>/dev/null || die "无法创建更新锁文件。" update_busy
+    flock -n 9 || die "已有内核更新任务正在运行，请稍候。" update_busy
     LOCK_KIND="flock"
 fi
 
@@ -59,13 +63,13 @@ if mkdir "$LOCK" 2>/dev/null; then
 else
     oldpid=$(cat "$PIDFILE" 2>/dev/null)
     if [ -n "$oldpid" ] && kill -0 "$oldpid" 2>/dev/null; then
-        die "已有内核更新任务正在运行（PID $oldpid），请稍候。"
+        die "已有内核更新任务正在运行（PID $oldpid），请稍候。" update_busy
     fi
     stale="${LOCK}.stale.$$"
     if mv "$LOCK" "$stale" 2>/dev/null; then
         rm -rf "$stale"
     fi
-    mkdir "$LOCK" 2>/dev/null || die "无法创建更新锁文件。"
+    mkdir "$LOCK" 2>/dev/null || die "无法创建更新锁文件。" update_busy
 fi
 echo $$ > "$PIDFILE"
 
@@ -80,11 +84,11 @@ case "$target_channel" in
     stable|beta) channel="$target_channel" ;;
 esac
 
-[ -n "$binpath" ] || die "内核路径为空，请到“基础设置”中检查配置。"
+[ -n "$binpath" ] || die "内核路径为空，请到“基础设置”中检查配置。" invalid_param
 [ -n "$webport" ] || webport="13800"
 
 arch=$(detect_agh_arch)
-[ -n "$arch" ] || die "暂不支持当前设备架构：$(uname -m)。"
+[ -n "$arch" ] || die "暂不支持当前设备架构：$(uname -m)。" core_arch_mismatch
 
 case "$channel" in
     beta)
@@ -211,20 +215,20 @@ elif [ "$channel" = "beta" ]; then
     fi
 fi
 
-[ "$download_ok" = "1" ] || die "下载失败，请检查路由器网络、DNS，或在“基础设置”中更换 GitHub 反代。"
+[ "$download_ok" = "1" ] || die "下载失败，请检查路由器网络、DNS，或在“基础设置”中更换 GitHub 反代。" core_download_failed
 
-[ -s "$ARCHIVE" ] || die "下载文件为空，请重试。"
-tar -tzf "$ARCHIVE" >/dev/null 2>&1 || die "下载文件损坏，请重试。"
+[ -s "$ARCHIVE" ] || die "下载文件为空，请重试。" core_integrity_failed
+tar -tzf "$ARCHIVE" >/dev/null 2>&1 || die "下载文件损坏，请重试。" core_integrity_failed
 
 # 基础完整性校验：压缩包过小或结构不符时直接拒绝，避免把错误页/半截文件当成内核。
 _arc_size=$(wc -c < "$ARCHIVE" 2>/dev/null | tr -d ' ')
 case "$_arc_size" in
-    ''|*[!0-9]*) die "无法读取下载文件大小，请重试。" ;;
+    ''|*[!0-9]*) die "无法读取下载文件大小，请重试。" core_integrity_failed ;;
 esac
-[ "$_arc_size" -ge 1048576 ] || die "下载文件仅 ${_arc_size} 字节，明显小于正常内核包，已取消安装。"
+[ "$_arc_size" -ge 1048576 ] || die "下载文件仅 ${_arc_size} 字节，明显小于正常内核包，已取消安装。" core_integrity_failed
 
 _arc_entries=$(tar -tzf "$ARCHIVE" 2>/dev/null | sed 's#^\./##' | grep -c '^AdGuardHome/AdGuardHome$')
-[ "$_arc_entries" = "1" ] || die "安装包结构异常（缺少 AdGuardHome/AdGuardHome），已取消安装。"
+[ "$_arc_entries" = "1" ] || die "安装包结构异常（缺少 AdGuardHome/AdGuardHome），已取消安装。" core_integrity_failed
 
 # 记录摘要便于事后核对；官方未提供固定清单时作为可追溯信息，不冒充强校验。
 if have_cmd sha256sum; then
@@ -237,10 +241,10 @@ fi
 
 EXTRACT="/tmp/adguardhome_lite_extract_$$"
 mkdir -p "$EXTRACT"
-tar -xzf "$ARCHIVE" -C "$EXTRACT" || die "解压失败，可能是存储空间不足。"
+tar -xzf "$ARCHIVE" -C "$EXTRACT" || die "解压失败，可能是存储空间不足。" core_integrity_failed
 
 newbin="$EXTRACT/AdGuardHome/AdGuardHome"
-[ -f "$newbin" ] || die "安装包中未找到 AdGuardHome 可执行文件。"
+[ -f "$newbin" ] || die "安装包中未找到 AdGuardHome 可执行文件。" core_integrity_failed
 
 chmod 755 "$newbin"
 
@@ -258,7 +262,7 @@ newver=$("$newbin" --version 2>/dev/null | awk '
         }
     }')
 if [ -z "$newver" ]; then
-    die "新内核无法在当前设备运行，可能是架构识别错误（识别结果：$arch）。"
+    die "新内核无法在当前设备运行，可能是架构识别错误（识别结果：$arch）。" core_arch_mismatch
 fi
 
 # 页面提示过具体版本时，拒绝安装其它版本，保证「提示的版本」与「实际安装的版本」一致
@@ -266,19 +270,19 @@ if [ -n "$target_ver" ]; then
     _nv="${newver#v}"
     _tv="${target_ver#v}"
     if [ "$_nv" != "$_tv" ]; then
-        die "下载的内核版本为 $_nv，与页面确认的目标版本 $_tv 不一致，已取消安装。"
+        die "下载的内核版本为 $_nv，与页面确认的目标版本 $_tv 不一致，已取消安装。" core_version_mismatch
     fi
 fi
 
 newsize=$(wc -c < "$newbin" 2>/dev/null | tr -d ' ')
-[ -n "$newsize" ] || die "无法读取新内核大小。"
-[ "$newsize" -ge 1048576 ] || die "内核可执行文件过小（${newsize} 字节），可能已损坏。"
+[ -n "$newsize" ] || die "无法读取新内核大小。" core_integrity_failed
+[ "$newsize" -ge 1048576 ] || die "内核可执行文件过小（${newsize} 字节），可能已损坏。" core_integrity_failed
 
 # 用新内核校验现有配置；避免升级后服务无法启动
 if [ -s "$configpath" ]; then
     if ! "$newbin" --check-config -c "$configpath" >/tmp/adguardhome_lite_core_check.log 2>&1; then
         log_msg "$(cat /tmp/adguardhome_lite_core_check.log 2>/dev/null)"
-        die "新内核无法解析现有配置文件，已取消更新。请先备份并检查配置。"
+        die "新内核无法解析现有配置文件，已取消更新。请先备份并检查配置。" config_check_failed
     fi
 fi
 
@@ -368,11 +372,11 @@ if [ "$was_enabled" = "1" ] || [ "$was_running" = "1" ]; then
             mv -f "$backup" "$binpath" 2>/dev/null
             /etc/init.d/adguardhome_lite start >/dev/null 2>&1
             if [ -n "$cfg_bak" ]; then
-                die "新内核启动失败，已回滚到旧版本。如配置也需要回退，执行：cp -f $cfg_bak $configpath"
+                die "新内核启动失败，已回滚到旧版本。如配置也需要回退，执行：cp -f $cfg_bak $configpath" core_start_failed
             fi
-            die "新内核启动失败，已回滚到旧版本。请查看运行日志。"
+            die "新内核启动失败，已回滚到旧版本。请查看运行日志。" core_start_failed
         fi
-        die "新内核启动失败，且没有可回滚的旧版本。请查看运行日志。"
+        die "新内核启动失败，且没有可回滚的旧版本。请查看运行日志。" core_start_failed
     fi
 fi
 

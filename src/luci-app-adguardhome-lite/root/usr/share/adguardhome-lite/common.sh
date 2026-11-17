@@ -13,10 +13,24 @@ if [ -f /lib/functions.sh ]; then
     . /lib/functions.sh
 fi
 
-# 同时输出到系统日志和当前标准输出，方便在 LuCI 中查看进度
+# 统一日志：级别 + 原因码 + 说明，供面板按级别/原因过滤
+# 用法：log_event info dns_applied "说明" / log_event error config_check_failed "说明"
+log_event() {
+    _lev="$1"
+    _reason="$2"
+    shift 2
+    case "$_lev" in
+        error) _prio="user.err" ; _tag="ERROR" ;;
+        warn) _prio="user.warning" ; _tag="WARN" ;;
+        *) _lev="info" ; _prio="user.info" ; _tag="INFO" ;;
+    esac
+    logger -t adguardhome_lite -p "$_prio" "[$_tag] $_reason: $*" 2>/dev/null
+    echo "[$(date '+%H:%M:%S')] [$_tag] $_reason: $*"
+}
+
+# 兼容旧调用点
 log_msg() {
-    logger -t adguardhome_lite "$*" 2>/dev/null
-    echo "[$(date '+%H:%M:%S')] $*"
+    log_event info general "$*"
 }
 
 # 持久化关键状态到 /etc/adguardhome_lite/state，重启后仍可排查上次失败原因。
