@@ -180,6 +180,16 @@ if [ -s "$configpath" ]; then
     # DNS 缓存：由插件配置控制，默认开启；老配置已在上方迁移。
     # 注意不要自动开启安全浏览（safebrowsing）：它依赖 AdGuard 的在线服务，
     # 国内网络不可达时会拖慢甚至阻塞解析，需要时请用户在面板手动开启。
+    # 缓存已通过 AdGuard Home API 在线应用时，跳过 YAML 写入，避免重复覆盖
+    _cache_api=0
+    if [ "$(uci -q get "$CONF.main.cache_api_applied" 2>/dev/null)" = "1" ]; then
+        _cache_api=1
+        uci -q delete "$CONF.main.cache_api_applied"
+        uci -q commit "$CONF" 2>/dev/null
+        log_event info cache_api_applied "缓存设置已通过 AdGuard Home API 在线应用，跳过 YAML 写入。"
+    fi
+
+    if [ "$_cache_api" = "0" ]; then
     case "$cache_enabled" in 0|1) ;; *) cache_enabled=1 ;; esac
     case "$cache_optimistic" in 0|1) ;; *) cache_optimistic=0 ;; esac
     case "$cache_size_mb" in ''|*[!0-9]*) cache_size_mb=16 ;; esac
@@ -249,6 +259,7 @@ if [ -s "$configpath" ]; then
     else
         log_msg "已应用 DNS 缓存：关闭。"
     fi
+    fi
 
     # 过滤列表下载代理：只改插件自己写入的值，用户自定义的 http_proxy 保持不动。
     _proxy="$(detect_http_proxy)"
@@ -287,13 +298,13 @@ if [ -s "$configpath" ]; then
 
     if ! check_agh_config; then
         _err=$(tail -n 3 /var/run/adguardhome_lite_check.log 2>/dev/null | tr '\n' ' ')
-        log_msg "配置校验失败，正在恢复备份。${_err}"
+        log_event warn config_check_failed "配置校验失败，正在恢复备份。${_err}"
         if ! cp -f "$configpath.bak" "$configpath" 2>/dev/null || ! check_agh_config; then
-            state_write last_apply "failed:config_restore:$(date '+%Y-%m-%dT%H:%M:%S')"
-            log_msg "恢复备份失败，已中止本次应用，避免使用损坏的配置启动。"
+            state_write last_apply "failed:config_restore_failed:$(date '+%Y-%m-%dT%H:%M:%S')"
+            log_event error config_restore_failed "恢复备份失败，已中止本次应用，避免使用损坏的配置启动。"
             exit 1
         fi
-        state_write last_apply "reverted:config_check:$(date '+%Y-%m-%dT%H:%M:%S')"
+        state_write last_apply "reverted:config_check_failed:$(date '+%Y-%m-%dT%H:%M:%S')"
     fi
 fi
 
@@ -303,8 +314,8 @@ if [ "$enabled" = "1" ]; then
     /etc/init.d/adguardhome_lite start >/dev/null 2>&1
     _rc=$?
     if [ "$_rc" -ne 0 ]; then
-        state_write last_apply "failed:start_$_rc:$(date '+%Y-%m-%dT%H:%M:%S')"
-        log_msg "启动命令返回错误码 $_rc，请到“运行日志”查看原因。"
+        state_write last_apply "failed:service_start_failed:$(date '+%Y-%m-%dT%H:%M:%S')"
+        log_event error service_start_failed "启动命令返回错误码 $_rc，请到“运行日志”查看原因。"
     else
         state_write last_apply "ok:$(date '+%Y-%m-%dT%H:%M:%S')"
     fi

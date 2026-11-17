@@ -7,6 +7,9 @@ local http = require "luci.http"
 local sys = require "luci.sys"
 local uci = require "luci.model.uci".cursor()
 local util = require "luci.model.adguardhome_lite.util"
+local codes = require "luci.model.adguardhome_lite.codes"
+local agh = require "luci.model.adguardhome_lite.agh"
+local selftest = require "luci.model.adguardhome_lite.selftest"
 
 -- 纯函数集中在 model 模块中，便于单元测试；此处仅做本地别名
 local split_words = util.split_words
@@ -571,10 +574,28 @@ local function require_post()
     return true
 end
 
-local function json_error(msg, code)
-    http.status(code or 400)
+local function default_reason(status)
+    if status == 403 then
+        return "permission_denied"
+    elseif status == 409 then
+        return "update_busy"
+    elseif status >= 500 then
+        return "request_failed"
+    end
+    return "invalid_param"
+end
+
+local function json_error(msg, code, reason)
+    local status = code or 400
+    reason = reason or default_reason(status)
+    http.status(status)
     http.prepare_content("application/json")
-    http.write_json({ ok = false, error = msg })
+    http.write_json({
+        ok = false,
+        error = msg,
+        reason = reason,
+        level = codes.level(reason)
+    })
 end
 
 -- 读取持久化状态（上次应用/更新/回退结果），仅用于展示与排障
@@ -583,64 +604,18 @@ local function state_value(key)
     return (raw:gsub("%s+$", ""))
 end
 
--- 生成唯一临时路径，避免并发请求互相覆盖
-local function tmp_path(prefix)
-    return string.format("/tmp/%s.%d.%d", prefix, os.time(), math.random(100000, 999999))
+-- 本机 AdGuard Home 接口：凭据与请求细节在 model/agh.lua 中统一处理
+local function agh_client()
+    agh.configure({
+        user = cfg("adminuser", "admin"),
+        pass = cfg("adminpass", "admin123"),
+        port = tonumber(cfg("webport", "13800")) or 13800
+    })
+    return agh
 end
 
--- 通过 0600 的 netrc 临时文件把凭据交给 curl，避免密码出现在 ps 进程列表里
-local function with_netrc(fn)
-    local user = cfg("adminuser", "admin")
-    local pass = (cfg("adminpass", "admin123"):gsub("[\r\n]", ""))
-    local path = tmp_path("adguardhome_lite_netrc")
-    local body = string.format("machine 127.0.0.1\nlogin %s\npassword %s\n", user, pass)
-
-    if not fs.writefile(path, body) then
-        return nil, "无法创建凭据文件"
-    end
-    sys.call(string.format("chmod 600 %q >/dev/null 2>&1", path))
-
-    local ok, a, b = pcall(fn, path)
-    os.remove(path)
-    if not ok then
-        return nil, tostring(a)
-    end
-
-    return a, b
-end
-
--- 调用本机 AdGuard Home 接口；返回 HTTP 状态码与响应体
 local function agh_request(path, method, body)
-    local port = tonumber(cfg("webport", "13800")) or 13800
-    local url = string.format("http://127.0.0.1:%d%s", port, path)
-    local req = tmp_path("agh_api_req.json")
-    local res = tmp_path("agh_api_res.json")
-
-    local code = with_netrc(function(netrc)
-        local cmd = string.format(
-            "curl -s -m 8 -o %q -w '%%{http_code}' --netrc-file %q",
-            res, netrc)
-        if method == "POST" then
-            if body then
-                local f = io.open(req, "w")
-                if f then
-                    f:write(body)
-                    f:close()
-                end
-                cmd = cmd .. " -H 'Content-Type: application/json' -X POST --data-binary @" .. string.format("%q", req)
-            else
-                cmd = cmd .. " -X POST"
-            end
-        end
-        sys.call(string.format("chmod 600 %q >/dev/null 2>&1", req))
-        return sys.exec(cmd .. " " .. string.format("%q", url) .. " 2>/dev/null") or ""
-    end)
-
-    local resp = fs.readfile(res) or ""
-    os.remove(req)
-    os.remove(res)
-
-    return code or "", resp
+    return agh_client().request(path, method, body)
 end
 
 function index()
@@ -1592,6 +1567,31 @@ function action_settings_save()
     end
     uci:commit(CONF)
 
+    -- 运行中优先通过 AdGuard Home API 在线应用缓存设置；失败则由 apply_settings.sh 回退到文件写入
+    uci:delete(CONF, "main", "cache_api_applied")
+    if service_running(binpath) then
+        agh_client()
+        local size_bytes = (cache_enabled == "1") and (cache_size_mb * 1024 * 1024) or 0
+        local optimistic = (cache_enabled == "1" and cache_optimistic == "1")
+        local ok = agh.patch_dns_config({
+            cache_size = size_bytes,
+            cache_ttl_min = cache_ttl_min,
+            cache_ttl_max = cache_ttl_max,
+            cache_optimistic = optimistic
+        })
+        if ok then
+            local dns_conf = agh.get_dns_config()
+            ok = dns_conf ~= nil and tonumber(dns_conf.cache_size) == size_bytes
+        end
+        if ok then
+            uci:set(CONF, "main", "cache_api_applied", "1")
+            uci:set(CONF, "main", "cache_applied", string.format(
+                "%s|%s|%s|%s|%s",
+                cache_enabled, cache_size_mb, cache_ttl_min, cache_ttl_max, cache_optimistic))
+        end
+    end
+    uci:commit(CONF)
+
     start_action("sh " .. SHARE .. "/apply_settings.sh")
 
     http.prepare_content("application/json")
@@ -1665,9 +1665,24 @@ function action_yaml_save()
 end
 
 function action_logs()
+    local level = (http.formvalue("level") or ""):lower()
     local syslog = sys.exec("logread 2>/dev/null | grep -i 'adguard' | tail -n 300") or ""
     local update = fs.readfile(RUN .. "_update.log") or ""
     local action = fs.readfile(RUN .. "_action.log") or ""
+
+    if level == "error" or level == "warn" or level == "info" then
+        local tag = "[" .. level:upper() .. "]"
+        local filtered = {}
+        for line in (syslog .. "\n"):gmatch("([^\n]*)\n") do
+            if line:find(tag, 1, true) then
+                filtered[#filtered + 1] = line
+            end
+        end
+        syslog = table.concat(filtered, "\n")
+        if syslog ~= "" then
+            syslog = syslog .. "\n"
+        end
+    end
 
     http.header("Cache-Control", "no-store")
     http.prepare_content("text/plain; charset=utf-8")
@@ -1675,7 +1690,8 @@ function action_logs()
     http.write("上次应用：" .. (state_value("last_apply") ~= "" and state_value("last_apply") or "无记录") .. "\n")
     http.write("上次更新：" .. (state_value("last_update") ~= "" and state_value("last_update") or "无记录") .. "\n")
     http.write("上次 DNS 回退：" .. (state_value("last_fallback") ~= "" and state_value("last_fallback") or "无记录") .. "\n")
-    http.write("\n===== 系统日志（包含 AdGuard 关键字，最近 300 行） =====\n")
+    http.write("\n===== 系统日志（包含 AdGuard 关键字，最近 300 行"
+        .. (level ~= "" and ("，筛选 " .. level:upper()) or "") .. "） =====\n")
     http.write(syslog)
     http.write("\n\n===== 内核安装/更新日志 =====\n")
     http.write(update)
@@ -1703,61 +1719,20 @@ function action_selftest()
         dnsport = yaml_port
     end
 
-    local checks = {}
-    local function add(id, label, ok, detail)
-        checks[#checks + 1] = {
-            id = id,
-            label = label,
-            ok = ok and true or false,
-            detail = detail or ""
-        }
-    end
-
-    local installed = fs.access(binpath, "x") and true or false
-    add("core", "内核文件", installed,
-        installed and (core_version(binpath) ~= "" and core_version(binpath) or binpath) or "未安装内核")
-    add("config", "配置文件", fs.access(configpath) and true or false, configpath)
-
-    local running = service_running(binpath)
-    add("running", "服务进程", running, running and "运行中" or "未运行")
-
-    local webcode = ""
-    if running then
-        webcode = sys.exec(string.format(
-            "curl -s -m 3 -o /dev/null -w '%%{http_code}' %q 2>/dev/null",
-            string.format("http://127.0.0.1:%d/", webport))) or ""
-    end
-    add("web", "管理面板端口", webcode ~= "" and webcode ~= "000",
-        string.format("端口 %d：HTTP %s", webport, webcode ~= "" and webcode or "无响应"))
-
-    local dns_ok, dns_detail = false, "未执行（服务未运行）"
-    if running then
-        local out = sys.exec(string.format(
-            "nslookup -timeout=2 -retry=1 -port=%d example.com 127.0.0.1 2>&1", dnsport)) or ""
-        dns_ok = out ~= "" and not out:find("can't resolve") and not out:find("timed out")
-        local snippet = out:gsub("%s+", " ")
-        if #snippet > 160 then
-            snippet = snippet:sub(1, 160) .. "..."
-        end
-        dns_detail = string.format("端口 %d：%s", dnsport, snippet ~= "" and snippet or "无输出")
-    end
-    add("dns", "DNS 查询", dns_ok, dns_detail)
-
-    -- 接管方式一致性只作提示，不影响整体结论
-    local mode_applied = cfg("mode_applied", "none")
-    add("mode", "DNS 接管状态", mode_applied == mode,
-        string.format("配置：%s，已应用：%s", mode, mode_applied))
-
-    local all_ok = true
-    for _, check in ipairs(checks) do
-        if check.id ~= "mode" and not check.ok then
-            all_ok = false
-        end
-    end
+    local result = selftest.run({
+        binpath = binpath,
+        configpath = configpath,
+        webport = webport,
+        dnsport = dnsport,
+        running = service_running(binpath),
+        version = core_version(binpath),
+        mode = mode,
+        mode_applied = cfg("mode_applied", "none")
+    })
 
     http.header("Cache-Control", "no-store")
     http.prepare_content("application/json")
-    http.write_json({ ok = all_ok, dns_port = dnsport, checks = checks })
+    http.write_json(result)
 end
 
 -- 旧版残留扫描：只读，返回 JSON 清单
