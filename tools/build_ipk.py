@@ -28,9 +28,23 @@ import tempfile
 SOURCE_DATE_EPOCH = 1794096000  # 2026-11-08 00:00:00 UTC，保证构建结果可复现
 
 PKG_NAME = "luci-app-adguardhome-lite"
-PKG_VERSION = "1.3.2"
-PKG_RELEASE = "B3"
 PKG_MAINTAINER = "Ozero-top"
+
+
+def read_version(src_root: str):
+    """版本唯一来源：src/luci-app-adguardhome-lite/VERSION（格式「版本-发行号」）。"""
+    path = os.path.join(src_root, "VERSION")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+    except OSError:
+        raise SystemExit("缺少版本文件：%s" % path)
+
+    version, sep, release = text.partition("-")
+    if not version or not sep or not release:
+        raise SystemExit("VERSION 格式应为「版本-发行号」，当前：%r" % text)
+
+    return version, release
 
 # 文本文件统一转换为 LF，避免 Windows 换行导致脚本无法执行
 TEXT_EXTENSIONS = {
@@ -194,8 +208,9 @@ def write_text(path: str, text: str, mode: int = 0o644):
     os.chmod(path, mode)
 
 
-def build_control(staging_control: str, variant: str, installed_kb: int):
-    version = "%s-%s" % (PKG_VERSION, PKG_RELEASE)
+def build_control(staging_control: str, variant: str, installed_kb: int,
+                  version_base: str, release: str):
+    version = "%s-%s" % (version_base, release)
     deps = "libc, luci-base, luci-lib-jsonc, curl, wget-ssl, ca-bundle"
     if variant == "modern":
         deps = "libc, luci-base, luci-compat, luci-lib-jsonc, curl, wget-ssl, ca-bundle"
@@ -247,10 +262,17 @@ exit 0
 
     prerm = """#!/bin/sh
 [ -n "$IPKG_INSTROOT" ] && exit 0
+# 升级时由 postinst 负责重启；卸载时必须先恢复 DNSMasq，失败则中止卸载。
+case "$1" in upgrade|failed-upgrade) exit 0 ;; esac
 
-# 停止服务会同时恢复 DNSMasq 原始设置，避免卸载后断网
 if [ -x /etc/init.d/adguardhome_lite ]; then
 	/etc/init.d/adguardhome_lite stop >/dev/null 2>&1
+fi
+if [ -x /usr/share/adguardhome-lite/dns_mode.sh ]; then
+	/usr/share/adguardhome-lite/dns_mode.sh revert >/dev/null 2>&1 || {
+		echo "AdGuard Home 助手：无法恢复 DNSMasq 设置，已中止卸载以保护网络。" >&2
+		exit 1
+	}
 fi
 
 rm -f /var/run/adguardhome_lite_update.lock /var/run/adguardhome_lite_update.pid
@@ -279,6 +301,7 @@ def build_variant(src_root: str, out_dir: str, variant: str) -> str:
         raise SystemExit("源码目录不存在：%s" % src_root)
 
     required = [
+        "VERSION",
         "luasrc/controller/adguardhome_lite.lua",
         "luasrc/view/adguardhome_lite/panel.htm",
         "htdocs/luci-static/resources/adguardhome-lite/panel.css",
@@ -289,6 +312,8 @@ def build_variant(src_root: str, out_dir: str, variant: str) -> str:
     for rel in required:
         if not os.path.isfile(os.path.join(src_root, rel)):
             raise SystemExit("缺少必要文件：%s" % rel)
+
+    version_base, release = read_version(src_root)
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -302,7 +327,7 @@ def build_variant(src_root: str, out_dir: str, variant: str) -> str:
         stage_data(src_root, staging_data)
 
         installed_kb = dir_size_kb(staging_data)
-        build_control(staging_control, variant, installed_kb)
+        build_control(staging_control, variant, installed_kb, version_base, release)
 
         control_tgz = os.path.join(work, "control.tar.gz")
         data_tgz = os.path.join(work, "data.tar.gz")
@@ -312,7 +337,7 @@ def build_variant(src_root: str, out_dir: str, variant: str) -> str:
         debian_binary = os.path.join(work, "debian-binary")
         write_text(debian_binary, "2.0\n")
 
-        version = "%s-%s" % (PKG_VERSION, PKG_RELEASE)
+        version = "%s-%s" % (version_base, release)
         if variant == "legacy":
             version += "-legacy"
         out_name = "%s_%s_all.ipk" % (PKG_NAME, version)

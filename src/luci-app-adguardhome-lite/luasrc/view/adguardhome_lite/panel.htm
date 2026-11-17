@@ -50,6 +50,7 @@
 				yamlSave:     "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[yaml_save]])%>",
 				legacyScan:   "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[legacy_scan]])%>",
 				legacyClean:  "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[legacy_clean]])%>",
+				selftest:     "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[selftest]])%>",
 				luci:         "<%=url([[admin]])%>"
 			}
 		};
@@ -120,6 +121,17 @@
 				<div id="agh-status-grid" class="agh-status-grid">
 					<div class="agh-empty">正在读取状态...</div>
 				</div>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>DNS 自检</h3>
+					<button type="button" id="agh-selftest-btn" class="agh-ghost-btn agh-small-btn">开始检测</button>
+				</div>
+				<p class="agh-hint">只读检查内核、进程、管理端口与本机 DNS 查询链路，不会修改任何配置。</p>
+				<ul class="agh-tips" id="agh-selftest-list">
+					<li class="agh-hint">尚未检测。</li>
+				</ul>
 			</div>
 
 			<div class="agh-card">
@@ -825,5 +837,33 @@
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
 <script src="<%=resource%>/adguardhome-lite/panel.js?v=20261116c"></script>
+<script>
+	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
+	(function () {
+		function report() {
+			var app = document.querySelector('.agh-app');
+			if (!app || window.parent === window) return;
+			var height = Math.ceil(app.getBoundingClientRect().height);
+			if (height > 0) {
+				window.parent.postMessage({ type: 'agh-height', height: height }, window.location.origin);
+			}
+		}
+		function bind() {
+			var app = document.querySelector('.agh-app');
+			if (window.ResizeObserver && app) {
+				new ResizeObserver(report).observe(app);
+			} else {
+				setInterval(report, 2000);
+			}
+			report();
+		}
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', bind);
+		} else {
+			bind();
+		}
+		window.addEventListener('load', report);
+	})();
+</script>
 </body>
 </html>

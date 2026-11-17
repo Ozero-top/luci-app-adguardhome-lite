@@ -25,6 +25,7 @@ set -u
 
 REPO="Ozero-top/luci-app-adguardhome-lite"
 PKG="luci-app-adguardhome-lite"
+# 版本以 src/luci-app-adguardhome-lite/VERSION 为准；本脚本需独立下载，保留字面值并由 CI 校验一致性
 VERSION="1.3.2-B3"
 MIRRORS=""
 NO_DEPS=0

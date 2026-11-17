@@ -20,9 +20,23 @@ import tarfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, "dist")
-MODERN = "luci-app-adguardhome-lite_1.3.2-B3_all.ipk"
-LEGACY = "luci-app-adguardhome-lite_1.3.2-B3-legacy_all.ipk"
-OUTPUT = "luci-app-adguardhome-lite_1.3.2-B3.run"
+VERSION_FILE = os.path.join(ROOT, "src", "luci-app-adguardhome-lite", "VERSION")
+
+
+def read_version():
+    """版本唯一来源：src/luci-app-adguardhome-lite/VERSION。"""
+    with open(VERSION_FILE, "r", encoding="utf-8") as f:
+        text = f.read().strip()
+    version, sep, release = text.partition("-")
+    if not version or not sep or not release:
+        raise SystemExit("VERSION 格式应为「版本-发行号」，当前：%r" % text)
+    return text
+
+
+VERSION = read_version()
+MODERN = "luci-app-adguardhome-lite_%s_all.ipk" % VERSION
+LEGACY = "luci-app-adguardhome-lite_%s-legacy_all.ipk" % VERSION
+OUTPUT = "luci-app-adguardhome-lite_%s.run" % VERSION
 
 INSTALL_SH = """#!/bin/sh
 # AdGuard Home 助手 - 离线安装脚本

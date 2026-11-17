@@ -144,19 +144,37 @@
 		}
 	}
 
+	// 统一超时：接口卡住时快速失败，避免整个面板一直停在加载状态
+	function fetchWithTimeout(url, options, ms) {
+		var opts = options || {};
+		var controller = window.AbortController ? new AbortController() : null;
+		if (controller) opts.signal = controller.signal;
+		var timer = setTimeout(function () {
+			if (controller) controller.abort();
+		}, ms || 20000);
+		return fetch(url, opts).then(function (r) {
+			clearTimeout(timer);
+			return r;
+		}, function (err) {
+			clearTimeout(timer);
+			if (err && err.name === 'AbortError') throw new Error('请求超时，请稍后重试。');
+			throw err;
+		});
+	}
+
 	async function apiGet(url) {
-		var r = await fetch(url, {
+		var r = await fetchWithTimeout(url, {
 			credentials: 'same-origin',
 			cache: 'no-store',
 			headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-		});
+		}, 20000);
 		return parseJsonResponse(r);
 	}
 
 	async function apiPost(url, data) {
 		var body = new URLSearchParams(data || {});
 		body.set('token', TOKEN);
-		var r = await fetch(url, {
+		var r = await fetchWithTimeout(url, {
 			method: 'POST',
 			credentials: 'same-origin',
 			cache: 'no-store',
@@ -166,7 +184,7 @@
 				'X-Requested-With': 'XMLHttpRequest'
 			},
 			body: body.toString()
-		});
+		}, 30000);
 		var json = await parseJsonResponse(r);
 		if (json && json.ok === false) {
 			throw new Error(json.error || '操作失败');
@@ -175,11 +193,11 @@
 	}
 
 	async function apiText(url) {
-		var r = await fetch(url, {
+		var r = await fetchWithTimeout(url, {
 			credentials: 'same-origin',
 			cache: 'no-store',
 			headers: { 'Accept': 'text/plain', 'X-Requested-With': 'XMLHttpRequest' }
-		});
+		}, 20000);
 		var ct = r.headers.get('content-type') || '';
 		if (ct.indexOf('text/html') >= 0) {
 			throw Object.assign(new Error('登录已过期'), { login: true });
@@ -643,6 +661,42 @@
 		} finally {
 			if (btn) btn.disabled = false;
 			refreshStatus(true);
+		}
+	}
+
+	function renderSelftest(d) {
+		var list = $('agh-selftest-list');
+		if (!list) return;
+		var checks = (d && d.checks) || [];
+		if (!checks.length) {
+			list.innerHTML = '<li class="agh-hint">未获取到检测结果。</li>';
+			return;
+		}
+		list.innerHTML = checks.map(function (c) {
+			var mark = c.ok ? '正常' : '异常';
+			var cls = c.ok ? '' : ' style="color:#c0392b"';
+			return '<li><b' + cls + '>' + mark + ' · ' + esc(c.label) + '</b><br>'
+				+ '<span class="agh-hint">' + esc(c.detail || '') + '</span></li>';
+		}).join('');
+	}
+
+	async function runSelftest() {
+		var btn = $('agh-selftest-btn');
+		if (btn) {
+			btn.disabled = true;
+			btn.textContent = '检测中...';
+		}
+		try {
+			var d = await apiGet(U.selftest);
+			renderSelftest(d);
+			showToast(d.ok ? '自检通过' : '自检发现问题，请查看下方结果', d.ok ? 'ok' : '');
+		} catch (err) {
+			handleApiError(err, $('agh-selftest-list'));
+		} finally {
+			if (btn) {
+				btn.disabled = false;
+				btn.textContent = '开始检测';
+			}
 		}
 	}
 
@@ -1697,6 +1751,7 @@
 		if ($('agh-stats-clear')) $('agh-stats-clear').onclick = clearStats;
 		if ($('agh-theme-toggle')) $('agh-theme-toggle').onclick = toggleTheme;
 		if ($('agh-legacy-clean')) $('agh-legacy-clean').onclick = cleanLegacy;
+		if ($('agh-selftest-btn')) $('agh-selftest-btn').onclick = runSelftest;
 		if ($('agh-install-btn')) $('agh-install-btn').onclick = installCore;
 		if ($('agh-enable-btn')) $('agh-enable-btn').onclick = function () {
 			postService('bootstrap', '将启动 AdGuard Home 并接管路由器 DNS。确定继续？');

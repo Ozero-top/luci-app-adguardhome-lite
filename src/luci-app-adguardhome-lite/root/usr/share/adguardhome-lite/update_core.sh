@@ -21,12 +21,19 @@ cleanup() {
     rm -rf "$LOCK"
     [ -n "$ARCHIVE" ] && rm -f "$ARCHIVE"
     rm -f "$PIDFILE" "/tmp/adguardhome_lite_core_check.log"
+    # flock 文件保留复用，不能删除：删除后新进程会锁住新 inode，互斥失效。
+    [ "$LOCK_KIND" = "flock" ] && exec 9>&-
 }
 
 # 无论成功失败都写入结果码，供 LuCI 页面轮询
 finish() {
     rc=$?
     echo "$rc" > "$RESULT"
+    if [ "$rc" = "0" ]; then
+        state_write last_update "ok:${newver:-unknown}:$(date '+%Y-%m-%dT%H:%M:%S')"
+    else
+        state_write last_update "failed:$rc:$(date '+%Y-%m-%dT%H:%M:%S')"
+    fi
     cleanup
     exit "$rc"
 }
@@ -37,18 +44,30 @@ trap 'exit 1' INT TERM
 mkdir -p /var/run
 rm -f "$RESULT"
 
-# 防止重复执行
+# 互斥锁优先使用 flock；没有 flock 时回退到目录锁。
+# 目录锁回收必须先改名再删除，避免删掉其他进程刚重建的锁（TOCTOU）。
+LOCK_KIND=""
+FLOCK_FILE="/var/run/adguardhome_lite_update.flock"
+if have_cmd flock; then
+    exec 9>"$FLOCK_FILE" 2>/dev/null || die "无法创建更新锁文件。"
+    flock -n 9 || die "已有内核更新任务正在运行，请稍候。"
+    LOCK_KIND="flock"
+fi
+
 if mkdir "$LOCK" 2>/dev/null; then
-    echo $$ > "$PIDFILE"
+    :
 else
     oldpid=$(cat "$PIDFILE" 2>/dev/null)
     if [ -n "$oldpid" ] && kill -0 "$oldpid" 2>/dev/null; then
         die "已有内核更新任务正在运行（PID $oldpid），请稍候。"
     fi
-    rm -rf "$LOCK"
+    stale="${LOCK}.stale.$$"
+    if mv "$LOCK" "$stale" 2>/dev/null; then
+        rm -rf "$stale"
+    fi
     mkdir "$LOCK" 2>/dev/null || die "无法创建更新锁文件。"
-    echo $$ > "$PIDFILE"
 fi
+echo $$ > "$PIDFILE"
 
 load_conf
 
@@ -185,6 +204,8 @@ elif [ "$channel" = "beta" ]; then
     log_msg "测试版通道不可用，回退到稳定版安装..."
     channel_name="稳定版"
     installed_channel="stable"
+    # 回退后不再按测试版目标版本比对，避免把正常回退判成版本不一致
+    target_ver=""
     if try_download "$stable_list"; then
         download_ok="1"
     fi
@@ -194,6 +215,25 @@ fi
 
 [ -s "$ARCHIVE" ] || die "下载文件为空，请重试。"
 tar -tzf "$ARCHIVE" >/dev/null 2>&1 || die "下载文件损坏，请重试。"
+
+# 基础完整性校验：压缩包过小或结构不符时直接拒绝，避免把错误页/半截文件当成内核。
+_arc_size=$(wc -c < "$ARCHIVE" 2>/dev/null | tr -d ' ')
+case "$_arc_size" in
+    ''|*[!0-9]*) die "无法读取下载文件大小，请重试。" ;;
+esac
+[ "$_arc_size" -ge 1048576 ] || die "下载文件仅 ${_arc_size} 字节，明显小于正常内核包，已取消安装。"
+
+_arc_entries=$(tar -tzf "$ARCHIVE" 2>/dev/null | sed 's#^\./##' | grep -c '^AdGuardHome/AdGuardHome$')
+[ "$_arc_entries" = "1" ] || die "安装包结构异常（缺少 AdGuardHome/AdGuardHome），已取消安装。"
+
+# 记录摘要便于事后核对；官方未提供固定清单时作为可追溯信息，不冒充强校验。
+if have_cmd sha256sum; then
+    _arc_sha=$(sha256sum "$ARCHIVE" 2>/dev/null | awk '{print $1}')
+    [ -n "$_arc_sha" ] && log_msg "内核包 SHA256：$_arc_sha"
+elif have_cmd openssl; then
+    _arc_sha=$(openssl dgst -sha256 "$ARCHIVE" 2>/dev/null | awk '{print $NF}')
+    [ -n "$_arc_sha" ] && log_msg "内核包 SHA256：$_arc_sha"
+fi
 
 EXTRACT="/tmp/adguardhome_lite_extract_$$"
 mkdir -p "$EXTRACT"
@@ -221,6 +261,19 @@ if [ -z "$newver" ]; then
     die "新内核无法在当前设备运行，可能是架构识别错误（识别结果：$arch）。"
 fi
 
+# 页面提示过具体版本时，拒绝安装其它版本，保证「提示的版本」与「实际安装的版本」一致
+if [ -n "$target_ver" ]; then
+    _nv="${newver#v}"
+    _tv="${target_ver#v}"
+    if [ "$_nv" != "$_tv" ]; then
+        die "下载的内核版本为 $_nv，与页面确认的目标版本 $_tv 不一致，已取消安装。"
+    fi
+fi
+
+newsize=$(wc -c < "$newbin" 2>/dev/null | tr -d ' ')
+[ -n "$newsize" ] || die "无法读取新内核大小。"
+[ "$newsize" -ge 1048576 ] || die "内核可执行文件过小（${newsize} 字节），可能已损坏。"
+
 # 用新内核校验现有配置；避免升级后服务无法启动
 if [ -s "$configpath" ]; then
     if ! "$newbin" --check-config -c "$configpath" >/tmp/adguardhome_lite_core_check.log 2>&1; then
@@ -229,8 +282,6 @@ if [ -s "$configpath" ]; then
     fi
 fi
 
-newsize=$(wc -c < "$newbin" 2>/dev/null | tr -d ' ')
-[ -n "$newsize" ] || die "无法读取新内核大小。"
 
 targetdir=$(dirname "$binpath")
 # 旧版本可能把内核直接放在该路径，导致同名文件挡住目录创建，先备份再建目录

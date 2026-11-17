@@ -6,6 +6,15 @@ local fs = require "nixio.fs"
 local http = require "luci.http"
 local sys = require "luci.sys"
 local uci = require "luci.model.uci".cursor()
+local util = require "luci.model.adguardhome_lite.util"
+
+-- 纯函数集中在 model 模块中，便于单元测试；此处仅做本地别名
+local split_words = util.split_words
+local join_words = util.join_words
+local valid_iface_name = util.valid_iface_name
+local valid_client_spec = util.valid_client_spec
+local version_newer = util.version_newer
+local clean_tag = util.clean_tag
 
 local CONF = "adguardhome_lite"
 local SHARE = "/usr/share/adguardhome-lite"
@@ -242,68 +251,7 @@ end
 
 -- 排除列表（接口 / 客户端 IP）的解析与校验。
 -- 这些值最终会写进 nft 规则文件，必须先做严格的白名单校验。
-local function split_words(v)
-    local t = {}
-    for w in tostring(v or ""):gmatch("%S+") do
-        t[#t + 1] = w
-    end
-    return t
-end
-
-local function join_words(v)
-    if type(v) == "table" then
-        return table.concat(v, " ")
-    end
-    return tostring(v or "")
-end
-
-local function valid_iface_name(name)
-    return #name <= 15 and name:match("^[%w_%.%-]+$") ~= nil
-end
-
-local function valid_ipv4(addr)
-    local a, b, c, d = addr:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
-    if not a then
-        return false
-    end
-    return tonumber(a) <= 255 and tonumber(b) <= 255 and tonumber(c) <= 255 and tonumber(d) <= 255
-end
-
-local function valid_ipv6(addr)
-    if not addr:match("^[%x:]+$") or not addr:find(":", 1, true) then
-        return false
-    end
-    if addr:find(":::", 1, true) then
-        return false
-    end
-    local _, doubles = addr:gsub("::", "")
-    if doubles > 1 then
-        return false
-    end
-    local colons = select(2, addr:gsub(":", ""))
-    if doubles == 1 then
-        return colons >= 2 and colons <= 7
-    end
-    return colons == 7
-end
-
-local function valid_client_spec(spec)
-    local addr, bits = spec:match("^([^/]+)/(%d+)$")
-    if addr then
-        if addr:find(":", 1, true) then
-            return valid_ipv6(addr) and tonumber(bits) <= 128
-        end
-        return valid_ipv4(addr) and tonumber(bits) <= 32
-    end
-    if spec:find(":", 1, true) then
-        return valid_ipv6(spec)
-    end
-    return valid_ipv4(spec)
-end
-
--- 当前设备名，仅用于界面提示可排除的接口
--- 只取目录：/sys/class/net 下还有 bonding_masters 等普通文件，不是网卡；
--- 内核自带的空隧道/占位设备不会有客户端接入，也一并跳过。
+-- 接口候选只取 /sys/class/net 下的目录；内核自带的空隧道/占位设备一并跳过。
 local IGNORED_IFACE_PATTERNS = {
     "^lo$", "^dummy%d+$", "^sit%d+$", "^ip6tnl%d+$", "^tunl%d+$",
     "^gre%d+$", "^gretap%d+$", "^erspan%d+$", "^ip6gre%d+$",
@@ -364,63 +312,6 @@ local function core_version(binpath)
         fs.writefile(VERSION_CACHE, ver)
     end
     return ver
-end
-
--- 版本号拆成「基础版本 + 预发布后缀」：1.0.0-b.2 → base {1,0,0}，pre "b"，pre_num 2
-local function version_info(v)
-    local s = tostring(v or ""):lower()
-    s = s:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^v", "")
-    local base, rest = s:match("^(%d[%d%.]*)%s*(.*)$")
-    if not base then
-        return nil
-    end
-    base = base:gsub("%.$", "")
-
-    local parts = {}
-    for n in base:gmatch("%d+") do
-        parts[#parts + 1] = tonumber(n)
-    end
-
-    local pre, pre_num = rest:match("^[%.%-_~]*([%a]+)[%.%-_~]*(%d*)")
-    return {
-        parts = parts,
-        pre = pre or "",
-        pre_num = tonumber(pre_num or "") or 0
-    }
-end
-
-local function version_newer(latest, current)
-    local a, b = version_info(latest), version_info(current)
-    if not a or not b then
-        return false
-    end
-
-    for i = 1, math.max(#a.parts, #b.parts) do
-        local x, y = a.parts[i] or 0, b.parts[i] or 0
-        if x ~= y then
-            return x > y
-        end
-    end
-
-    -- 基础版本相同时：正式版大于预发布版，预发布之间按通道名与序号比较
-    if a.pre == "" and b.pre == "" then
-        return false
-    end
-    if a.pre == "" then
-        return true
-    end
-    if b.pre == "" then
-        return false
-    end
-    if a.pre ~= b.pre then
-        return a.pre > b.pre
-    end
-    return a.pre_num > b.pre_num
-end
-
--- 缓存里的版本可能带 v 前缀或空白，统一后再比较
-local function clean_tag(v)
-    return (tostring(v or ""):gsub("%s+", ""):gsub("^[vV]", ""))
 end
 
 -- 内核更新检查：按「内核更新通道」取对应最新版本，结果缓存 24 小时
@@ -686,6 +577,72 @@ local function json_error(msg, code)
     http.write_json({ ok = false, error = msg })
 end
 
+-- 读取持久化状态（上次应用/更新/回退结果），仅用于展示与排障
+local function state_value(key)
+    local raw = fs.readfile("/etc/adguardhome_lite/state/" .. key) or ""
+    return (raw:gsub("%s+$", ""))
+end
+
+-- 生成唯一临时路径，避免并发请求互相覆盖
+local function tmp_path(prefix)
+    return string.format("/tmp/%s.%d.%d", prefix, os.time(), math.random(100000, 999999))
+end
+
+-- 通过 0600 的 netrc 临时文件把凭据交给 curl，避免密码出现在 ps 进程列表里
+local function with_netrc(fn)
+    local user = cfg("adminuser", "admin")
+    local pass = (cfg("adminpass", "admin123"):gsub("[\r\n]", ""))
+    local path = tmp_path("adguardhome_lite_netrc")
+    local body = string.format("machine 127.0.0.1\nlogin %s\npassword %s\n", user, pass)
+
+    if not fs.writefile(path, body) then
+        return nil, "无法创建凭据文件"
+    end
+    sys.call(string.format("chmod 600 %q >/dev/null 2>&1", path))
+
+    local ok, a, b = pcall(fn, path)
+    os.remove(path)
+    if not ok then
+        return nil, tostring(a)
+    end
+
+    return a, b
+end
+
+-- 调用本机 AdGuard Home 接口；返回 HTTP 状态码与响应体
+local function agh_request(path, method, body)
+    local port = tonumber(cfg("webport", "13800")) or 13800
+    local url = string.format("http://127.0.0.1:%d%s", port, path)
+    local req = tmp_path("agh_api_req.json")
+    local res = tmp_path("agh_api_res.json")
+
+    local code = with_netrc(function(netrc)
+        local cmd = string.format(
+            "curl -s -m 8 -o %q -w '%%{http_code}' --netrc-file %q",
+            res, netrc)
+        if method == "POST" then
+            if body then
+                local f = io.open(req, "w")
+                if f then
+                    f:write(body)
+                    f:close()
+                end
+                cmd = cmd .. " -H 'Content-Type: application/json' -X POST --data-binary @" .. string.format("%q", req)
+            else
+                cmd = cmd .. " -X POST"
+            end
+        end
+        sys.call(string.format("chmod 600 %q >/dev/null 2>&1", req))
+        return sys.exec(cmd .. " " .. string.format("%q", url) .. " 2>/dev/null") or ""
+    end)
+
+    local resp = fs.readfile(res) or ""
+    os.remove(req)
+    os.remove(res)
+
+    return code or "", resp
+end
+
 function index()
     local root = entry(
         { "admin", "services", "adguardhome_lite" },
@@ -718,6 +675,7 @@ function index()
     entry({ "admin", "services", "adguardhome_lite", "yaml_save" }, call("action_yaml_save")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "legacy_scan" }, call("action_legacy_scan")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "legacy_clean" }, call("action_legacy_clean")).leaf = true
+    entry({ "admin", "services", "adguardhome_lite", "selftest" }, call("action_selftest")).leaf = true
 end
 
 function action_status()
@@ -777,6 +735,9 @@ function action_status()
         update_running = update_running(),
         action_running = action_running(),
         action_code = read_number(RUN .. "_action.code"),
+        last_apply = state_value("last_apply"),
+        last_update = state_value("last_update"),
+        last_fallback = state_value("last_fallback"),
         plugin = plugin_update_info()
     }
 
@@ -802,10 +763,7 @@ collect_stats = function()
         end
     end
 
-    local webport = tonumber(cfg("webport", "13800")) or 13800
-    local auth = string.format("%s:%s", cfg("adminuser", "admin"), cfg("adminpass", "admin123"))
-    local url = string.format("http://127.0.0.1:%d/control/stats", webport)
-    local raw = sys.exec(string.format("curl -s -m 3 -u %q %s 2>/dev/null", auth, url))
+    local _, raw = agh_request("/control/stats", "GET")
 
     if not raw or raw == "" then
         return { ok = false, error = "AdGuard Home 未运行或统计接口不可用。" }
@@ -871,11 +829,7 @@ function action_stats_clear()
         return
     end
 
-    local webport = tonumber(cfg("webport", "13800")) or 13800
-    local auth = string.format("%s:%s", cfg("adminuser", "admin"), cfg("adminpass", "admin123"))
-    local url = string.format("http://127.0.0.1:%d/control/stats_reset", webport)
-    local code = sys.exec(string.format(
-        "curl -s -m 5 -o /dev/null -w '%%{http_code}' -X POST -u %q %s 2>/dev/null", auth, url))
+    local code = agh_request("/control/stats_reset", "POST")
 
     if code ~= "200" then
         json_error("清空统计失败，AdGuard Home 可能未运行。")
@@ -888,34 +842,8 @@ function action_stats_clear()
     http.write_json({ ok = true })
 end
 
--- 调用本机 AdGuard Home 控制接口，返回 HTTP 状态码和响应体
-local function agh_api(path, method, body)
-    local auth = string.format("%s:%s", cfg("adminuser", "admin"), cfg("adminpass", "admin123"))
-    local port = tonumber(cfg("webport", "13800")) or 13800
-    local url = string.format("http://127.0.0.1:%d%s", port, path)
-    local req = "/tmp/agh_api_req.json"
-    local res = "/tmp/agh_api_res.json"
-
-    local cmd = string.format("curl -s -m 8 -o %s -w '%%{http_code}' -u %q", res, auth)
-    if method == "POST" then
-        if body then
-            local f = io.open(req, "w")
-            if f then
-                f:write(body)
-                f:close()
-            end
-            cmd = cmd .. " -H 'Content-Type: application/json' -X POST --data-binary @" .. req
-        else
-            cmd = cmd .. " -X POST"
-        end
-    end
-
-    local code = sys.exec(cmd .. " " .. url .. " 2>/dev/null") or ""
-    local resp = fs.readfile(res) or ""
-    os.remove(req)
-    os.remove(res)
-    return code, resp
-end
+-- 历史调用名保持不变，内部统一走 netrc 凭据方式
+local agh_api = agh_request
 
 local function interval_days(value, default)
     local n, unit = tostring(value or ""):match("^(%d+)%s*([dhms])$")
@@ -1743,12 +1671,93 @@ function action_logs()
 
     http.header("Cache-Control", "no-store")
     http.prepare_content("text/plain; charset=utf-8")
-    http.write("===== 系统日志（包含 AdGuard 关键字，最近 300 行） =====\n")
+    http.write("===== 持久化状态（重启后保留） =====\n")
+    http.write("上次应用：" .. (state_value("last_apply") ~= "" and state_value("last_apply") or "无记录") .. "\n")
+    http.write("上次更新：" .. (state_value("last_update") ~= "" and state_value("last_update") or "无记录") .. "\n")
+    http.write("上次 DNS 回退：" .. (state_value("last_fallback") ~= "" and state_value("last_fallback") or "无记录") .. "\n")
+    http.write("\n===== 系统日志（包含 AdGuard 关键字，最近 300 行） =====\n")
     http.write(syslog)
     http.write("\n\n===== 内核安装/更新日志 =====\n")
     http.write(update)
     http.write("\n\n===== 最近一次服务操作日志 =====\n")
     http.write(action)
+end
+
+-- DNS 自检：只读检查内核、进程、面板端口与 DNS 查询链路，不修改任何配置
+function action_selftest()
+    local binpath = cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome")
+    local configpath = cfg("config", "/etc/AdGuardHome.yaml")
+    local mode = cfg("dns_mode", "takeover")
+    local webport = tonumber(cfg("webport", "13800")) or 13800
+
+    -- 优先使用配置文件中实际写入的端口，避免「设置已改但尚未应用」时误报
+    local dnsport = 5333
+    if mode == "takeover" or mode == "passwall" or mode == "openclash" then
+        dnsport = 53
+    elseif mode == "clashfirst" then
+        dnsport = 5335
+    end
+    local yaml_port_raw = (yaml_section_scalar(configpath, "dns", "port") or ""):gsub('"', "")
+    local yaml_port = tonumber(yaml_port_raw)
+    if yaml_port and yaml_port > 0 then
+        dnsport = yaml_port
+    end
+
+    local checks = {}
+    local function add(id, label, ok, detail)
+        checks[#checks + 1] = {
+            id = id,
+            label = label,
+            ok = ok and true or false,
+            detail = detail or ""
+        }
+    end
+
+    local installed = fs.access(binpath, "x") and true or false
+    add("core", "内核文件", installed,
+        installed and (core_version(binpath) ~= "" and core_version(binpath) or binpath) or "未安装内核")
+    add("config", "配置文件", fs.access(configpath) and true or false, configpath)
+
+    local running = service_running(binpath)
+    add("running", "服务进程", running, running and "运行中" or "未运行")
+
+    local webcode = ""
+    if running then
+        webcode = sys.exec(string.format(
+            "curl -s -m 3 -o /dev/null -w '%%{http_code}' %q 2>/dev/null",
+            string.format("http://127.0.0.1:%d/", webport))) or ""
+    end
+    add("web", "管理面板端口", webcode ~= "" and webcode ~= "000",
+        string.format("端口 %d：HTTP %s", webport, webcode ~= "" and webcode or "无响应"))
+
+    local dns_ok, dns_detail = false, "未执行（服务未运行）"
+    if running then
+        local out = sys.exec(string.format(
+            "nslookup -timeout=2 -retry=1 -port=%d example.com 127.0.0.1 2>&1", dnsport)) or ""
+        dns_ok = out ~= "" and not out:find("can't resolve") and not out:find("timed out")
+        local snippet = out:gsub("%s+", " ")
+        if #snippet > 160 then
+            snippet = snippet:sub(1, 160) .. "..."
+        end
+        dns_detail = string.format("端口 %d：%s", dnsport, snippet ~= "" and snippet or "无输出")
+    end
+    add("dns", "DNS 查询", dns_ok, dns_detail)
+
+    -- 接管方式一致性只作提示，不影响整体结论
+    local mode_applied = cfg("mode_applied", "none")
+    add("mode", "DNS 接管状态", mode_applied == mode,
+        string.format("配置：%s，已应用：%s", mode, mode_applied))
+
+    local all_ok = true
+    for _, check in ipairs(checks) do
+        if check.id ~= "mode" and not check.ok then
+            all_ok = false
+        end
+    end
+
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+    http.write_json({ ok = all_ok, dns_port = dnsport, checks = checks })
 end
 
 -- 旧版残留扫描：只读，返回 JSON 清单
@@ -1767,6 +1776,10 @@ end
 
 -- 旧版残留清理：先备份，再删除旧插件文件、移动旧内核
 function action_legacy_clean()
+    if not require_post() then
+        return
+    end
+
     local out = sys.exec("sh " .. SHARE .. "/legacy_cleanup.sh clean 2>/dev/null") or ""
     out = out:match("({.*})") or ""
 
