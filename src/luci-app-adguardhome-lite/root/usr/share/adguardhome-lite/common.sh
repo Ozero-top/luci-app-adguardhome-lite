@@ -423,7 +423,7 @@ restart_dnsmasq() {
 port_listening() {
     _lp="$1"
     [ -n "$_lp" ] || return 1
-    netstat -lntu 2>/dev/null | grep -qE "[:.]$_lp[[:space:]]"
+    netstat -lntu 2>/dev/null | grep -qE "[:.]${_lp}[[:space:]]"
 }
 
 # WAN 下发的上游 DNS（排除本机回环与 fake-IP 地址）
