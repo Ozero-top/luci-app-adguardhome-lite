@@ -7,6 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "luci-app-adguardhome-lite"
 CONTROLLER = (SRC / "luasrc" / "controller" / "adguardhome_lite.lua").read_text(encoding="utf-8")
+SETTINGS = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "settings.lua").read_text(encoding="utf-8")
+LOGS_ACTION = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "logs.lua").read_text(encoding="utf-8")
 CODES = (SRC / "luasrc" / "model" / "adguardhome_lite" / "codes.lua").read_text(encoding="utf-8")
 COMMON = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "common.sh").read_text(encoding="utf-8")
 APPLY = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "apply_settings.sh").read_text(encoding="utf-8")
@@ -39,11 +41,11 @@ class ReasonCodeTest(unittest.TestCase):
     def test_log_filter_ui(self):
         self.assertIn("agh-log-level", PANEL_HTM)
         self.assertIn("state.logLevel", PANEL_JS)
-        self.assertIn('formvalue("level")', CONTROLLER)
+        self.assertIn('formvalue("level")', LOGS_ACTION)
 
     def test_cache_api_first_with_fallback(self):
-        self.assertIn("cache_api_applied", CONTROLLER)
-        self.assertIn("patch_dns_config", CONTROLLER)
+        self.assertIn("cache_api_applied", SETTINGS)
+        self.assertIn("patch_dns_config", SETTINGS)
         self.assertIn("cache_api_applied", APPLY)
         self.assertIn("_cache_api", APPLY)
 

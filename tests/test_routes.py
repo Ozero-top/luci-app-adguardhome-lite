@@ -10,6 +10,7 @@ SRC = ROOT / "src" / "luci-app-adguardhome-lite"
 CTRL = SRC / "luasrc" / "controller" / "adguardhome_lite.lua"
 VIEW = SRC / "luasrc" / "view" / "adguardhome_lite" / "panel.htm"
 AGH = SRC / "luasrc" / "model" / "adguardhome_lite" / "agh.lua"
+ACTIONS = SRC / "luasrc" / "model" / "adguardhome_lite" / "actions"
 
 MUTATIONS = [
     "action_stats_clear",
@@ -45,9 +46,18 @@ class RoutesTest(unittest.TestCase):
 
     def test_mutations_require_post(self):
         for name in MUTATIONS:
-            match = re.search(r"(?ms)^function %s\(\)\n(.*?)^end$" % name, self.controller)
-            self.assertIsNotNone(match, "缺少函数 %s" % name)
-            self.assertIn("require_post()", match.group(1), "%s 未校验 POST 令牌" % name)
+            short = name[len("action_"):]
+            body = None
+            for path in ACTIONS.rglob("*.lua"):
+                match = re.search(
+                    r"(?ms)^function M\.%s\(ctx\)\n(.*?)^end$" % short,
+                    path.read_text(encoding="utf-8"))
+                if match:
+                    body = match.group(1)
+                    break
+            self.assertIsNotNone(body, "动作模块中缺少 %s" % short)
+            self.assertIn("require_post()", body, "%s 未校验 POST 令牌" % name)
+            self.assertIn("function %s()" % name, self.controller, "控制器缺少 %s 包装" % name)
 
     def test_password_not_in_process_arguments(self):
         agh = AGH.read_text(encoding="utf-8")
