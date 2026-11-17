@@ -82,7 +82,10 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 - **旧版清理**：概览自动检测旧版 `luci-app-adguardhome`、旧 LuCI 文件与旧内核，可一键清理，文件先备份到 `/etc/adguardhome_lite/legacy-backup-时间戳/`。
 - **暗色主题**：概览右上角一键切换暗色 / 浅色，选择保存在浏览器本地，刷新不再闪浅色。
 - **安全可控**：默认密码 `admin123`，可在插件内重置；停止服务或卸载时自动恢复 DNSMasq 设置。
-- **配置可维护**：内置 YAML 模板（11 个订阅，默认按 512MB 档启用 6 个；白名单默认关闭；日志/统计保留 30 天）；高级配置保存前自动 `--check-config` 并留备份。
+- **DNS 自检**：概览一键只读检查内核、进程、管理端口与本机 53 查询链路，不修改任何配置，失败项直接给出原因。
+- **日志能定位**：运行日志支持「仅错误 / 仅警告」筛选，每条记录带原因码（如 `dns_hijack_conflict`、`core_integrity_failed`），反馈问题时可精确说明环节。
+- **异常自动回退**：看护进程由 procd 托管，内核异常退出后 30 秒内自动恢复 DNSMasq，避免全屋断解析；内核更新加锁并校验压缩包结构与版本一致性，失败保留原内核。
+- **配置可维护**：内置 YAML 模板（11 个订阅，默认按 512MB 档启用 6 个；白名单默认关闭；日志/统计保留 30 天）；高级配置保存前自动 `--check-config` 并留备份，设置应用失败自动回滚。
 
 ---
 
@@ -170,14 +173,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.2-B3_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.3-B1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.2-B3` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.3-B1` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -195,7 +198,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.2-B3 -m https://gh-proxy.org
+sh install.sh -v 1.3.3-B1 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会在 `apk` 的已安装列表里留记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
@@ -439,6 +442,10 @@ uci commit dhcp
 ### Q13：加密 DNS 什么时候需要开？
 
 只在 AdGuard Home 直接查询真实上游时有意义，也就是「Clash 前置」模式。默认「接管 53」的上游是本机 DNSMasq（`127.0.0.1:1745`），这一段是 loopback，加密不会生效；出公网的查询由 Clash 或上游 DNS 负责。需要防运营商 DNS 劫持时，在「基础设置 → DNS 解析」的加密上游里选择阿里或 DNSPod DoH 即可；Cloudflare 等境外 DoH 通常需要配合代理，否则可能超时。加密只保护「路由器 → 上游」这一段，不影响过滤效果。
+
+### Q14：出问题怎么快速定位？
+
+先在概览点「DNS 自检」，它会只读检查内核、进程、13800 面板端口和本机 53 查询链路，不会改动配置；再到「运行日志」把级别切到「仅错误」或「仅警告」，每条记录都带原因码（如 `dns_hijack_conflict`、`core_integrity_failed`、`config_check_failed`）。反馈问题时附上错误那几行，基本能直接看出卡在哪一步。
 
 更多排查与验证步骤见 [安装与使用说明](docs/安装与使用说明.md)。
 
