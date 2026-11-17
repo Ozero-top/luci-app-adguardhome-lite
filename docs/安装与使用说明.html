@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 助手 使用说明 · 1.3.3-B1</title>
+<title>AdGuard Home 助手 使用说明 · 1.3.3</title>
 <meta name="description" content="AdGuard Home 助手使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 助手 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.3-B1</span>
+  <span class="pill"><span class="dot"></span>1.3.3</span>
 </header>
 
 <div class="layout">
@@ -210,7 +210,7 @@ footer{
       <h1>AdGuard Home 助手 使用说明</h1>
       <p>本插件只做三件事：<strong>装内核、接 DNS、看状态</strong>。过滤规则、查询日志、家长控制仍在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.3-B1</span>
+        <span>适用版本 1.3.3</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -529,9 +529,9 @@ rm -f /etc/AdGuardHome.yaml</code></pre>
 python tools/build_run.py      # 离线 .run</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.3-B1_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.3-B1-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.3-B1.run</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.3-1_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.3-1-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.3-1.run</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
@@ -546,7 +546,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
             <tr>
-              <td><span class="tag">1.3.3-B1</span></td>
+              <td><span class="tag">1.3.3</span></td>
               <td>可靠性加固：看护进程改为 procd 独立实例，内核异常退出 30 秒内自动回退 DNSMasq；内核更新加锁，并校验压缩包结构、内核可执行性与目标版本一致性，失败保留原内核；设置应用和 YAML 校验失败自动回滚；卸载前恢复 DNSMasq。面板新增只读「DNS 自检」，运行日志支持按错误/警告筛选并显示原因码；请求超时与 iframe 高度自适应。工程侧版本改由 <code>VERSION</code> 单一来源驱动，新增 GitHub Actions（shellcheck / luac / 单测 / 双变体构建）与 33 项自动化测试；控制器按业务域拆分，错误返回统一 reason code；缓存设置优先通过 AdGuard Home API 在线应用，失败回退文件</td>
             </tr>
             <tr>
@@ -589,7 +589,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 助手 · 使用说明 1.3.2-B3 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 助手 · 使用说明 1.3.3 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {
