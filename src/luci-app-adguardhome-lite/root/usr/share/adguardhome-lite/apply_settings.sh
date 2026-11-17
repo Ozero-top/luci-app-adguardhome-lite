@@ -287,8 +287,13 @@ if [ -s "$configpath" ]; then
 
     if ! check_agh_config; then
         _err=$(tail -n 3 /var/run/adguardhome_lite_check.log 2>/dev/null | tr '\n' ' ')
-        log_msg "配置校验失败，已恢复备份。${_err}"
-        cp -f "$configpath.bak" "$configpath" 2>/dev/null
+        log_msg "配置校验失败，正在恢复备份。${_err}"
+        if ! cp -f "$configpath.bak" "$configpath" 2>/dev/null || ! check_agh_config; then
+            state_write last_apply "failed:config_restore:$(date '+%Y-%m-%dT%H:%M:%S')"
+            log_msg "恢复备份失败，已中止本次应用，避免使用损坏的配置启动。"
+            exit 1
+        fi
+        state_write last_apply "reverted:config_check:$(date '+%Y-%m-%dT%H:%M:%S')"
     fi
 fi
 
@@ -298,7 +303,10 @@ if [ "$enabled" = "1" ]; then
     /etc/init.d/adguardhome_lite start >/dev/null 2>&1
     _rc=$?
     if [ "$_rc" -ne 0 ]; then
+        state_write last_apply "failed:start_$_rc:$(date '+%Y-%m-%dT%H:%M:%S')"
         log_msg "启动命令返回错误码 $_rc，请到“运行日志”查看原因。"
+    else
+        state_write last_apply "ok:$(date '+%Y-%m-%dT%H:%M:%S')"
     fi
 
     # 前置模式下 AdGuard Home 先启动，再让 Clash 重载上游，

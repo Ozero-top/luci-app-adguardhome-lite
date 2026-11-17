@@ -1,0 +1,12 @@
+{
+  "runtime.version": "Lua 5.1",
+  "diagnostics.globals": [
+    "entry",
+    "call",
+    "template",
+    "context"
+  ],
+  "diagnostics.disable": [
+    "lowercase-global"
+  ]
+}

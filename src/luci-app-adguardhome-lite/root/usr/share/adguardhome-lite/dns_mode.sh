@@ -511,20 +511,23 @@ apply_mode() {
     return 0
 }
 
-# 保证 DNSMasq 始终监听 53。
-# 说明：DNSMasq 一旦跟随 Clash 的劫持端口（例如 53 → 7874），
-# 就会与 Clash 抢 7874 导致 DNSMasq 启动失败、全网断 DNS。
-# 因此这里只允许 DNSMasq 留在 53，不再跟随任何劫持端口。
+# 保证 DNSMasq 监听 53，唯一例外是 Clash 仍把 53 劫持到某个端口：
+# 此时若该端口空闲或由 DNSMasq 占用，就允许 DNSMasq 留在该端口，让劫持链路继续可用。
+# 如果劫持目标是 Clash 自己的监听端口，则 DNSMasq 仍回到 53，由 Clash 直接应答。
 ensure_safe_dnsmasq_layout() {
     _hj="$(openclash_hijack_port)"
     _cur="$(get_uci dhcp.@dnsmasq[0].port)"
     _bp="0"
 
-    if [ "$_cur" != "53" ]; then
+    if [ -n "$_hj" ] && [ "$_hj" != "53" ] && [ "$_cur" = "$_hj" ]; then
+        # Clash 劫持目标正好由 DNSMasq 监听：这是可用布局，不能把它挪回 53
+        :
+    elif [ "$_cur" != "53" ]; then
         uci -q set dhcp.@dnsmasq[0].port=53
         uci -q commit dhcp 2>/dev/null
         restart_dnsmasq
         sleep 1
+        _cur="53"
         log_msg "DNSMasq 已恢复监听 53。"
     fi
 
@@ -532,6 +535,8 @@ ensure_safe_dnsmasq_layout() {
         log_msg "未检测到 Clash DNS 劫持，DNSMasq 转发规则生效（53 → AdGuard Home）。"
     elif [ "$_hj" = "53" ] || [ "$_hj" = "$dnsport" ]; then
         log_msg "Clash 劫持目标为 $_hj，链路正常。"
+    elif [ "$_cur" = "$_hj" ]; then
+        log_msg "Clash 把 53 劫持到 $_hj，DNSMasq 在该端口提供服务，解析链路正常。"
     else
         _bp="1"
         log_msg "Clash 把 53 直接劫持到 $_hj，查询不再经过 DNSMasq，AdGuard Home 会被绕过。"
@@ -600,6 +605,15 @@ repair_dnsmasq_upstream() {
     sleep 1
 }
 
+# 端口是否被 DNSMasq 以外的进程占用（空闲或由 DNSMasq 占用都返回 1）
+port_held_by_other() {
+    _pho_port="$1"
+    [ -n "$_pho_port" ] || return 1
+    netstat -lnptu 2>/dev/null \
+        | awk -v p=":$_pho_port" '$4 ~ (p "$") {print $NF}' \
+        | grep -v 'dnsmasq' | grep -q .
+}
+
 revert_mode() {
     _had="$(get_uci "$CONF.main.old_captured")"
     _applied="$(get_uci "$CONF.main.mode_applied")"
@@ -626,6 +640,16 @@ revert_mode() {
     uci -q set "$CONF.main.mode_applied=none"
     uci -q commit "$CONF" 2>/dev/null
 
+    # Clash 劫持仍指向原接管端口时，保持 DNSMasq 在该端口，避免恢复后断 DNS
+    _hj2="$(openclash_hijack_port)"
+    if [ -n "$_hj2" ] && [ "$_hj2" != "53" ] && ! port_held_by_other "$_hj2"; then
+        if set_dnsmasq_port "$_hj2"; then
+            log_msg "检测到 Clash 劫持目标为 $_hj2，DNSMasq 监听该端口以维持解析。"
+        else
+            log_msg "无法把 DNSMasq 调整到 Clash 劫持端口 $_hj2，请检查 DNSMasq 状态。"
+        fi
+    fi
+
     # 保证 53 端口始终有 DNS 服务：
     # - DNSMasq 必须留在 53（有劫持时也不再跟随劫持端口）；
     # - 如果 Clash 已停止，53 仍由 DNSMasq 提供服务，避免客户端无 DNS。
@@ -646,8 +670,11 @@ revert_mode() {
         sleep 1
         # 恢复后如果上游指向已停止的本地端口，自动回退到 WAN DNS，避免断网
         repair_dnsmasq_upstream
-        if ! nslookup www.baidu.com 127.0.0.1 >/dev/null 2>&1; then
-            log_msg "提示：DNSMasq 解析仍失败，请检查 Clash 运行状态或 WAN DNS。"
+        # 按 DNSMasq 实际端口自检：Clash 劫持布局下 DNSMasq 可能不在 53
+        _chk_port="$(get_uci dhcp.@dnsmasq[0].port)"
+        [ -n "$_chk_port" ] || _chk_port="53"
+        if ! nslookup -timeout=2 -retry=1 -port="$_chk_port" www.baidu.com 127.0.0.1 >/dev/null 2>&1; then
+            log_msg "提示：DNSMasq（端口 $_chk_port）解析仍失败，请检查 Clash 运行状态或 WAN DNS。"
         fi
         log_msg "已恢复 DNSMasq 原始设置"
     fi

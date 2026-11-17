@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 安装静态检查工具
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck lua5.1
+
+      - name: Shell 语法与静态检查
+        run: |
+          find . -path ./AdZero-main -prune -o -type f -name '*.sh' -print0 | xargs -0 shellcheck -S error
+          for f in install.sh src/luci-app-adguardhome-lite/root/usr/share/adguardhome-lite/*.sh \
+                   src/luci-app-adguardhome-lite/root/etc/init.d/adguardhome_lite \
+                   src/luci-app-adguardhome-lite/root/etc/uci-defaults/50_luci-adguardhome-lite; do
+            sh -n "$f"
+          done
+
+      - name: Lua 语法检查
+        run: find src -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+
+      - name: Lua 单元测试
+        run: lua5.1 tests/lua/test_util.lua
+
+      - name: 前端语法检查
+        run: node --check src/luci-app-adguardhome-lite/htdocs/luci-static/resources/adguardhome-lite/panel.js
+
+      - name: 单元测试
+        run: python -m unittest discover -s tests -t . -v
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 构建双变体安装包
+        run: python tools/build_ipk.py
+
+      - name: 校验产物
+        run: |
+          test -s dist/SHA256SUMS
+          test -n "$(ls dist/luci-app-adguardhome-lite_*_all.ipk)"
+          test -n "$(ls dist/legacy/luci-app-adguardhome-lite_*-legacy_all.ipk)"
+          cd dist && sha256sum -c SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipk
+          path: |
+            dist/*.ipk
+            dist/legacy/*.ipk
+            dist/SHA256SUMS

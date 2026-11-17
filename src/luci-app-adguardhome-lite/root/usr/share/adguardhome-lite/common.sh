@@ -19,6 +19,33 @@ log_msg() {
     echo "[$(date '+%H:%M:%S')] $*"
 }
 
+# 持久化关键状态到 /etc/adguardhome_lite/state，重启后仍可排查上次失败原因。
+# 采用「临时文件 + rename」原子写入，避免掉电留下半截内容。
+state_write() {
+    _st_dir="/etc/adguardhome_lite/state"
+    _st_key="$1"
+    _st_val="$2"
+    case "$_st_key" in
+        ''|*[!a-z0-9_]*) return 1 ;;
+    esac
+    mkdir -p "$_st_dir" 2>/dev/null || return 1
+    _st_tmp="$_st_dir/.${_st_key}.$$"
+    printf '%s\n' "$_st_val" > "$_st_tmp" 2>/dev/null || return 1
+    chmod 600 "$_st_tmp" 2>/dev/null
+    mv -f "$_st_tmp" "$_st_dir/$_st_key" 2>/dev/null || {
+        rm -f "$_st_tmp" 2>/dev/null
+        return 1
+    }
+    return 0
+}
+
+# 读取持久化状态；不存在时输出空行
+state_read() {
+    _st_file="/etc/adguardhome_lite/state/$1"
+    [ -f "$_st_file" ] || return 0
+    head -n 1 "$_st_file" 2>/dev/null
+}
+
 # 读取插件配置。所有变量均使用全局变量，供调用脚本直接使用。
 load_conf() {
     if command -v config_load >/dev/null 2>&1; then
