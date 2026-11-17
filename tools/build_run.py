@@ -24,19 +24,25 @@ VERSION_FILE = os.path.join(ROOT, "src", "luci-app-adguardhome-lite", "VERSION")
 
 
 def read_version():
-    """版本唯一来源：src/luci-app-adguardhome-lite/VERSION。"""
+    """版本唯一来源：src/luci-app-adguardhome-lite/VERSION。
+
+    正式版写「1.3.3」，发行号默认 1；返回 (版本, 发行号)。
+    """
     with open(VERSION_FILE, "r", encoding="utf-8") as f:
         text = f.read().strip()
     version, sep, release = text.partition("-")
-    if not version or not sep or not release:
-        raise SystemExit("VERSION 格式应为「版本-发行号」，当前：%r" % text)
-    return text
+    if not version:
+        raise SystemExit("VERSION 不能为空：%r" % text)
+    if not sep or not release:
+        release = "1"
+    return version, release
 
 
-VERSION = read_version()
-MODERN = "luci-app-adguardhome-lite_%s_all.ipk" % VERSION
-LEGACY = "luci-app-adguardhome-lite_%s-legacy_all.ipk" % VERSION
-OUTPUT = "luci-app-adguardhome-lite_%s.run" % VERSION
+VERSION, RELEASE = read_version()
+PKG_VERSION = "%s-%s" % (VERSION, RELEASE)
+MODERN = "luci-app-adguardhome-lite_%s_all.ipk" % PKG_VERSION
+LEGACY = "luci-app-adguardhome-lite_%s-legacy_all.ipk" % PKG_VERSION
+OUTPUT = "luci-app-adguardhome-lite_%s.run" % PKG_VERSION
 
 INSTALL_SH = """#!/bin/sh
 # AdGuard Home 助手 - 离线安装脚本

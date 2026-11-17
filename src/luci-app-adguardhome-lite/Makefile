@@ -1,10 +1,9 @@
-# 版本唯一来源：本目录下的 VERSION（格式「版本-发行号」，例如 1.3.2-B3）
+# 版本唯一来源：本目录下的 VERSION（正式版写 1.3.3，发行号默认 1；需要时写 1.3.3-2）
 # 在 include rules.mk 之前解析，确保 MAKEFILE_LIST 指向本 Makefile
 VERSION_FILE:=$(dir $(lastword $(MAKEFILE_LIST)))VERSION
 PKG_VERSION:=$(shell awk -F- 'NR==1{print $$1}' $(VERSION_FILE) 2>/dev/null)
-PKG_RELEASE:=$(shell awk -F- 'NR==1{print $$2}' $(VERSION_FILE) 2>/dev/null)
+PKG_RELEASE:=$(shell awk -F- 'NR==1{print (NF>1?$$2:"1")}' $(VERSION_FILE) 2>/dev/null)
 $(if $(PKG_VERSION),,$(error 缺少或无法读取 VERSION 文件：$(VERSION_FILE)))
-$(if $(PKG_RELEASE),,$(error VERSION 文件格式应为「版本-发行号」，当前：$(VERSION_FILE)))
 
 include $(TOPDIR)/rules.mk
 

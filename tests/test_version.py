@@ -16,7 +16,7 @@ def version_text() -> str:
 class VersionSourceTest(unittest.TestCase):
     def test_version_format(self):
         text = version_text()
-        self.assertRegex(text, r"^\d+\.\d+\.\d+-[A-Za-z0-9.]+$", "VERSION 格式应为「版本-发行号」")
+        self.assertRegex(text, r"^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$", "VERSION 格式应为「版本」或「版本-发行号」")
 
     def test_makefile_reads_version_file(self):
         makefile = (SRC / "Makefile").read_text(encoding="utf-8")
@@ -42,13 +42,13 @@ class VersionSourceTest(unittest.TestCase):
         import build_ipk
 
         version, release = build_ipk.read_version(str(SRC))
-        self.assertEqual("%s-%s" % (version, release), version_text())
+        expected = version_text() if "-" in version_text() else version_text() + "-1"
+        self.assertEqual("%s-%s" % (version, release), expected)
 
     def test_readme_mentions_current_version(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        version, release = version_text().split("-", 1)
         # README 允许只写版本号，不强制写发行号；至少主版本要能对上
-        self.assertIn(version, readme)
+        self.assertIn(version_text().split("-", 1)[0], readme)
 
     def test_build_run_uses_version(self):
         import sys

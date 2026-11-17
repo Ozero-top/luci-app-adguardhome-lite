@@ -41,7 +41,8 @@ class BuildIpkTest(unittest.TestCase):
         cls.out = Path(cls.tmp.name)
         cls.modern = Path(build_ipk.build_variant(str(SRC), str(cls.out), "modern"))
         cls.legacy = Path(build_ipk.build_variant(str(SRC), str(cls.out / "legacy"), "legacy"))
-        cls.version = (SRC / "VERSION").read_text(encoding="utf-8").strip()
+        base, release = build_ipk.read_version(str(SRC))
+        cls.version = "%s-%s" % (base, release)
 
     @classmethod
     def tearDownClass(cls):

@@ -32,7 +32,10 @@ PKG_MAINTAINER = "Ozero-top"
 
 
 def read_version(src_root: str):
-    """版本唯一来源：src/luci-app-adguardhome-lite/VERSION（格式「版本-发行号」）。"""
+    """版本唯一来源：src/luci-app-adguardhome-lite/VERSION。
+
+    正式版写「1.3.3」，发行号按 OpenWrt 惯例默认 1；需要多轮打包时写「1.3.3-2」。
+    """
     path = os.path.join(src_root, "VERSION")
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -41,8 +44,10 @@ def read_version(src_root: str):
         raise SystemExit("缺少版本文件：%s" % path)
 
     version, sep, release = text.partition("-")
-    if not version or not sep or not release:
-        raise SystemExit("VERSION 格式应为「版本-发行号」，当前：%r" % text)
+    if not version:
+        raise SystemExit("VERSION 不能为空：%r" % text)
+    if not sep or not release:
+        release = "1"
 
     return version, release
 
