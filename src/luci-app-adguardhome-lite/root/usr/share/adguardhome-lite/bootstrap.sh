@@ -16,6 +16,55 @@ fail_bootstrap() {
     exit 1
 }
 
+# 按物理内存选择预置规则档位：512MB / 1GB / 2GB 及以上
+detect_mem_tier() {
+    _mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null)
+    case "$_mem_kb" in
+        ''|*[!0-9]*) echo 512; return ;;
+    esac
+    if [ "$_mem_kb" -le 614400 ]; then
+        echo 512
+    elif [ "$_mem_kb" -le 1572864 ]; then
+        echo 1024
+    else
+        echo 2048
+    fi
+}
+
+# 生成对应档位的预置订阅条目，id 固定，重复生成时保持稳定
+preset_filters() {
+    _tier="$1"
+    _base="https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist"
+    cat <<EOF
+  - enabled: true
+    url: $_base/$_tier/security.txt
+    name: AGH 安全防护
+    id: 601
+  - enabled: true
+    url: $_base/$_tier/chinese.txt
+    name: AGH 中文广告
+    id: 602
+  - enabled: true
+    url: $_base/$_tier/ads.txt
+    name: AGH 全站广告
+    id: 603
+EOF
+    [ "$_tier" = "1024" ] || [ "$_tier" = "2048" ] || return 0
+    cat <<EOF
+  - enabled: true
+    url: $_base/$_tier/tracking.txt
+    name: AGH 跟踪统计
+    id: 604
+EOF
+    [ "$_tier" = "2048" ] || return 0
+    cat <<EOF
+  - enabled: true
+    url: $_base/$_tier/annoyances.txt
+    name: AGH 网页干扰
+    id: 605
+EOF
+}
+
 load_conf
 
 [ -x "$binpath" ] || fail_bootstrap "尚未安装内核，请先在概览页安装内核。"
@@ -34,6 +83,27 @@ mkdir -p "$workdir" "$(dirname "$configpath")" 2>/dev/null
 log_msg "正在从内置模板生成首次配置..."
 cp -f "$TEMPLATE" "$configpath" || fail_bootstrap "复制默认配置模板失败。"
 chmod 600 "$configpath" 2>/dev/null
+
+# 按设备内存写入预置规则（512MB 用 3 个列表，1GB 用 4 个，2GB 及以上用 5 个）
+preset_tier=$(detect_mem_tier)
+preset_block="$configpath.preset.$$"
+preset_tmp="$configpath.tmp.$$"
+preset_filters "$preset_tier" > "$preset_block" || fail_bootstrap "生成预置规则条目失败。"
+if ! awk -v block="$preset_block" '
+    /^[[:space:]]*# AGH_PRESET_FILTERS/ {
+        while ((getline line < block) > 0) print line
+        close(block)
+        next
+    }
+    { print }
+' "$configpath" > "$preset_tmp"; then
+    rm -f "$preset_block" "$preset_tmp"
+    fail_bootstrap "写入预置规则失败。"
+fi
+mv -f "$preset_tmp" "$configpath" || { rm -f "$preset_block" "$preset_tmp"; fail_bootstrap "替换配置文件失败。"; }
+chmod 600 "$configpath" 2>/dev/null
+rm -f "$preset_block"
+log_msg "已按内存写入 $preset_tier 档预置规则。"
 
 # 新装默认开启 DNS 缓存（16MB、TTL 不覆盖、乐观缓存关闭）；
 # 若 UCI 已存在缓存选项，则以用户配置为准。

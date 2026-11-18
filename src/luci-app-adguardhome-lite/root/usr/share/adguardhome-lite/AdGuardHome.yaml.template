@@ -110,56 +110,16 @@ statistics:
   interval: 30d
   enabled: true
   ignored_enabled: false
+# 预置订阅由 bootstrap.sh 按设备内存写入（512MB / 1GB / 2GB 及以上三档），
+# 内容来自自建规则仓库，已按分类去重，无需再用第三方整包列表。
 filters:
-  - enabled: false
-    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
-    name: AdGuard DNS filter
-    id: 1
-  - enabled: true
-    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt
-    name: AdAway Default Blocklist
-    id: 2
-  - enabled: false
-    url: https://gh-proxy.org/https://raw.githubusercontent.com/Cats-Team/AdRules/main/dns.txt
-    name: AdRules DNS List（猫团队）
-    id: 1794123457
-  - enabled: true
-    url: https://anti-ad.net/easylist.txt
-    name: anti-AD
-    id: 1794123458
-  - enabled: true
-    url: https://gh-proxy.org/https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Adguard.txt
-    name: AWAvenue 秋风广告规则
-    id: 1794123459
-  - enabled: true
-    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_4.txt
-    name: AdGuard 恶意软件防护过滤器
-    id: 1794123460
-  - enabled: true
-    url: https://gh-proxy.org/https://raw.githubusercontent.com/8680/GOODBYEADS/master/data/rules/dns.txt
-    name: GOODBYEADS
-    id: 1794123461
-  - enabled: false
-    url: https://gh-proxy.org/https://raw.githubusercontent.com/8680/GOODBYEADS/master/data/rules/ad-domain.txt
-    name: GOODBYEADS域名规则
-    id: 1794130387
-  - enabled: true
-    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_3.txt
-    name: AdGuard Tracking Protection
-    id: 1794200744
-  - enabled: false
-    url: https://big.oisd.nl/
-    name: OISD Big
-    id: 1794200745
-  - enabled: false
-    url: https://gh-proxy.org/https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt
-    name: HaGeZi Multi Pro
-    id: 1794200746
+  # AGH_PRESET_FILTERS
 whitelist_filters:
+  # 白名单默认添加但不启用，与旧版内置白名单行为一致，需要时在面板里手动开启
   - enabled: false
-    url: https://gh-proxy.org/https://raw.githubusercontent.com/8680/GOODBYEADS/master/data/rules/allow.txt
-    name: GOODBYEADS
-    id: 1794130386
+    url: https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist/allowlist.txt
+    name: AGH 白名单
+    id: 650
 # 拦截常见 DoH/DoT 服务商域名，防止应用绕过 AdGuard Home 直接加密解析
 user_rules:
   - dns.google
