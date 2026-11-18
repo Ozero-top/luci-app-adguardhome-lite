@@ -11,6 +11,15 @@
 	var ADULT_FILTER_URL = 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/nsfw.txt';
 	var ADULT_FILTER_NAME = 'HaGeZi NSFW（成人内容）';
 
+	// 拦截常见 DoH 提供商，防止设备绕过 AdGuard Home。
+	// 开启时写入 user_rules，关闭时按域名移除，裸域名与 ||domain^ 两种写法都会被清理。
+	var DOH_DOMAINS = [
+		'dns.google', 'cloudflare-dns.com', 'dns.quad9.net',
+		'doh.opendns.com', 'dns.mozilla.org', 'doh.cleanbrowsing.org',
+		'dns.nextdns.io', 'doh.pub', 'doh.360.cn'
+	];
+	var DOH_RULES = DOH_DOMAINS.map(function (d) { return '||' + d + '^'; });
+
 	var state = {
 		status: null,
 		settings: null,
@@ -766,6 +775,17 @@
 			}
 			adultEl.checked = !!(nsfw && nsfw.enabled);
 		}
+
+		// DoH 开关以 user_rules 里是否已含全部 9 条规则为准
+		var dohEl = $('agh-filter-doh');
+		if (dohEl) {
+			var userRules = (d.user_rules || []).map(function (x) { return String(x).trim(); });
+			var hit = 0;
+			for (var j = 0; j < DOH_RULES.length; j++) {
+				if (userRules.indexOf(DOH_RULES[j]) >= 0) hit++;
+			}
+			dohEl.checked = hit === DOH_RULES.length;
+		}
 		updateSwitchStates();
 	}
 
@@ -796,6 +816,30 @@
 		}
 		if (!found) return;
 		return filtersAction({ action: 'remove', url: ADULT_FILTER_URL, whitelist: '0' });
+	}
+
+	// 开关 DoH 拦截：在自定义规则里增删 9 条，复用现有的规则保存接口
+	function toggleDohBlock(on) {
+		var ta = $('agh-filter-rules');
+		var lines = ta ? ta.value.split('\n') : [];
+		var out = [];
+		var seen = {};
+		for (var i = 0; i < lines.length; i++) {
+			var s = lines[i].trim();
+			if (!s) continue;
+			// 裸域名与 ||domain^ 等价，统一清理后按开关状态重建
+			if (DOH_RULES.indexOf(s) >= 0 || DOH_DOMAINS.indexOf(s) >= 0) continue;
+			if (!seen[s]) {
+				seen[s] = 1;
+				out.push(s);
+			}
+		}
+		if (on) {
+			for (var k = 0; k < DOH_RULES.length; k++) out.push(DOH_RULES[k]);
+		}
+		if (ta) ta.value = out.join('\n');
+		state.rulesDirty = false;
+		return filtersAction({ action: 'rules', rules: out.join('\n') });
 	}
 
 	function renderFilters(d) {
@@ -1813,6 +1857,13 @@
 		if ($('agh-filter-rules')) {
 			$('agh-filter-rules').oninput = function () {
 				state.rulesDirty = true;
+			};
+		}
+		if ($('agh-filter-doh')) {
+			$('agh-filter-doh').onchange = function () {
+				toggleDohBlock(this.checked).then(function () {
+					updateSwitchStates();
+				});
 			};
 		}
 		if ($('agh-retention-form')) {

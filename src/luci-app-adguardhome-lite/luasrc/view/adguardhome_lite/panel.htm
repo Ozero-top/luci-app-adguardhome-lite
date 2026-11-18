@@ -509,6 +509,17 @@
 					</div>
 				</div>
 
+				<div class="agh-form-grid agh-form-grid-3">
+					<div class="agh-field agh-field-switch agh-field-switch-stack">
+						<div class="agh-switch-head">
+							<label for="agh-filter-doh">拦截 DoH 服务器</label>
+							<span class="agh-switch-state" data-for="agh-filter-doh">已关闭</span>
+							<label class="agh-switch"><input type="checkbox" id="agh-filter-doh"><span></span></label>
+						</div>
+						<p class="agh-hint">阻止浏览器和应用绕过 AdGuard Home 直连 dns.google、doh.pub 等加密 DNS。开启后这 9 条规则会同步写入下方自定义规则，可随时手动调整。</p>
+					</div>
+				</div>
+
 				<h4 class="agh-subhead">订阅 / 规则列表</h4>
 				<div class="agh-memory-trim">
 					<span class="agh-hint">按设备内存切换规则档位：</span>
@@ -843,7 +854,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261117e"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261118a"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {
