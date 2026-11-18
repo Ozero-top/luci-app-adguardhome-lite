@@ -777,7 +777,7 @@
 		}
 		var rules = $('agh-filter-rules');
 		// 用户正在编辑自定义规则时，刷新订阅列表不要覆盖文本域
-		if (rules && !state.rulesDirty) rules.value = (d.user_rules || []).join('\n');
+		if (rules && !state.rulesDirty) rules.value = toList(d.user_rules).join('\n');
 
 		// 成人内容拦截开关以 NSFW 订阅是否存在且启用为准
 		var adultEl = $('agh-filter-adult');
@@ -1225,7 +1225,7 @@
 		var menu = $('agh-bypass-iface-menu');
 		if (!menu) return;
 		var picked = (configured || '').split(/\s+/);
-		var list = (devices || []).slice();
+		var list = toList(devices).slice();
 		picked.forEach(function (name) {
 			if (name && list.indexOf(name) < 0) list.push(name);
 		});
