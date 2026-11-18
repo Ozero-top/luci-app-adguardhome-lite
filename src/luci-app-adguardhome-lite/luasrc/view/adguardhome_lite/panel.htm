@@ -27,7 +27,7 @@
 			color-scheme: dark;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261118b">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261118d">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -554,7 +554,6 @@
 					<div class="agh-rules-layout">
 						<div class="agh-field">
 							<textarea id="agh-filter-rules" rows="4" placeholder="@@||example.com^&#10;||ads.example.com^"></textarea>
-							<p class="agh-hint">一行一条，AdGuard 语法；<code>@@</code> 开头为白名单。</p>
 						</div>
 						<div class="agh-field agh-field-switch agh-field-switch-stack">
 							<div class="agh-switch-head">
@@ -565,6 +564,7 @@
 							<p class="agh-hint">阻止浏览器和应用绕过 AdGuard Home 直连 dns.google、doh.pub 等加密 DNS。开启后这 9 条规则会同步写入左侧自定义规则，可随时手动调整。</p>
 						</div>
 					</div>
+					<p class="agh-hint">一行一条，AdGuard 语法；<code>@@</code> 开头为白名单。</p>
 					<div class="agh-form-actions">
 						<button type="submit" class="agh-btn agh-btn-primary">保存规则</button>
 						<span class="agh-hint">保存后立即生效。</span>
