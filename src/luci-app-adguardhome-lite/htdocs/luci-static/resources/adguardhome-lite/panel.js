@@ -749,6 +749,20 @@
 		}
 	}
 
+	// 服务端把空 Lua 表序列化成 {} 而不是 []，这里统一兼容数组与对象两种形态，
+	// 否则 (d.user_rules || []) 拿到 {} 后调 .join 会抛 TypeError。
+	function toList(value) {
+		if (!value) return [];
+		if (Array.isArray(value)) return value;
+		var out = [];
+		if (typeof value === 'object') {
+			for (var k in value) {
+				if (Object.prototype.hasOwnProperty.call(value, k)) out.push(value[k]);
+			}
+		}
+		return out;
+	}
+
 	function setFilterFlags(d) {
 		var map = {
 			filtering_enabled: 'agh-filter-enabled',
@@ -779,7 +793,7 @@
 		// DoH 开关以 user_rules 里是否已含全部 9 条规则为准
 		var dohEl = $('agh-filter-doh');
 		if (dohEl) {
-			var userRules = (d.user_rules || []).map(function (x) { return String(x).trim(); });
+			var userRules = toList(d.user_rules).map(function (x) { return String(x).trim(); });
 			var hit = 0;
 			for (var j = 0; j < DOH_RULES.length; j++) {
 				if (userRules.indexOf(DOH_RULES[j]) >= 0) hit++;
@@ -845,7 +859,7 @@
 	function renderFilters(d) {
 		var list = $('agh-filter-list');
 		if (!list) return;
-		var filters = (d && d.filters) || [];
+		var filters = toList(d && d.filters);
 		if (!filters.length) {
 			list.innerHTML = '<div class="agh-empty">还没有订阅规则</div>';
 			return;
@@ -897,7 +911,7 @@
 		try {
 			var d = await apiGet(U.filters);
 			if (!d.ok) throw new Error(d.error || '读取失败');
-			state.filters = d.filters || [];
+			state.filters = toList(d.filters);
 			setFilterFlags(d);
 			renderFilters(d);
 			setMsg(msg, '', '');
