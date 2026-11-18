@@ -653,12 +653,17 @@ code {
 	word-break: break-word;
 }
 
-/* 自定义规则：文本框与 DoH 开关横向并列 */
+/* 自定义规则：文本框与 DoH 开关横向并列，开关卡片与输入框等高 */
 .agh-rules-layout {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) 300px;
+	grid-template-columns: minmax(0, 1fr) 400px;
 	gap: 14px;
-	align-items: start;
+	align-items: stretch;
+}
+
+.agh-rules-layout .agh-field-switch {
+	height: 100%;
+	box-sizing: border-box;
 }
 
 @media (max-width: 1200px) {
