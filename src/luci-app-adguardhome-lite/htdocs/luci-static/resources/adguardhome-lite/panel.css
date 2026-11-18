@@ -653,6 +653,14 @@ code {
 	word-break: break-word;
 }
 
+/* 自定义规则：文本框与 DoH 开关横向并列 */
+.agh-rules-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 300px;
+	gap: 14px;
+	align-items: start;
+}
+
 @media (max-width: 1200px) {
 	.agh-form-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.agh-form-grid.agh-form-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -660,6 +668,7 @@ code {
 
 @media (max-width: 800px) {
 	.agh-form-grid.agh-form-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.agh-rules-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 460px) {
