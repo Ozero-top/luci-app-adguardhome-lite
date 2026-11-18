@@ -27,7 +27,7 @@
 			color-scheme: dark;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261115l">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261118a">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -509,17 +509,6 @@
 					</div>
 				</div>
 
-				<div class="agh-form-grid agh-form-grid-3">
-					<div class="agh-field agh-field-switch agh-field-switch-stack">
-						<div class="agh-switch-head">
-							<label for="agh-filter-doh">拦截 DoH 服务器</label>
-							<span class="agh-switch-state" data-for="agh-filter-doh">已关闭</span>
-							<label class="agh-switch"><input type="checkbox" id="agh-filter-doh"><span></span></label>
-						</div>
-						<p class="agh-hint">阻止浏览器和应用绕过 AdGuard Home 直连 dns.google、doh.pub 等加密 DNS。开启后这 9 条规则会同步写入下方自定义规则，可随时手动调整。</p>
-					</div>
-				</div>
-
 				<h4 class="agh-subhead">订阅 / 规则列表</h4>
 				<div class="agh-memory-trim">
 					<span class="agh-hint">按设备内存切换规则档位：</span>
@@ -562,9 +551,19 @@
 
 				<h4 class="agh-subhead">自定义规则（白名单 / 黑名单）</h4>
 				<form id="agh-filter-rules-form" class="agh-form" autocomplete="off">
-					<div class="agh-field">
-						<textarea id="agh-filter-rules" rows="4" placeholder="@@||example.com^&#10;||ads.example.com^"></textarea>
-						<p class="agh-hint">一行一条，AdGuard 语法；<code>@@</code> 开头为白名单。</p>
+					<div class="agh-rules-layout">
+						<div class="agh-field">
+							<textarea id="agh-filter-rules" rows="4" placeholder="@@||example.com^&#10;||ads.example.com^"></textarea>
+							<p class="agh-hint">一行一条，AdGuard 语法；<code>@@</code> 开头为白名单。</p>
+						</div>
+						<div class="agh-field agh-field-switch agh-field-switch-stack">
+							<div class="agh-switch-head">
+								<label for="agh-filter-doh">拦截 DoH 服务器</label>
+								<span class="agh-switch-state" data-for="agh-filter-doh">已关闭</span>
+								<label class="agh-switch"><input type="checkbox" id="agh-filter-doh"><span></span></label>
+							</div>
+							<p class="agh-hint">阻止浏览器和应用绕过 AdGuard Home 直连 dns.google、doh.pub 等加密 DNS。开启后这 9 条规则会同步写入左侧自定义规则，可随时手动调整。</p>
+						</div>
 					</div>
 					<div class="agh-form-actions">
 						<button type="submit" class="agh-btn agh-btn-primary">保存规则</button>
