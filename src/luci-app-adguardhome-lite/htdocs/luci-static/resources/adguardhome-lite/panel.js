@@ -887,7 +887,7 @@
 		};
 	}
 
-	// 按设备内存档位自动启停黑名单订阅
+	// 按设备内存切换预置规则档位
 	function bindMemoryTrim() {
 		var wrap = $('agh-memory-trim');
 		if (!wrap) return;
@@ -896,15 +896,15 @@
 			btn.onclick = async function () {
 				var tier = btn.getAttribute('data-tier');
 				var label = tier === '512' ? '512MB' : (tier === '1024' ? '1GB' : '2GB 及以上');
-				if (!window.confirm('按 ' + label + ' 重新启停黑名单订阅？')) return;
+				if (!window.confirm('切换到 ' + label + ' 规则档位？会移除其它档位的预置列表。')) return;
 				Array.prototype.slice.call(wrap.querySelectorAll('button')).forEach(function (b) {
 					b.classList.toggle('is-active', b === btn);
 				});
-				if (msg) msg.textContent = '正在调整...';
+				if (msg) msg.textContent = '正在切换...';
 				try {
 					var d = await apiPost(U.filtersSave, { action: 'trim', tier: tier });
-					if (msg) msg.textContent = label + '：已调整 ' + (d.changed || 0) + ' 个列表，保留 ' + (d.kept || 0) + ' 条规则';
-					showToast('已应用', 'ok');
+					if (msg) msg.textContent = label + '：已订阅 ' + (d.kept || 0) + ' 个列表，变更 ' + (d.changed || 0) + ' 项';
+					showToast('已切换档位', 'ok');
 					await loadFilters();
 				} catch (err) {
 					if (msg) msg.textContent = '';

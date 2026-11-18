@@ -3,6 +3,46 @@
 
 local M = {}
 
+-- 预置规则来自自建规则仓库，按设备内存分三档，每档由若干已去重的分类文件组成
+local PRESET_BASE = "https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist/"
+local PRESET_ALLOW = PRESET_BASE .. "allowlist.txt"
+local PRESET_TIERS = {
+    ["512"] = { "security", "chinese", "ads" },
+    ["1024"] = { "security", "chinese", "tracking", "ads" },
+    ["2048"] = { "security", "chinese", "tracking", "ads", "annoyances" }
+}
+local PRESET_NAMES = {
+    security = "AGH 安全防护",
+    chinese = "AGH 中文广告",
+    ads = "AGH 全站广告",
+    tracking = "AGH 跟踪统计",
+    annoyances = "AGH 网页干扰"
+}
+
+-- 旧版模板内置的第三方整包订阅，切换档位时一并清理，避免重复生效
+local LEGACY_PATTERNS = {
+    "adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt",
+    "adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt",
+    "adguardteam.github.io/HostlistsRegistry/assets/filter_3.txt",
+    "adguardteam.github.io/HostlistsRegistry/assets/filter_4.txt",
+    "anti-ad.net/easylist.txt",
+    "Cats-Team/AdRules",
+    "AWAvenue-Ads-Rule",
+    "8680/GOODBYEADS",
+    "big.oisd.nl",
+    "hagezi/dns-blocklists"
+}
+local LEGACY_WHITELIST = "8680/GOODBYEADS"
+
+local function matches_any(url, patterns)
+    for _, p in ipairs(patterns) do
+        if url:find(p, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
 function M.filters_get(ctx)
     local fs, http, sys, uci, util, codes, agh, selftest, split_words, join_words, valid_iface_name, valid_client_spec, version_newer, clean_tag, CONF, SHARE, RUN, STATS_CACHE, VERSION_CACHE, CORE_UPDATE, PLUGIN_UPDATE, INSTALL_VERSION, RELEASE_URL, collect_stats, read_cache, cfg, CACHE_YAML_KEYS, yaml_cache_scalar, yaml_list_values, yaml_safe_search_enabled, yaml_section_scalar, yaml_set_section_scalar, cache_option, IGNORED_IFACE_PATTERNS, iface_ignored, net_devices, is_enabled, core_version, core_update_info, plugin_version, plugin_update_info, service_running, openclash_hijack_port, openclash_running, openclash_upstream_agh, passwall_enabled, passwall_dns_port, read_number, update_running, action_running, start_action, check_token, require_post, default_reason, json_error, state_value, agh_client, agh_request, agh_api, interval_days = ctx.fs, ctx.http, ctx.sys, ctx.uci, ctx.util, ctx.codes, ctx.agh, ctx.selftest, ctx.split_words, ctx.join_words, ctx.valid_iface_name, ctx.valid_client_spec, ctx.version_newer, ctx.clean_tag, ctx.CONF, ctx.SHARE, ctx.RUN, ctx.STATS_CACHE, ctx.VERSION_CACHE, ctx.CORE_UPDATE, ctx.PLUGIN_UPDATE, ctx.INSTALL_VERSION, ctx.RELEASE_URL, ctx.collect_stats, ctx.read_cache, ctx.cfg, ctx.CACHE_YAML_KEYS, ctx.yaml_cache_scalar, ctx.yaml_list_values, ctx.yaml_safe_search_enabled, ctx.yaml_section_scalar, ctx.yaml_set_section_scalar, ctx.cache_option, ctx.IGNORED_IFACE_PATTERNS, ctx.iface_ignored, ctx.net_devices, ctx.is_enabled, ctx.core_version, ctx.core_update_info, ctx.plugin_version, ctx.plugin_update_info, ctx.service_running, ctx.openclash_hijack_port, ctx.openclash_running, ctx.openclash_upstream_agh, ctx.passwall_enabled, ctx.passwall_dns_port, ctx.read_number, ctx.update_running, ctx.action_running, ctx.start_action, ctx.check_token, ctx.require_post, ctx.default_reason, ctx.json_error, ctx.state_value, ctx.agh_client, ctx.agh_request, ctx.agh_api, ctx.interval_days
     http.header("Cache-Control", "no-store")
@@ -123,13 +163,11 @@ function M.filters_save(ctx)
         path = "/control/filtering/set_rules"
         body = jsonc.stringify({ rules = rules })
     elseif act == "trim" then
-        -- 按设备内存档位自动启停黑名单订阅，白名单与自定义规则不动
-        local tier = tonumber(http.formvalue("tier")) or 2048
-        local budget
-        if tier <= 512 then
-            budget = 250000
-        elseif tier <= 1024 then
-            budget = 800000
+        -- 切换预置规则档位：写入目标档位的内置列表，移除其它档位的
+        local tier = http.formvalue("tier") or "512"
+        if not PRESET_TIERS[tier] then
+            json_error("不支持的档位。", nil, "rule_action_failed")
+            return
         end
 
         local _, sresp = agh_api("/control/filtering/status", "GET")
@@ -139,31 +177,79 @@ function M.filters_save(ctx)
             return
         end
 
-        local lists = {}
-        for _, f in ipairs(st.filters) do
-            if not f.whitelist then
-                lists[#lists + 1] = f
+        local existing, existing_white = {}, {}
+        for _, f in ipairs(st.filters or {}) do
+            if f.url then
+                existing[f.url] = f
             end
         end
-        table.sort(lists, function(a, b)
-            return (tonumber(a.rules_count) or 0) < (tonumber(b.rules_count) or 0)
-        end)
-
-        local kept, changed = 0, 0
-        for _, f in ipairs(lists) do
-            local cnt = tonumber(f.rules_count) or 0
-            local enable = (budget == nil) or (kept + cnt <= budget)
-            if enable then
-                kept = kept + cnt
+        for _, f in ipairs(st.whitelist_filters or {}) do
+            if f.url then
+                existing_white[f.url] = f
             end
-            if (not not f.enabled) ~= enable then
+        end
+
+        local want, changed = {}, 0
+        for _, cat in ipairs(PRESET_TIERS[tier]) do
+            want[PRESET_BASE .. tier .. "/" .. cat .. ".txt"] = PRESET_NAMES[cat]
+        end
+
+        -- 先移除其它档位以及已下线分类的内置列表，避免重复或残留；
+        -- 不能遍历分类表，否则从分类表里删掉的旧分类（如 social）会残留。
+        for url in pairs(existing) do
+            if url:sub(1, #PRESET_BASE) == PRESET_BASE and not want[url] then
+                local tier_of = url:sub(#PRESET_BASE + 1):match("^(%d+)/")
+                if tier_of and PRESET_TIERS[tier_of] then
+                    agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({ url = url, whitelist = false }))
+                    changed = changed + 1
+                end
+            end
+        end
+
+        -- 清理旧版模板内置的第三方整包订阅，用户自行添加的订阅不匹配特征串，保持不动
+        for url in pairs(existing) do
+            if not want[url] and matches_any(url, LEGACY_PATTERNS) then
+                agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({ url = url, whitelist = false }))
+                changed = changed + 1
+            end
+        end
+        for url in pairs(existing_white) do
+            if url:find(LEGACY_WHITELIST, 1, true) then
+                agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({ url = url, whitelist = true }))
+                changed = changed + 1
+            end
+        end
+
+        local kept = 0
+        for url, name in pairs(want) do
+            local f = existing[url]
+            if not f then
+                agh_api("/control/filtering/add_url", "POST", jsonc.stringify({ name = name, url = url, whitelist = false }))
+                changed = changed + 1
+            elseif not f.enabled then
                 agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
-                    url = f.url,
+                    url = url,
                     whitelist = false,
-                    data = { name = f.name or f.url, url = f.url, enabled = enable, whitelist = false }
+                    data = { name = name, url = url, enabled = true, whitelist = false }
                 }))
                 changed = changed + 1
             end
+            kept = kept + 1
+        end
+
+        -- 白名单与档位无关，缺失时补上；AGH 新增订阅默认启用，这里按旧版惯例保持关闭
+        if not existing_white[PRESET_ALLOW] then
+            agh_api("/control/filtering/add_url", "POST", jsonc.stringify({
+                name = "AGH 白名单",
+                url = PRESET_ALLOW,
+                whitelist = true
+            }))
+            agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
+                url = PRESET_ALLOW,
+                whitelist = true,
+                data = { name = "AGH 白名单", url = PRESET_ALLOW, enabled = false, whitelist = true }
+            }))
+            changed = changed + 1
         end
 
         http.header("Cache-Control", "no-store")
