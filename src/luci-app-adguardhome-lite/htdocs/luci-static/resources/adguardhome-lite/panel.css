@@ -666,6 +666,20 @@ code {
 	box-sizing: border-box;
 }
 
+/* 输入框随网格行高拉伸，保证与开关卡片始终等高 */
+.agh-rules-layout .agh-field:first-child {
+	display: flex;
+}
+
+.agh-rules-layout .agh-field:first-child textarea {
+	flex: 1;
+}
+
+/* 输入框说明文字放在网格外，避免把开关卡片撑得比输入框高 */
+.agh-rules-layout + .agh-hint {
+	margin: 6px 0 0;
+}
+
 @media (max-width: 1200px) {
 	.agh-form-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.agh-form-grid.agh-form-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
