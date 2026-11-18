@@ -70,11 +70,12 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 - **页内看统计**：概览显示 DNS 查询、过滤器拦截、恶意/钓鱼、成人内容四项数据，每 10 秒随状态刷新。
 - **查询日志**：运行日志 → 查询日志显示最近 20 条查询与拦截结果，只读。
-- **过滤规则管理**：基础设置 → 过滤规则内启用/停用规则、添加订阅（黑名单/白名单）、编辑自定义规则，修改立即生效；支持按设备内存 512MB / 1GB / 2GB+ 一键精简订阅。
+- **过滤规则管理**：基础设置 → 过滤规则内启用/停用规则、添加订阅（黑名单/白名单）、编辑自定义规则，修改立即生效；支持按设备内存 512MB / 1GB / 2GB+ 一键切换预置订阅档位（分别 3 / 4 / 5 个已去重的分类列表）。
+- **预置规则可选档位**：预置订阅由自建规则仓库每 7 天自动抓取、去重、重分类后生成，按内存分档：512MB 为安全防护 / 中文广告 / 全站广告；1GB 再加跟踪统计；2GB 及以上再加网页干扰。三档共用同一份白名单。
 - **安全搜索 / 浏览安全 / 家长控制**：一个开关即可启用或关闭。
 - **保留周期**：统计与查询日志的保留天数可在「插件配置」内调整。
 - **成人内容拦截**：「过滤规则」页一个开关，自动追加/移除 HaGeZi NSFW 订阅，命中计入「已拦截」，立即生效。
-- **规则更新走代理**：自动检测 Clash 的 HTTP 代理并写入 `http_proxy`；内置订阅地址默认带 `gh-proxy.org` 前缀，避免直连 raw 失败。
+- **规则更新走代理**：自动检测 Clash 的 HTTP 代理并写入 `http_proxy`；内置规则订阅走 jsDelivr CDN，通常无需反代，下载失败时可切换到 GitHub 反代或 raw 直连。
 
 ### 维护与安全
 
@@ -85,7 +86,7 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 - **DNS 自检**：概览一键只读检查内核、进程、管理端口与本机 53 查询链路，不修改任何配置，失败项直接给出原因。
 - **日志能定位**：运行日志支持「仅错误 / 仅警告」筛选，每条记录带原因码（如 `dns_hijack_conflict`、`core_integrity_failed`），反馈问题时可精确说明环节。
 - **异常自动回退**：看护进程由 procd 托管，内核异常退出后 30 秒内自动恢复 DNSMasq，避免全屋断解析；内核更新加锁并校验压缩包结构与版本一致性，失败保留原内核。
-- **配置可维护**：内置 YAML 模板（11 个订阅，默认按 512MB 档启用 6 个；白名单默认关闭；日志/统计保留 30 天）；高级配置保存前自动 `--check-config` 并留备份，设置应用失败自动回滚。
+- **配置可维护**：内置 YAML 模板（预置订阅按设备内存分 512MB / 1GB / 2GB+ 三档，各 3 / 4 / 5 个分类列表；白名单默认添加但不启用；日志/统计保留 30 天）；高级配置保存前自动 `--check-config` 并留备份，设置应用失败自动回滚。
 
 ---
 
@@ -173,14 +174,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.3-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.4-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.3` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.4` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -198,7 +199,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.3 -m https://gh-proxy.org
+sh install.sh -v 1.3.4 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会在 `apk` 的已安装列表里留记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
@@ -217,7 +218,7 @@ sh install.sh -v 1.3.3 -m https://gh-proxy.org
 - 账号：`admin`，密码 `admin123`（首次登录后建议修改）
 - DNS 接管：默认「接管 53 端口」，DNSMasq 自动移到 `1745`
 - 上游 DNS：`127.0.0.1:1745`
-- 过滤规则：11 个订阅，默认按 512MB 档启用 6 个（约 24 万条）；1 个白名单默认关闭
+- 过滤规则：预置订阅按设备内存自动选档（512MB 3 个 / 1GB 4 个 / 2GB+ 5 个分类列表，档内已去重）；白名单默认添加但不启用
 - 查询日志与统计：保留 30 天（查询日志只存内存，不写闪存）
 - DNS 缓存：默认开启，16MB，最小 TTL 0（不覆盖），乐观缓存关闭；可在「基础设置 → DNS 解析」修改
 - 加密上游：默认关闭；仅在「Clash 前置」模式可开启，可选阿里 / DNSPod / Cloudflare DoH 或自定义
