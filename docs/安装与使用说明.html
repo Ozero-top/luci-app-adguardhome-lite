@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 助手 使用说明 · 1.3.4</title>
+<title>AdGuard Home 助手 使用说明 · 1.3.5</title>
 <meta name="description" content="AdGuard Home 助手使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 助手 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.4</span>
+  <span class="pill"><span class="dot"></span>1.3.5</span>
 </header>
 
 <div class="layout">
@@ -210,7 +210,7 @@ footer{
       <h1>AdGuard Home 助手 使用说明</h1>
       <p>本插件只做三件事：<strong>装内核、接 DNS、看状态</strong>。过滤规则、查询日志、家长控制仍在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.4</span>
+        <span>适用版本 1.3.5</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -379,6 +379,7 @@ nft list chain inet fw4 agh_dns_redirect</code></pre>
             <tr><td>过滤规则</td><td>启用/停用订阅、添加订阅（黑名单/白名单）、自定义规则，立即生效</td></tr>
             <tr><td>安全搜索 / 浏览安全</td><td>过滤规则页开关，立即生效</td></tr>
             <tr><td>成人内容拦截</td><td>过滤规则页开关，追加/移除 HaGeZi NSFW 订阅，立即生效</td></tr>
+            <tr><td>拦截 DoH 服务器</td><td>自定义规则旁开关，写入/移除 9 条常见加密 DNS 的拦截规则，防止设备绕过过滤</td></tr>
             <tr><td>日志与统计保留</td><td>可选 7/30/90/180/365 天，保存后重启服务</td></tr>
           </tbody>
         </table>
@@ -529,9 +530,9 @@ rm -f /etc/AdGuardHome.yaml</code></pre>
 python tools/build_run.py      # 离线 .run</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.4-1_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.4-1-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.4-1.run</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.5-1_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.5-1-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.5-1.run</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
@@ -545,6 +546,10 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
         <table>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
+            <tr>
+              <td><span class="tag">1.3.5</span></td>
+              <td>过滤规则页新增「拦截 DoH 服务器」开关：一键写入/移除 9 条常见加密 DNS 的拦截规则，防止浏览器与应用绕过 AdGuard Home；开关位于自定义规则输入框右侧，与输入框等高。预置规则仓库补全广告根域：带 <code>$third-party</code> 的规则降级为纯域规则，新增 tanx.com、alimama.com 等手工根域清单兜底动态子域，并移除 5 个零产出上游源；修复过滤接口返回空规则列表时面板抛 <code>TypeError</code> 的问题</td>
+            </tr>
             <tr>
               <td><span class="tag">1.3.4</span></td>
               <td>预置过滤规则改为自建规则仓库提供：每 7 天自动抓取上游规则、跨源去重并按分类重新生成，按设备内存分 512MB / 1GB / 2GB+ 三档（各 3 / 4 / 5 个分类列表），切换档位自动移除其它档位的列表；修复把带路径或修饰符的广告规则压成整域拦截的问题（此前可能导致 baidu.com、qq.com 等整站无法打开）；白名单改为默认添加但保持关闭；档位切换会一并清理已下线分类的残留订阅</td>
@@ -593,7 +598,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 助手 · 使用说明 1.3.4 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 助手 · 使用说明 1.3.5 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {

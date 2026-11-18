@@ -72,9 +72,11 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 - **查询日志**：运行日志 → 查询日志显示最近 20 条查询与拦截结果，只读。
 - **过滤规则管理**：基础设置 → 过滤规则内启用/停用规则、添加订阅（黑名单/白名单）、编辑自定义规则，修改立即生效；支持按设备内存 512MB / 1GB / 2GB+ 一键切换预置订阅档位（分别 3 / 4 / 5 个已去重的分类列表）。
 - **预置规则可选档位**：预置订阅由[自建规则仓库](https://github.com/Ozero-top/AdguardHome-Rrules)每 7 天自动抓取、去重、重分类后生成，按内存分档：512MB 为安全防护 / 中文广告 / 全站广告；1GB 再加跟踪统计；2GB 及以上再加网页干扰。三档共用同一份白名单。
+- **广告根域兜底**：带 `$third-party` 的规则降级为纯域规则，并对 tanx.com、alimama.com 这类动态子域的广告根域做整域兜底，补上「上游只收录见过的子域、平台临时换子域就漏拦」的缺口；同时剔除零产出源，减少下载与解析开销。
 - **安全搜索 / 浏览安全 / 家长控制**：一个开关即可启用或关闭。
 - **保留周期**：统计与查询日志的保留天数可在「插件配置」内调整。
 - **成人内容拦截**：「过滤规则」页一个开关，自动追加/移除 HaGeZi NSFW 订阅，命中计入「已拦截」，立即生效。
+- **拦截 DoH 服务器**：「过滤规则」页自定义规则旁一个开关，一键写入 9 条常见加密 DNS（`dns.google`、`cloudflare-dns.com`、`dns.quad9.net`、`doh.pub` 等）的拦截规则，防止浏览器和应用绕过 AdGuard Home；关闭即按域名移除，裸域名与 `||domain^` 两种写法都会清理干净。
 - **规则更新走代理**：自动检测 Clash 的 HTTP 代理并写入 `http_proxy`；内置规则订阅走 jsDelivr CDN，通常无需反代，下载失败时可切换到 GitHub 反代或 raw 直连。
 
 ### 维护与安全
@@ -174,14 +176,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.4-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.5-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.4` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.5` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -199,7 +201,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.4 -m https://gh-proxy.org
+sh install.sh -v 1.3.5 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会在 `apk` 的已安装列表里留记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
@@ -507,6 +509,23 @@ make package/luci-app-adguardhome-lite/compile V=s
 - [安装与使用说明](docs/安装与使用说明.md)：安装验证清单、DNS 接管详解、Clash 排查、卸载回滚与常见问题。
 - [预置规则仓库](https://github.com/Ozero-top/AdguardHome-Rrules)：每 7 天自动抓取、去重、重分类的三档订阅，产物发布于 `dist` 分支。
 - 插件内「使用引导」标签包含三步说明与常见问题入口。
+
+---
+
+## 更新日志
+
+### 1.3.5
+
+- **新增「拦截 DoH 服务器」开关**：「过滤规则」页自定义规则旁一键写入 / 移除 9 条常见加密 DNS（`dns.google`、`cloudflare-dns.com`、`dns.quad9.net`、`doh.pub` 等）的拦截规则，防止浏览器与应用绕过 AdGuard Home；关闭时按域名清理，裸域名与 `||domain^` 两种写法都会移除
+- **预置规则补全广告根域**：带 `$third-party` 的规则降级为纯域规则，并新增手工广告根域清单（`tanx.com`、`alimama.com`、`mmstat.com` 等），覆盖广告平台临时新增的子域
+- **规则仓库瘦身**：移除 5 个零产出上游源，`meta.json` 增加原始行数与有效率，便于判断源质量；CI 的条数波动门禁放宽到最近 5 条提交，重构时可带 `[allow-drift]` 放行
+- **修复面板报错**：过滤接口返回空规则列表（`{}`）时不再抛 `TypeError`，DoH 开关状态与自定义规则回填恢复正常
+- **面板布局**：DoH 开关移入「自定义规则」区域，与规则输入框横向并列、高度一致，窄屏自动堆叠
+
+### 1.3.4
+
+- 预置过滤规则改由自建规则仓库提供，每 7 天自动抓取、跨源去重并按分类重新生成，按设备内存分 512MB / 1GB / 2GB+ 三档
+- 修复带路径或修饰符的广告规则被压成整域拦截导致的误杀问题；白名单改为默认添加但保持关闭
 
 ---
 

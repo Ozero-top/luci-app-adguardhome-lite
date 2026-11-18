@@ -26,7 +26,7 @@ VERSION_FILE = os.path.join(ROOT, "src", "luci-app-adguardhome-lite", "VERSION")
 def read_version():
     """版本唯一来源：src/luci-app-adguardhome-lite/VERSION。
 
-    正式版写「1.3.4」，发行号默认 1；返回 (版本, 发行号)。
+    正式版写「1.3.5」，发行号默认 1；返回 (版本, 发行号)。
     """
     with open(VERSION_FILE, "r", encoding="utf-8") as f:
         text = f.read().strip()

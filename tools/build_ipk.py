@@ -34,7 +34,7 @@ PKG_MAINTAINER = "Ozero-top"
 def read_version(src_root: str):
     """版本唯一来源：src/luci-app-adguardhome-lite/VERSION。
 
-    正式版写「1.3.4」，发行号按 OpenWrt 惯例默认 1；需要多轮打包时写「1.3.4-2」。
+    正式版写「1.3.5」，发行号按 OpenWrt 惯例默认 1；需要多轮打包时写「1.3.5-2」。
     """
     path = os.path.join(src_root, "VERSION")
     try:
