@@ -614,8 +614,8 @@ local function agh_client()
     return agh
 end
 
-local function agh_request(path, method, body)
-    return agh_client().request(path, method, body)
+local function agh_request(path, method, body, timeout)
+    return agh_client().request(path, method, body, timeout)
 end
 
 function index()

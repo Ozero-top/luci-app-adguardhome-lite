@@ -44,15 +44,16 @@ local function with_netrc(fn)
 end
 
 -- 调用本机接口；返回 HTTP 状态码与响应体
-function M.request(path, method, body)
+-- timeout 默认 8 秒；订阅刷新这类会真正下载上游列表的接口需要放宽
+function M.request(path, method, body, timeout)
     local url = string.format("http://127.0.0.1:%d%s", opts.port, path)
     local req = tmp_path("agh_api_req.json")
     local res = tmp_path("agh_api_res.json")
 
     local code = with_netrc(function(netrc)
         local cmd = string.format(
-            "curl -s -m 8 -o %q -w '%%{http_code}' --netrc-file %q",
-            res, netrc)
+            "curl -s -m %d -o %q -w '%%{http_code}' --netrc-file %q",
+            tonumber(timeout) or 8, res, netrc)
         if method == "POST" then
             if body then
                 local f = io.open(req, "w")

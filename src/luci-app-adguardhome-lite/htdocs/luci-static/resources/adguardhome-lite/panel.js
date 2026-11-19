@@ -181,7 +181,7 @@
 		return parseJsonResponse(r);
 	}
 
-	async function apiPost(url, data) {
+	async function apiPost(url, data, timeout) {
 		var body = new URLSearchParams(data || {});
 		body.set('token', TOKEN);
 		var r = await fetchWithTimeout(url, {
@@ -194,7 +194,7 @@
 				'X-Requested-With': 'XMLHttpRequest'
 			},
 			body: body.toString()
-		}, 30000);
+		}, timeout || 30000);
 		var json = await parseJsonResponse(r);
 		if (json && json.ok === false) {
 			throw new Error(json.error || '操作失败');
@@ -1838,6 +1838,28 @@
 		bindFilterSwitch('agh-filter-safesearch', 'safesearch');
 		bindFilterSwitch('agh-filter-safebrowsing', 'safebrowsing');
 		bindMemoryTrim();
+
+		// 手动更新订阅：让 AGH 立即重新下载所有列表，而不是等它按周期刷新
+		if ($('agh-filters-refresh')) {
+			$('agh-filters-refresh').onclick = async function () {
+				var btn = this;
+				var msg = $('agh-memory-trim-msg');
+				btn.disabled = true;
+				if (msg) msg.textContent = '正在更新订阅，请稍候...';
+				try {
+					// 上游列表较大时下载可能要几十秒，这里单独放宽超时
+					var d = await apiPost(U.filtersSave, { action: 'refresh' }, 75000);
+					if (msg) msg.textContent = d.updated ? ('已更新 ' + d.updated + ' 个列表') : '更新完成';
+					showToast('订阅已更新', 'ok');
+					await loadFilters();
+				} catch (err) {
+					if (msg) msg.textContent = '';
+					handleApiError(err, msg);
+				} finally {
+					btn.disabled = false;
+				}
+			};
+		}
 
 		if ($('agh-filter-adult')) {
 			$('agh-filter-adult').onchange = function () {
