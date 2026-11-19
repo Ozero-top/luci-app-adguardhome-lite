@@ -275,7 +275,7 @@ footer{
       <p><code>.run</code> 会优先安装新版 LuCI 包，失败时回退 legacy 包。</p>
 
       <h3>2.3 脚本安装（25.12 / apk 系统）</h3>
-      <p>25.12 起使用 <code>apk</code>，不能安装 <code>.ipk</code>。直接运行：</p>
+      <p>OpenWrt / iStoreOS 25.12 起改用 <code>apk</code>，不能安装 <code>.ipk</code>，请使用 <code>install.sh</code>（OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 也可使用）：</p>
 <pre><code>curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh</code></pre>
       <p>只有 <code>wget</code> 时：</p>
 <pre><code>wget -qO- https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh</code></pre>
