@@ -8,8 +8,23 @@
 	var CFG = window.AGH || {};
 	var U = CFG.urls || {};
 	var TOKEN = CFG.token || '';
-	var ADULT_FILTER_URL = 'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/nsfw.txt';
+	var ADULT_FILTER_URL = 'https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist/manual/nsfw.txt';
 	var ADULT_FILTER_NAME = 'HaGeZi NSFW（成人内容）';
+	// 旧版本写入过的上游地址，以及手动添加过的同一条列表；识别后统一迁移到 CDN 地址
+	var ADULT_FILTER_URLS = [
+		ADULT_FILTER_URL,
+		'https://raw.githubusercontent.com/Ozero-top/AdguardHome-Rrules/refs/heads/dist/manual/nsfw.txt',
+		'https://raw.githubusercontent.com/Ozero-top/AdguardHome-Rrules/dist/manual/nsfw.txt',
+		'https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/nsfw.txt'
+	];
+
+	function findAdultFilter(list) {
+		list = list || [];
+		for (var i = 0; i < list.length; i++) {
+			if (!list[i].whitelist && ADULT_FILTER_URLS.indexOf(list[i].url) >= 0) return list[i];
+		}
+		return null;
+	}
 
 	// 拦截常见 DoH 提供商，防止设备绕过 AdGuard Home。
 	// 开启时写入 user_rules，关闭时按域名移除，裸域名与 ||domain^ 两种写法都会被清理。
@@ -30,6 +45,7 @@
 		logLevel: '',
 		rulesDirty: false,
 		filterBusy: false,
+		adultMigrated: false,
 		stepsCollapsed: null,
 		busy: false,
 		passShown: false,
@@ -780,15 +796,16 @@
 		// 用户正在编辑自定义规则时，刷新订阅列表不要覆盖文本域
 		if (rules && !state.rulesDirty) rules.value = toList(d.user_rules).join('\n');
 
-		// 成人内容拦截开关以 NSFW 订阅是否存在且启用为准
+		// 成人内容拦截开关以 NSFW 订阅（含旧地址）是否存在且启用为准
 		var adultEl = $('agh-filter-adult');
 		if (adultEl) {
-			var list = d.filters || [];
-			var nsfw = null;
-			for (var i = 0; i < list.length; i++) {
-				if (list[i].url === ADULT_FILTER_URL && !list[i].whitelist) { nsfw = list[i]; break; }
-			}
+			var nsfw = findAdultFilter(d.filters);
 			adultEl.checked = !!(nsfw && nsfw.enabled);
+			// 已启用的旧地址在本页首次检测到时迁移一次到 CDN，其余情况交给用户开关
+			if (nsfw && nsfw.enabled && nsfw.url !== ADULT_FILTER_URL && !state.adultMigrated) {
+				state.adultMigrated = true;
+				toggleAdultFilter(true);
+			}
 		}
 
 		// DoH 开关以 user_rules 里是否已含全部 9 条规则为准
@@ -804,33 +821,34 @@
 		updateSwitchStates();
 	}
 
-	// 成人内容拦截：新增/启用或移除 HaGeZi NSFW 订阅，由接口同步 UCI 状态
-	function toggleAdultFilter(on) {
-		var found = null;
-		var list = state.filters || [];
-		for (var i = 0; i < list.length; i++) {
-			if (list[i].url === ADULT_FILTER_URL && !list[i].whitelist) { found = list[i]; break; }
+	// 成人内容拦截：启用时写入 CDN 订阅，旧地址（raw / 上游 HaGeZi）自动迁移，避免重复列表
+	async function toggleAdultFilter(on) {
+		var found = findAdultFilter(state.filters);
+		if (!on) {
+			if (!found) return;
+			return filtersAction({ action: 'remove', url: found.url, whitelist: '0' });
 		}
-		if (on) {
-			if (found && found.enabled) return;
-			if (found) {
-				return filtersAction({
-					action: 'toggle',
-					url: ADULT_FILTER_URL,
-					name: found.name || ADULT_FILTER_NAME,
-					whitelist: '0',
-					enabled: '1'
-				});
-			}
+		if (found && found.url === ADULT_FILTER_URL) {
+			if (found.enabled) return;
 			return filtersAction({
-				action: 'add',
-				name: ADULT_FILTER_NAME,
+				action: 'toggle',
 				url: ADULT_FILTER_URL,
-				whitelist: '0'
+				name: found.name || ADULT_FILTER_NAME,
+				whitelist: '0',
+				enabled: '1'
 			});
 		}
-		if (!found) return;
-		return filtersAction({ action: 'remove', url: ADULT_FILTER_URL, whitelist: '0' });
+		// 旧地址先移除，再按 CDN 地址重新添加；分两步是因为 AGH 的 set_url 不支持改地址
+		if (found) {
+			var ok = await filtersAction({ action: 'remove', url: found.url, whitelist: '0' });
+			if (!ok) return;
+		}
+		return filtersAction({
+			action: 'add',
+			name: ADULT_FILTER_NAME,
+			url: ADULT_FILTER_URL,
+			whitelist: '0'
+		});
 	}
 
 	// 开关 DoH 拦截：在自定义规则里增删 9 条，复用现有的规则保存接口
