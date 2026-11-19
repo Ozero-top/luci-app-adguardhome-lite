@@ -256,6 +256,31 @@ function M.filters_save(ctx)
         http.prepare_content("application/json")
         http.write_json({ ok = true, tier = tier, changed = changed, kept = kept })
         return
+    elseif act == "refresh" then
+        -- 手动更新订阅：AGH 的黑名单和白名单要分别触发刷新，
+        -- 下载上游列表可能耗时较久，这里放宽到 60 秒。
+        local updated = 0
+        for _, whitelist in ipairs({ false, true }) do
+            local code, resp = agh_api("/control/filtering/refresh", "POST",
+                jsonc.stringify({ whitelist = whitelist }), 60)
+            if code ~= "200" then
+                local detail = tostring(resp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+                if #detail > 120 then
+                    detail = detail:sub(1, 120) .. "..."
+                end
+                json_error(detail == "" and "更新失败，AdGuard Home 可能未运行。" or ("更新失败：" .. detail),
+                    nil, "rule_action_failed")
+                return
+            end
+            local okr, parsed = pcall(jsonc.parse, resp)
+            if okr and type(parsed) == "table" and tonumber(parsed.updated) then
+                updated = updated + tonumber(parsed.updated)
+            end
+        end
+        http.header("Cache-Control", "no-store")
+        http.prepare_content("application/json")
+        http.write_json({ ok = true, updated = updated })
+        return
     elseif act == "feature" then
         local feature = http.formvalue("feature") or ""
         local value = http.formvalue("value") == "1"
