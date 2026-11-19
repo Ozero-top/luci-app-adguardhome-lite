@@ -145,7 +145,7 @@ Release 页同时提供 `SHA256SUMS`，可校验文件完整性。
 
 ### 方式二：脚本安装（25.12 / apk 系统）
 
-OpenWrt / iStoreOS **25.12 起默认使用 `apk`**，`.ipk` 装不上。这类系统直接用 `install.sh`：脚本自动下载源码、补齐依赖、安装文件并清理 LuCI 缓存，不需要打安装包。
+OpenWrt / iStoreOS **25.12 起改用 `apk`**，`.ipk` 装不上，请使用 `install.sh`（OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 也可使用）：脚本自动下载源码、补齐依赖、安装文件并清理 LuCI 缓存，不需要打安装包。
 
 ```sh
 # curl（推荐）
@@ -372,7 +372,7 @@ DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 这类规则会被保留，
 
 ### Q2：OpenWrt 25.12 升级 apk 系统后怎么安装？
 
-25.12 起默认使用 `apk`，不能安装 `.ipk`，直接用 `install.sh`（详见[脚本安装](#方式二脚本安装2512--apk-系统)）：
+OpenWrt / iStoreOS 25.12 起改用 `apk`，不能安装 `.ipk`，请使用 `install.sh`（OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 也可使用，详见[脚本安装](#方式二脚本安装2512--apk-系统)）：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh
