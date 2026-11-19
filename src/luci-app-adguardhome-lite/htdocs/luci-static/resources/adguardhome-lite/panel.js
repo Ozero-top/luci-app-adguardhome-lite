@@ -825,7 +825,7 @@
 	async function toggleAdultFilter(on) {
 		var found = findAdultFilter(state.filters);
 		if (!on) {
-			if (!found) return;
+			if (!found) return true;
 			return filtersAction({ action: 'remove', url: found.url, whitelist: '0' });
 		}
 		if (found && found.url === ADULT_FILTER_URL) {
@@ -961,6 +961,25 @@
 		if (!el) return;
 		el.onchange = function () {
 			filtersAction({ action: 'feature', feature: feature, value: el.checked ? '1' : '0' });
+		};
+	}
+
+	// 成人内容拦截与家长控制功能重叠，开启其中一个时自动关闭另一个
+	function bindParentalSwitch() {
+		var el = $('agh-filter-parental');
+		if (!el) return;
+		el.onchange = async function () {
+			var adult = $('agh-filter-adult');
+			var adultWasOn = !!(adult && adult.checked);
+			if (el.checked && adultWasOn) {
+				if (adult) adult.checked = false;
+				var ok = await toggleAdultFilter(false);
+				if (!ok) {
+					el.checked = false;
+					return;
+				}
+			}
+			filtersAction({ action: 'feature', feature: 'parental', value: el.checked ? '1' : '0' });
 		};
 	}
 
@@ -1871,7 +1890,7 @@
 		if ($('agh-crypto-form')) $('agh-crypto-form').onsubmit = saveSettings;
 
 		bindFilterSwitch('agh-filter-enabled', 'filtering');
-		bindFilterSwitch('agh-filter-parental', 'parental');
+		bindParentalSwitch();
 		bindFilterSwitch('agh-filter-safesearch', 'safesearch');
 		bindFilterSwitch('agh-filter-safebrowsing', 'safebrowsing');
 		bindMemoryTrim();
@@ -1909,9 +1928,21 @@
 			};
 		}
 
+		// 成人内容拦截与家长控制功能重叠，开启其中一个时自动关闭另一个
 		if ($('agh-filter-adult')) {
-			$('agh-filter-adult').onchange = function () {
-				toggleAdultFilter(this.checked);
+			$('agh-filter-adult').onchange = async function () {
+				var el = this;
+				var parental = $('agh-filter-parental');
+				var parentalWasOn = !!(parental && parental.checked);
+				if (el.checked && parentalWasOn) {
+					if (parental) parental.checked = false;
+					var ok = await filtersAction({ action: 'feature', feature: 'parental', value: '0' });
+					if (!ok) {
+						el.checked = false;
+						return;
+					}
+				}
+				toggleAdultFilter(el.checked);
 			};
 		}
 
