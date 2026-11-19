@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 助手 使用说明 · 1.3.5</title>
+<title>AdGuard Home 助手 使用说明 · 1.3.5-2</title>
 <meta name="description" content="AdGuard Home 助手使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 助手 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.5</span>
+  <span class="pill"><span class="dot"></span>1.3.5-2</span>
 </header>
 
 <div class="layout">
@@ -210,7 +210,7 @@ footer{
       <h1>AdGuard Home 助手 使用说明</h1>
       <p>本插件只做三件事：<strong>装内核、接 DNS、看状态</strong>。过滤规则、查询日志、家长控制仍在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.5</span>
+        <span>适用版本 1.3.5-2</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -380,6 +380,7 @@ nft list chain inet fw4 agh_dns_redirect</code></pre>
             <tr><td>安全搜索 / 浏览安全</td><td>过滤规则页开关，立即生效</td></tr>
             <tr><td>成人内容拦截</td><td>过滤规则页开关，追加/移除 HaGeZi NSFW 订阅，立即生效</td></tr>
             <tr><td>拦截 DoH 服务器</td><td>自定义规则旁开关，写入/移除 9 条常见加密 DNS 的拦截规则，防止设备绕过过滤</td></tr>
+            <tr><td>手动更新订阅</td><td>档位按钮右侧按钮，立即重新下载全部订阅；结果区分「全部最新 / 更新 N 个 / 未返回明细」，操作记入运行日志</td></tr>
             <tr><td>日志与统计保留</td><td>可选 7/30/90/180/365 天，保存后重启服务</td></tr>
           </tbody>
         </table>
@@ -494,6 +495,7 @@ uci commit dhcp
         <p>通常是直连 <code>raw.githubusercontent.com</code> 失败。插件会自动检测 Clash 的 HTTP 代理并写入 <code>http_proxy</code>：</p>
 <pre><code>grep -n '^http_proxy' /etc/AdGuardHome.yaml</code></pre>
         <p>为空时启动 Clash，再回插件重新保存一次设置。</p>
+        <p>需要立刻生效时，点「过滤规则」页档位按钮右侧的「手动更新」：插件会调用 AdGuard Home 的刷新接口重新下载全部订阅，黑名单与白名单分别处理。结果为「订阅已是最新」「已更新 N 个列表」或「AdGuard Home 未返回明细」；白名单失败只提示、不影响黑名单。每次操作会写入「运行日志 → 订阅更新日志」，保留最近 100 次。</p>
       </div>
 
       <div class="faq">
@@ -530,9 +532,9 @@ rm -f /etc/AdGuardHome.yaml</code></pre>
 python tools/build_run.py      # 离线 .run</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.5-1_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.5-1-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.5-1.run</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.5-2_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.5-2-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.5-2.run</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
@@ -546,6 +548,10 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
         <table>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
+            <tr>
+              <td><span class="tag">1.3.5-2</span></td>
+              <td>过滤规则页新增「手动更新订阅」按钮：立即让 AdGuard Home 重新下载全部订阅，结果区分「订阅已是最新 / 已更新 N 个列表 / 未返回明细」；白名单刷新失败不再让整体报错，档位切换与手动更新互斥避免更新冲突，每次操作写入运行日志新增的「订阅更新日志」段（保留最近 100 次）；后端黑名单 45 秒、白名单 20 秒、前端 90 秒，超时不再前后不一致</td>
+            </tr>
             <tr>
               <td><span class="tag">1.3.5</span></td>
               <td>过滤规则页新增「拦截 DoH 服务器」开关：一键写入/移除 9 条常见加密 DNS 的拦截规则，防止浏览器与应用绕过 AdGuard Home；开关位于自定义规则输入框右侧，与输入框等高。预置规则仓库补全广告根域：带 <code>$third-party</code> 的规则降级为纯域规则，新增 tanx.com、alimama.com 等手工根域清单兜底动态子域，并移除 5 个零产出上游源；修复过滤接口返回空规则列表时面板抛 <code>TypeError</code> 的问题</td>
@@ -598,7 +604,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 助手 · 使用说明 1.3.5 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 助手 · 使用说明 1.3.5-2 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {

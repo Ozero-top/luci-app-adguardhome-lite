@@ -77,6 +77,7 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 - **保留周期**：统计与查询日志的保留天数可在「插件配置」内调整。
 - **成人内容拦截**：「过滤规则」页一个开关，自动追加/移除 HaGeZi NSFW 订阅，命中计入「已拦截」，立即生效。
 - **拦截 DoH 服务器**：「过滤规则」页自定义规则旁一个开关，一键写入 9 条常见加密 DNS（`dns.google`、`cloudflare-dns.com`、`dns.quad9.net`、`doh.pub` 等）的拦截规则，防止浏览器和应用绕过 AdGuard Home；关闭即按域名移除，裸域名与 `||domain^` 两种写法都会清理干净。
+- **手动更新订阅**：「过滤规则」页档位按钮右侧一个按钮，立即让 AdGuard Home 重新下载全部订阅，不必等自动更新周期；更新结果区分「全部最新 / 更新 N 个 / 未返回明细」，白名单刷新失败只作提示，不影响黑名单；每次操作记入「运行日志 → 订阅更新日志」。
 - **规则更新走代理**：自动检测 Clash 的 HTTP 代理并写入 `http_proxy`；内置规则订阅走 jsDelivr CDN，通常无需反代，下载失败时可切换到 GitHub 反代或 raw 直连。
 
 ### 维护与安全
@@ -176,14 +177,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.5-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.5-2_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.5` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.5-2` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -201,7 +202,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.5 -m https://gh-proxy.org
+sh install.sh -v 1.3.5-2 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会在 `apk` 的已安装列表里留记录，升级/卸载都请继续用 `install.sh`；`/etc/config/adguardhome_lite` 与内核在重复安装时都会保留。
@@ -513,6 +514,15 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.5-2
+
+- **新增「手动更新订阅」按钮**：「过滤规则」页档位按钮右侧，一键让 AdGuard Home 立即重新下载全部订阅，不必等自动更新周期
+- **更新结果更明确**：区分「订阅已是最新 / 已更新 N 个列表 / AdGuard Home 未返回明细」三种情况，不再一律显示「更新完成」
+- **白名单失败不打断**：黑名单已更新成功时，白名单刷新失败只作提示，不会整体报「更新失败」
+- **并发保护**：档位切换与手动更新互斥，避免同时改动过滤列表导致 AdGuard Home 返回更新冲突
+- **日志可追溯**：每次手动更新写入运行日志新增的「订阅更新日志」段（保留最近 100 次）
+- **超时对齐**：后端黑名单 45 秒、白名单 20 秒，前端 90 秒，客户端不会先于后端超时
 
 ### 1.3.5
 
