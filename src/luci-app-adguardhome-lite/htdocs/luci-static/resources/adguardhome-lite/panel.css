@@ -1044,6 +1044,13 @@ code {
 	border-top: 1px solid var(--agh-border);
 }
 
+.agh-footer-links {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	flex-wrap: wrap;
+}
+
 .agh-footer-link a {
 	color: var(--agh-primary);
 	text-decoration: none;
