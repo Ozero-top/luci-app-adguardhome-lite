@@ -29,6 +29,7 @@
 		logSubtab: 'sys',
 		logLevel: '',
 		rulesDirty: false,
+		filterBusy: false,
 		stepsCollapsed: null,
 		busy: false,
 		passShown: false,
@@ -945,6 +946,20 @@
 		};
 	}
 
+	// 档位切换与订阅更新都会改动 AGH 的过滤列表，必须互斥，
+	// 否则 AGH 可能返回「filters are being updated」之类的冲突错误。
+	function setFilterBusy(value) {
+		state.filterBusy = value;
+		var trim = $('agh-memory-trim');
+		if (trim) {
+			Array.prototype.slice.call(trim.querySelectorAll('button')).forEach(function (b) {
+				b.disabled = value;
+			});
+		}
+		var refreshBtn = $('agh-filters-refresh');
+		if (refreshBtn) refreshBtn.disabled = value;
+	}
+
 	// 按设备内存切换预置规则档位
 	function bindMemoryTrim() {
 		var wrap = $('agh-memory-trim');
@@ -952,12 +967,14 @@
 		var msg = $('agh-memory-trim-msg');
 		Array.prototype.slice.call(wrap.querySelectorAll('button')).forEach(function (btn) {
 			btn.onclick = async function () {
+				if (state.filterBusy) return;
 				var tier = btn.getAttribute('data-tier');
 				var label = tier === '512' ? '512MB' : (tier === '1024' ? '1GB' : '2GB 及以上');
 				if (!window.confirm('切换到 ' + label + ' 规则档位？会移除其它档位的预置列表。')) return;
 				Array.prototype.slice.call(wrap.querySelectorAll('button')).forEach(function (b) {
 					b.classList.toggle('is-active', b === btn);
 				});
+				setFilterBusy(true);
 				if (msg) msg.textContent = '正在切换...';
 				try {
 					var d = await apiPost(U.filtersSave, { action: 'trim', tier: tier });
@@ -968,6 +985,8 @@
 					if (msg) msg.textContent = '';
 					handleApiError(err, msg);
 					await loadFilters(true);
+				} finally {
+					setFilterBusy(false);
 				}
 			};
 		});
@@ -1842,21 +1861,32 @@
 		// 手动更新订阅：让 AGH 立即重新下载所有列表，而不是等它按周期刷新
 		if ($('agh-filters-refresh')) {
 			$('agh-filters-refresh').onclick = async function () {
-				var btn = this;
+				if (state.filterBusy) return;
 				var msg = $('agh-memory-trim-msg');
-				btn.disabled = true;
+				setFilterBusy(true);
 				if (msg) msg.textContent = '正在更新订阅，请稍候...';
 				try {
-					// 上游列表较大时下载可能要几十秒，这里单独放宽超时
-					var d = await apiPost(U.filtersSave, { action: 'refresh' }, 75000);
-					if (msg) msg.textContent = d.updated ? ('已更新 ' + d.updated + ' 个列表') : '更新完成';
-					showToast('订阅已更新', 'ok');
+					// 后端黑名单 45 秒 + 白名单 20 秒，前端留 90 秒余量；
+					// 预留足够时间，避免客户端先超时而后台仍在刷新。
+					var d = await apiPost(U.filtersSave, { action: 'refresh' }, 90000);
+					var text;
+					if (!d.reported) {
+						text = '更新完成（AdGuard Home 未返回明细）';
+					} else if (d.updated) {
+						text = '已更新 ' + d.updated + ' 个列表';
+					} else {
+						text = '订阅已是最新';
+					}
+					if (d.white_error) text += '；白名单刷新失败：' + d.white_error;
+					if (msg) msg.textContent = text;
+					showToast(d.white_error ? '订阅已更新，白名单刷新失败' : '订阅已更新',
+						d.white_error ? 'bad' : 'ok');
 					await loadFilters();
 				} catch (err) {
 					if (msg) msg.textContent = '';
 					handleApiError(err, msg);
 				} finally {
-					btn.disabled = false;
+					setFilterBusy(false);
 				}
 			};
 		}
