@@ -481,7 +481,7 @@
 							<span class="agh-switch-state" data-for="agh-filter-adult">已关闭</span>
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-adult"><span></span></label>
 						</div>
-						<p class="agh-hint">追加或移除 HaGeZi NSFW 订阅，命中计入「已拦截」。</p>
+						<p class="agh-hint">追加或移除 HaGeZi NSFW 订阅，命中计入「已拦截」；与「家长控制」互斥，开启会关闭家长控制。</p>
 					</div>
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
@@ -489,7 +489,7 @@
 							<span class="agh-switch-state" data-for="agh-filter-parental">已关闭</span>
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-parental"><span></span></label>
 						</div>
-						<p class="agh-hint">启用 AdGuard Home 内置的家长控制，命中计入「成人内容（家长控制）」统计。</p>
+						<p class="agh-hint">启用 AdGuard Home 内置的家长控制，命中计入「成人内容（家长控制）」统计；与「成人内容拦截」互斥，开启会关闭成人规则。</p>
 					</div>
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
@@ -855,7 +855,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261119c"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261119d"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {
