@@ -8,6 +8,7 @@
 				"/etc/config/adguardhome_lite": [ "read" ],
 				"/var/run/adguardhome_lite_update.log": [ "read" ],
 				"/var/run/adguardhome_lite_action.log": [ "read" ],
+				"/var/run/adguardhome_lite_filter.log": [ "read" ],
 				"/var/run/adguardhome_lite_bootstrap.log": [ "read" ]
 			}
 		},
@@ -18,6 +19,7 @@
 				"/etc/config/adguardhome_lite": [ "write" ],
 				"/var/run/adguardhome_lite_update.log": [ "write" ],
 				"/var/run/adguardhome_lite_action.log": [ "write" ],
+				"/var/run/adguardhome_lite_filter.log": [ "write" ],
 				"/var/run/adguardhome_lite_bootstrap.log": [ "write" ]
 			}
 		}

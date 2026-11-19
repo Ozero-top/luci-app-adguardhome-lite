@@ -9,6 +9,7 @@ function M.logs(ctx)
     local syslog = sys.exec("logread 2>/dev/null | grep -i 'adguard' | tail -n 300") or ""
     local update = fs.readfile(RUN .. "_update.log") or ""
     local action = fs.readfile(RUN .. "_action.log") or ""
+    local filter = fs.readfile(RUN .. "_filter.log") or ""
 
     if level == "error" or level == "warn" or level == "info" then
         local tag = "[" .. level:upper() .. "]"
@@ -37,6 +38,8 @@ function M.logs(ctx)
     http.write(update)
     http.write("\n\n===== 最近一次服务操作日志 =====\n")
     http.write(action)
+    http.write("\n\n===== 订阅更新日志（最近 100 次） =====\n")
+    http.write(filter)
 end
 
 return M

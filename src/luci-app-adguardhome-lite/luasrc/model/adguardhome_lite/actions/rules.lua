@@ -257,29 +257,77 @@ function M.filters_save(ctx)
         http.write_json({ ok = true, tier = tier, changed = changed, kept = kept })
         return
     elseif act == "refresh" then
-        -- 手动更新订阅：AGH 的黑名单和白名单要分别触发刷新，
-        -- 下载上游列表可能耗时较久，这里放宽到 60 秒。
-        local updated = 0
-        for _, whitelist in ipairs({ false, true }) do
-            local code, resp = agh_api("/control/filtering/refresh", "POST",
-                jsonc.stringify({ whitelist = whitelist }), 60)
-            if code ~= "200" then
-                local detail = tostring(resp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-                if #detail > 120 then
-                    detail = detail:sub(1, 120) .. "..."
-                end
-                json_error(detail == "" and "更新失败，AdGuard Home 可能未运行。" or ("更新失败：" .. detail),
-                    nil, "rule_action_failed")
-                return
+        -- 手动更新订阅：AGH 的黑名单与白名单要分别触发刷新。
+        -- 超时分别设为 45 秒与 20 秒，两者之和小于前端 90 秒，避免客户端先超时。
+        local updated, reported = 0, false
+        local white_error = ""
+
+        local code, resp = agh_api("/control/filtering/refresh", "POST",
+            jsonc.stringify({ whitelist = false }), 45)
+        if code ~= "200" then
+            local detail = tostring(resp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+            if #detail > 120 then
+                detail = detail:sub(1, 120) .. "..."
             end
-            local okr, parsed = pcall(jsonc.parse, resp)
-            if okr and type(parsed) == "table" and tonumber(parsed.updated) then
-                updated = updated + tonumber(parsed.updated)
+            json_error(detail == "" and "更新失败，AdGuard Home 可能未运行。" or ("更新失败：" .. detail),
+                nil, "rule_action_failed")
+            return
+        end
+        local okr, parsed = pcall(jsonc.parse, resp)
+        if okr and type(parsed) == "table" and tonumber(parsed.updated) ~= nil then
+            updated = updated + tonumber(parsed.updated)
+            reported = true
+        end
+
+        -- 白名单没有订阅或下载失败都不该让整次操作失败：黑名单已更新成功，
+        -- 这里只把原因回传给前端提示。
+        local wcode, wresp = agh_api("/control/filtering/refresh", "POST",
+            jsonc.stringify({ whitelist = true }), 20)
+        if wcode == "200" then
+            local wok, wparsed = pcall(jsonc.parse, wresp)
+            if wok and type(wparsed) == "table" and tonumber(wparsed.updated) ~= nil then
+                updated = updated + tonumber(wparsed.updated)
+                reported = true
+            end
+        else
+            white_error = tostring(wresp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+            if #white_error > 120 then
+                white_error = white_error:sub(1, 120) .. "..."
+            end
+            if white_error == "" then
+                white_error = "白名单更新失败"
             end
         end
+
+        -- 记入插件日志：出问题时不用同时翻 AGH 面板日志
+        local logfile = RUN .. "_filter.log"
+        local hist = fs.readfile(logfile) or ""
+        local stamp = os.date("%Y-%m-%d %H:%M:%S")
+        local line = string.format("%s 手动更新订阅：更新 %d 个列表%s\n", stamp, updated,
+            white_error ~= "" and ("，白名单失败：" .. white_error) or "")
+        local kept = {}
+        for item in (hist .. "\n"):gmatch("([^\n]*)\n") do
+            if item ~= "" then
+                kept[#kept + 1] = item
+            end
+        end
+        if #kept >= 100 then
+            local trimmed = {}
+            for i = #kept - 99, #kept do
+                trimmed[#trimmed + 1] = kept[i]
+            end
+            kept = trimmed
+        end
+        fs.writefile(logfile, table.concat(kept, "\n") .. "\n" .. line)
+
         http.header("Cache-Control", "no-store")
         http.prepare_content("application/json")
-        http.write_json({ ok = true, updated = updated })
+        http.write_json({
+            ok = true,
+            updated = updated,
+            reported = reported,
+            white_error = white_error
+        })
         return
     elseif act == "feature" then
         local feature = http.formvalue("feature") or ""
