@@ -3,6 +3,8 @@
 
 local M = {}
 
+local parental_service = require "luci.model.adguardhome_lite.parental"
+
 -- 预置规则来自自建规则仓库，按设备内存分三档，每档由若干已去重的分类文件组成
 local PRESET_BASE = "https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist/"
 local PRESET_ALLOW = PRESET_BASE .. "allowlist.txt"
@@ -336,6 +338,17 @@ function M.filters_save(ctx)
         if not allowed[feature] then
             json_error("不支持的开关。", nil, "rule_toggle_failed")
             return
+        end
+
+        -- 家长控制依赖 AdGuard 服务端在线判定，连不上时开启会直接断网，
+        -- 所以开启前强制试拨一次，不通就拒绝（关闭无需探测）。
+        if feature == "parental" and value then
+            parental_service.invalidate(sys, RUN)
+            if not parental_service.reachable(sys, fs, RUN, 0, 5) then
+                json_error("无法连接 AdGuard 家长控制服务（family.adguard-dns.com），开启后会导致全屋无法上网。请先启用代理再试。",
+                    nil, "parental_service_unreachable")
+                return
+            end
         end
 
         if feature == "filtering" then

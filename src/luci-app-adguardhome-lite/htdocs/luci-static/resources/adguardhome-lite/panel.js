@@ -46,6 +46,7 @@
 		rulesDirty: false,
 		filterBusy: false,
 		adultMigrated: false,
+		parentalNotified: false,
 		stepsCollapsed: null,
 		busy: false,
 		passShown: false,
@@ -481,6 +482,18 @@
 				rows.push(['配置建议', '<span class="agh-warn">Clash 的 DNS 劫持未开启，客户端查询会绕过 AdGuard Home。</span>']);
 			} else if (!d.openclash_upstream_agh) {
 				rows.push(['配置建议', '<span class="agh-warn">未检测到指向 127.0.0.1:' + String(d.dns_port) + ' 的 Clash 上游，可保存一次设置或重启 Clash 使其生效。</span>']);
+			}
+		}
+		if (d.parental_auto_disabled) {
+			rows.push(['配置建议', '<span class="agh-warn">连不上 AdGuard 家长控制服务（family.adguard-dns.com），家长控制已自动关闭，避免全屋断网；代理可用后再开启。</span>']);
+			if (!state.parentalNotified) {
+				state.parentalNotified = true;
+				showToast('家长控制已自动关闭：连不上 AdGuard 服务端，继续开启会导致断网', 'bad');
+			}
+		} else {
+			state.parentalNotified = false;
+			if (d.parental_enabled && d.parental_service_ok === false) {
+				rows.push(['配置建议', '<span class="agh-warn">家长控制已开启，但连不上 AdGuard 家长控制服务，正在尝试自动关闭；若网络异常请手动关闭家长控制。</span>']);
 			}
 		}
 
