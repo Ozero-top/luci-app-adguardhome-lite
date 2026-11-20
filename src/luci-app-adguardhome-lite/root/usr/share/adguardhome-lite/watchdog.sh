@@ -10,17 +10,21 @@ DEAD=0
 
 PARENTAL_URL="https://family.adguard-dns.com/dns-query"
 PARENTAL_CACHE="/var/run/adguardhome_lite_parental_probe"
+# 开启家长控制期间的最大探测间隔；掉线后最多这么久就能发现
+PARENTAL_INTERVAL=30
 
 # 家长控制会把查询送到 AdGuard 服务端判定，连不上时会导致全网无 DNS。
-# 开启期间每 5 分钟最多探测一次，不通就自动关闭；家长控制关闭时不做任何事。
+# 开启期间每隔 PARENTAL_INTERVAL 秒探测一次，不通就自动关闭；关闭时不做任何事。
 check_parental() {
     grep -q '^  parental_enabled:[[:space:]]*true' "$configpath" 2>/dev/null || {
         [ -f "$PARENTAL_CACHE" ] && rm -f "$PARENTAL_CACHE"
         return 0
     }
 
-    # 缓存有效期内直接复用上次结果，避免频繁阻塞在探测上
-    if [ -f "$PARENTAL_CACHE" ] && [ -n "$(find "$PARENTAL_CACHE" -mmin -5 2>/dev/null)" ]; then
+    # 缓存有效期内直接复用上次结果，避免每轮循环都阻塞在探测上
+    _now="$(date +%s)"
+    _mtime="$(stat -c %Y "$PARENTAL_CACHE" 2>/dev/null || echo 0)"
+    if [ -f "$PARENTAL_CACHE" ] && [ $(( _now - _mtime )) -lt "$PARENTAL_INTERVAL" ]; then
         [ "$(cat "$PARENTAL_CACHE" 2>/dev/null)" = "fail" ] || return 0
     else
         _code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "$PARENTAL_URL" 2>/dev/null)"
