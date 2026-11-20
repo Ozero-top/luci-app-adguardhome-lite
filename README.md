@@ -45,7 +45,7 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 ### 安装与内核
 
 - **三步上手**：安装内核 → 一键启用 → 打开控制台，每步给出状态与失败原因。
-- **官方内核**：自动识别架构下载官方版本，可选测试版；升级前备份配置，测试通道失败自动回退稳定版。
+- **官方内核**：自动识别架构下载官方版本，可选预发布版；升级前备份配置，预发布通道失败自动回退正式版。
 - **下载兜底**：进度实时可见，支持多个 GitHub 反代，失败自动回退官方 CDN 与直连；fake-IP 环境自动解析真实 IP。
 - **更新提示**：插件与内核有新版本时在页面提示，后台定期检查。
 
@@ -161,14 +161,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.5-2_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.6-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.5-2` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.6` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -186,7 +186,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.5-2 -m https://gh-proxy.org
+sh install.sh -v 1.3.6 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -362,7 +362,7 @@ curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite
 ### Q3：内核下载失败，或重启后消失？
 
 - **下载失败**：检查网络与系统时间；国内网络在「基础设置 → 插件配置」启用 GitHub 反代；fake-IP 环境自动解析真实 IP；空间不足时把内核位置改到内置存储或清理闪存。
-- **测试版**：依次尝试 GitHub 预发布（含反代）→ 官方测试通道 → 稳定版，日志记录每个地址的结果。
+- **预发布版**：依次尝试 GitHub 预发布（含反代）→ 官方预发布通道 → 正式版，日志记录每个地址的结果。
 - **重启后消失**：内核装在 `/tmp` 内存位置，重装或在「基础设置 → 插件配置」改到内置存储。
 
 ### Q4：启用后不能上网 / 面板打不开 / 网页打不开？
@@ -472,6 +472,12 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.6
+
+- **兼容 AdGuard Home v1.0.0**：安全搜索开关改用 `/control/safesearch/settings`，v0.107.53 及更早版本自动回退旧接口
+- **修复自定义上游保存**：v1.0.0 起不再接受空的 `upstream_mode`，保存前自动归一化为 `load_balance`
+- **内核通道更名**：「稳定版 / 测试版」改为「正式版 / 预发布版」，语义与发布策略一致，UCI 值不变
 
 ### 1.3.5-2
 

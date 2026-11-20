@@ -3,7 +3,7 @@
 # 由控制器在缓存过期时后台调用，结果写入 /var/run/adguardhome_lite_core_update
 #
 # 通道判定以 GitHub Releases API 的 prerelease 字段为准：正式版通道只取
-# prerelease=false 的最新条目，测试通道取 prerelease=true 的最新条目。
+# prerelease=false 的最新条目，预发布通道取 prerelease=true 的最新条目。
 # 版本号里的 -b 只作为 Atom 兜底时的近似判断（官方可能调整命名）。
 # API 不可用时回退 releases.atom（仅最近 10 条）。
 

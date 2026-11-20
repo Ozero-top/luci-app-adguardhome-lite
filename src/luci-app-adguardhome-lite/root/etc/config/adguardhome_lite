@@ -29,7 +29,7 @@ config adguardhome_lite 'main'
 	# 工作目录：保存过滤器缓存、查询日志和统计数据
 	option workdir '/etc/AdGuardHome'
 
-	# 内核更新通道：stable=稳定版（推荐），beta=测试版
+	# 内核更新通道：stable=正式版（推荐），beta=预发布版
 	option channel 'stable'
 
 	# GitHub 反代（国内加速）：

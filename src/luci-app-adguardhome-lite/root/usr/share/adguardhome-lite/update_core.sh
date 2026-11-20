@@ -1,6 +1,6 @@
 #!/bin/sh
 # AdGuard Home 助手 - 内核安装/更新脚本
-# 功能：自动识别架构、下载官方最新稳定版/测试版、校验并替换内核。
+# 功能：自动识别架构、下载官方最新正式版/预发布版、校验并替换内核。
 # 说明：本脚本由 LuCI 概览页按钮调用，也可以手动执行。
 
 . /usr/share/adguardhome-lite/common.sh
@@ -93,15 +93,15 @@ arch=$(detect_agh_arch)
 case "$channel" in
     beta)
         base_url="https://static.adguard.com/adguardhome/beta"
-        channel_name="测试版"
+        channel_name="预发布版"
         ;;
     *)
         base_url="https://static.adguard.com/adguardhome/release"
-        channel_name="稳定版"
+        channel_name="正式版"
         ;;
 esac
 
-# 记录实际安装通道，供页面区分「测试版」标识；回退稳定版时会改写
+# 记录实际安装通道，供页面区分「预发布版」标识；回退正式版时会改写
 installed_channel="stable"
 [ "$channel" = "beta" ] && installed_channel="beta"
 
@@ -126,7 +126,7 @@ case "$github_proxy" in
         ;;
 esac
 
-# 稳定版下载链：页面已确认版本时按 tag 直连，其次官方 CDN 兜底
+# 正式版下载链：页面已确认版本时按 tag 直连，其次官方 CDN 兜底
 if [ -n "$target_ver" ] && [ "$channel" != "beta" ]; then
     tagged_url="https://github.com/AdguardTeam/AdGuardHome/releases/download/v${target_ver}/AdGuardHome_linux_${arch}.tar.gz"
     if [ -n "$proxy_host" ]; then
@@ -140,7 +140,7 @@ else
     stable_list="$release_url $github_url"
 fi
 
-# 测试版优先使用页面已确认的版本；没有时再取 GitHub 预发布标签（atom 可走反代），官方 beta 通道作兜底
+# 预发布版优先使用页面已确认的版本；没有时再取 GitHub 预发布标签（atom 可走反代），官方 beta 通道作兜底
 beta_tag=""
 beta_github=""
 if [ "$channel" = "beta" ]; then
@@ -170,11 +170,11 @@ if [ "$channel" = "beta" ]; then
         else
             url_list="$beta_github $static_url"
         fi
-        log_msg "测试版使用 GitHub 预发布版本：$beta_tag"
+        log_msg "使用 GitHub 预发布版本：$beta_tag"
     else
         url_list="$static_url"
         [ -n "$proxy_host" ] && url_list="$url_list https://${proxy_host}/${static_url}"
-        log_msg "未能获取测试版标签，使用官方 beta 下载通道。"
+        log_msg "未能获取预发布版标签，使用官方 beta 下载通道。"
     fi
 else
     url_list="$stable_list"
@@ -205,10 +205,10 @@ download_ok="0"
 if try_download "$url_list"; then
     download_ok="1"
 elif [ "$channel" = "beta" ]; then
-    log_msg "测试版通道不可用，回退到稳定版安装..."
-    channel_name="稳定版"
+    log_msg "预发布版通道不可用，回退到正式版安装..."
+    channel_name="正式版"
     installed_channel="stable"
-    # 回退后不再按测试版目标版本比对，避免把正常回退判成版本不一致
+    # 回退后不再按预发布版目标版本比对，避免把正常回退判成版本不一致
     target_ver=""
     if try_download "$stable_list"; then
         download_ok="1"
@@ -308,12 +308,12 @@ is_agh_running && was_running=1
 was_enabled=$(uci -q get "$CONF.main.enabled" 2>/dev/null)
 [ -n "$was_enabled" ] || was_enabled="0"
 
-# 测试版属于大版本预发布，升级前先备份配置，便于回滚
+# 预发布版属于大版本先行发布，升级前先备份配置，便于回滚
 cfg_bak=""
 if [ "$channel" = "beta" ] && [ -s "$configpath" ]; then
     cfg_bak="${configpath}.bak-$(date +%Y%m%d%H%M%S)"
     if cp -p "$configpath" "$cfg_bak" 2>/dev/null; then
-        log_msg "测试版升级前已备份配置：$cfg_bak"
+        log_msg "预发布版升级前已备份配置：$cfg_bak"
     else
         cfg_bak=""
         log_msg "提示：配置备份失败，继续升级（原文件未被修改）。"

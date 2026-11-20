@@ -332,7 +332,7 @@ local function core_update_info(binpath, channel)
         sys.exec("sh " .. SHARE .. "/check_core_update.sh >/dev/null 2>&1 &")
     end
 
-    -- 稳定版只看正式版；测试版在预发布与正式版中取更新的一个
+    -- 正式版通道只看正式发布；预发布通道在预发布与正式版中取更新的一个
     local candidates = { stable }
     if channel == "beta" and beta_tag ~= "" then
         candidates = { beta_tag, stable }
@@ -408,7 +408,7 @@ local function plugin_update_info()
         sys.exec("sh " .. SHARE .. "/check_plugin_update.sh >/dev/null 2>&1 &")
     end
 
-    -- 插件 Release 都是正式版，不比内核的稳定版 / 测试版通道，直接比版本号
+    -- 插件 Release 都是正式版，不比内核的正式版 / 预发布版通道，直接比版本号
     local current = plugin_version()
     local newer = version_newer(latest, current)
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 助手 使用说明 · 1.3.5-2</title>
+<title>AdGuard Home 助手 使用说明 · 1.3.6</title>
 <meta name="description" content="AdGuard Home 助手使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 助手 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.5-2</span>
+  <span class="pill"><span class="dot"></span>1.3.6</span>
 </header>
 
 <div class="layout">
@@ -210,7 +210,7 @@ footer{
       <h1>AdGuard Home 助手 使用说明</h1>
       <p>本插件只做三件事：<strong>装内核、接 DNS、看状态</strong>。过滤规则、查询日志、家长控制仍在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.5-2</span>
+        <span>适用版本 1.3.6</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -344,8 +344,8 @@ nft list chain inet fw4 agh_dns_redirect</code></pre>
         <li>等待进度完成。</li>
       </ol>
       <p>插件会自动识别 CPU 架构，从 AdGuard 官方源下载对应内核。国内网络可在 <strong>基础设置 → 插件配置</strong> 选择 GitHub 反代（推荐 <code>gh-proxy.org</code>）；fake-IP 环境会自动解析真实 IP 后下载。</p>
-      <p>安装过程中「安装进度」会显示下载百分比或已下载大小、完成后记录用时；概览的「内核版本」行在有新版本时会显示「可更新」，第 1 步的说明也会同步提示，点击提示可跳到安装按钮。稳定版通道只提示正式版，测试版通道可提示预发布版本；同一基础版本的正式版发布后，测试通道会提示升级到正式版。</p>
-      <p>选择「测试版」时，页面提示过具体版本会直接按该版本下载，未取到时先从 GitHub Releases 取最新的预发布标签（可走反代），失败后依次回退官方测试通道与稳定版；升级大版本前会自动备份 <code>/etc/AdGuardHome.yaml</code>，概览页内核版本旁会标注「测试版」。</p>
+      <p>安装过程中「安装进度」会显示下载百分比或已下载大小、完成后记录用时；概览的「内核版本」行在有新版本时会显示「可更新」，第 1 步的说明也会同步提示，点击提示可跳到安装按钮。正式版通道只提示正式发布，预发布版通道也可提示预发布版本；同一基础版本的正式版发布后，预发布通道会提示升级到正式版。</p>
+      <p>选择「预发布版」时，页面提示过具体版本会直接按该版本下载，未取到时先从 GitHub Releases 取最新的预发布标签（可走反代），失败后依次回退官方预发布通道与正式版；升级大版本前会自动备份 <code>/etc/AdGuardHome.yaml</code>，概览页内核版本旁会标注「预发布版」。</p>
 
       <h3>第 2 步：一键启用</h3>
       <p>首次启用会从内置模板生成 <code>/etc/AdGuardHome.yaml</code>，并写入默认账号、中文界面、过滤规则、日志周期和 DNS 接管配置。</p>
@@ -366,7 +366,7 @@ nft list chain inet fw4 agh_dns_redirect</code></pre>
             <tr><td>管理面板端口</td><td>默认 <code>13800</code>，不能占用 53 / 1745 / 5333 / 5335</td></tr>
             <tr><td>内核安装位置</td><td>内置存储重启保留；内存临时重启后需重装</td></tr>
             <tr><td>数据工作目录</td><td>保存统计和过滤缓存；内存临时会减少闪存写入</td></tr>
-            <tr><td>内核更新通道</td><td>稳定版 / 测试版；测试版取 GitHub 预发布，失败自动回退稳定版，升级前备份配置；概览的更新提示按该通道判断</td></tr>
+            <tr><td>内核更新通道</td><td>正式版 / 预发布版；预发布版取 GitHub 预发布，失败自动回退正式版，升级前备份配置；概览的更新提示按该通道判断</td></tr>
             <tr><td>GitHub 反代</td><td>仅加速内核下载，不修改系统网络</td></tr>
             <tr><td>不参与接管的接口</td><td>仅「接管 53」可用，勾选后该接口的查询交给 DNSMasq</td></tr>
             <tr><td>不参与接管的客户端</td><td>仅「接管 53」可用，支持 IPv4 / IPv6 / CIDR</td></tr>
@@ -430,7 +430,7 @@ nft list chain inet fw4 agh_dns_redirect</code></pre>
       <div class="faq">
         <h3>Q1：内核下载失败？</h3>
         <p>检查网络和系统时间；国内网络启用 GitHub 反代；fake-IP 环境已自动处理；空间不足时把内核位置改到内置存储。</p>
-        <p>测试版会依次尝试 GitHub 预发布（含反代）→ 官方测试通道 → 稳定版，全部失败才会报错；安装日志里能看到每个下载地址的尝试结果与下载进度。</p>
+        <p>预发布版会依次尝试 GitHub 预发布（含反代）→ 官方预发布通道 → 正式版，全部失败才会报错；安装日志里能看到每个下载地址的尝试结果与下载进度。</p>
       </div>
 
       <div class="faq">
@@ -532,9 +532,9 @@ rm -f /etc/AdGuardHome.yaml</code></pre>
 python tools/build_run.py      # 离线 .run</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.5-2_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.5-2-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.5-2.run</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.6-1_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.6-1-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.6-1.run</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
@@ -548,6 +548,10 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
         <table>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
+            <tr>
+              <td><span class="tag">1.3.6</span></td>
+              <td>兼容 AdGuard Home v1.0.0：安全搜索开关改用新的设置接口，旧内核自动回退；修复 v1.0.0 起自定义上游保存失败（上游模式空值）；内核更新通道更名为「正式版 / 预发布版」</td>
+            </tr>
             <tr>
               <td><span class="tag">1.3.5-2</span></td>
               <td>过滤规则页新增「手动更新订阅」按钮：立即让 AdGuard Home 重新下载全部订阅，结果区分「订阅已是最新 / 已更新 N 个列表 / 未返回明细」；白名单刷新失败不再让整体报错，档位切换与手动更新互斥避免更新冲突，每次操作写入运行日志新增的「订阅更新日志」段（保留最近 100 次）；后端黑名单 45 秒、白名单 20 秒、前端 90 秒，超时不再前后不一致</td>
@@ -604,7 +608,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 助手 · 使用说明 1.3.5-2 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 助手 · 使用说明 1.3.6 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {

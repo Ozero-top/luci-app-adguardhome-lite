@@ -345,6 +345,30 @@ function M.filters_save(ctx)
             local interval = st and tonumber(st.interval) or 24
             path = "/control/filtering/config"
             body = jsonc.stringify({ enabled = value, interval = interval })
+        elseif feature == "safesearch" then
+            -- 安全搜索：v1.0.0 移除了 /control/safesearch/enable|disable，
+            -- 改用 v0.107.53 起就存在的 /control/safesearch/settings（新旧内核都支持）。
+            -- 先读完整配置再只改 enabled，保留各搜索引擎的单独设置。
+            local gcode, gresp = agh_api("/control/safesearch/status", "GET")
+            local sc
+            if gcode == "200" then
+                local okp, parsed = pcall(jsonc.parse, gresp or "")
+                if okp and type(parsed) == "table" then
+                    sc = parsed
+                end
+            end
+            if sc then
+                sc.enabled = value
+                local pcode = agh_api("/control/safesearch/settings", "PUT", jsonc.stringify(sc))
+                if pcode == "200" then
+                    http.header("Cache-Control", "no-store")
+                    http.prepare_content("application/json")
+                    http.write_json({ ok = true })
+                    return
+                end
+            end
+            -- 更老的内核没有 settings 接口时退回旧写法
+            path = "/control/safesearch/" .. (value and "enable" or "disable")
         else
             path = string.format("/control/%s/%s", feature, value and "enable" or "disable")
         end
