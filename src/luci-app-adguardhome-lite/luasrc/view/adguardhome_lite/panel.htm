@@ -489,7 +489,7 @@
 							<span class="agh-switch-state" data-for="agh-filter-parental">已关闭</span>
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-parental"><span></span></label>
 						</div>
-						<p class="agh-hint">启用 AdGuard Home 内置的家长控制，命中计入「成人内容（家长控制）」统计；与「成人内容拦截」互斥，开启会关闭成人规则。</p>
+						<p class="agh-hint">启用 AdGuard Home 内置的家长控制，命中计入「成人内容（家长控制）」统计；与「成人内容拦截」互斥，开启会关闭成人规则。该功能需要能访问 AdGuard 服务端（family.adguard-dns.com），国内通常需要代理：开启前会先试拨，连不上则拒绝开启；运行中连不上会自动关闭，避免全屋断网。</p>
 					</div>
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
@@ -858,7 +858,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261120a"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261121a"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {
