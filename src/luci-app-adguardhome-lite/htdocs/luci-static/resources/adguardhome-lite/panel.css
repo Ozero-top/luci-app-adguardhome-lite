@@ -1298,7 +1298,7 @@ code {
 	border-color: var(--agh-primary);
 }
 
-/* 测试版内核标识 */
+/* 预发布版内核标识 */
 .agh-beta-tag {
 	display: inline-block;
 	margin-left: 4px;

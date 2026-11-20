@@ -56,10 +56,11 @@ class VersionSourceTest(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "tools"))
         import build_run
 
-        # VERSION 可能带发行号（1.3.5-2），PKG_VERSION 才是与文件完全一致的值
-        self.assertEqual(build_run.PKG_VERSION, version_text())
-        self.assertIn(version_text(), build_run.MODERN)
-        self.assertIn(version_text(), build_run.OUTPUT)
+        # VERSION 可带发行号（1.3.5-2）也可不带（1.3.6），不带时发行号按惯例为 1
+        expected = version_text() if "-" in version_text() else version_text() + "-1"
+        self.assertEqual(build_run.PKG_VERSION, expected)
+        self.assertIn(expected, build_run.MODERN)
+        self.assertIn(expected, build_run.OUTPUT)
 
 
 if __name__ == "__main__":

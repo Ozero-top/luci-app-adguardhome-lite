@@ -265,7 +265,7 @@
 	}
 
 	function channelLabel(channel) {
-		return channel === 'beta' ? '测试版' : '稳定版';
+		return channel === 'beta' ? '预发布版' : '正式版';
 	}
 
 	// AdGuard Home 预发布版本号形如 v1.0.0-b.2
@@ -285,7 +285,7 @@
 		var u = d && d.core_update;
 		if (!u || !u.update || !u.latest) return '';
 		return ' <a href="#" class="agh-update-tip agh-core-update" title="点击前往安装">可更新 v' +
-			esc(u.latest) + (u.beta ? '（测试版）' : '') + '</a>';
+			esc(u.latest) + (u.beta ? '（预发布版）' : '') + '</a>';
 	}
 
 	function renderCoreVersion(d) {
@@ -293,7 +293,7 @@
 		var version = d.version || '已安装';
 		var html = '<span class="agh-ok">' + esc(version) + '</span>';
 		if (isCoreBeta(d)) {
-			html += ' <span class="agh-beta-tag">测试版</span>';
+			html += ' <span class="agh-beta-tag">预发布版</span>';
 		}
 		html += coreUpdateBadge(d);
 		return html;
@@ -540,11 +540,11 @@
 				var hintText;
 				if (cu && cu.update && cu.latest) {
 					hintText = '已安装 ' + (d.version || '未知') + '，发现新版本 v' + cu.latest +
-						(cu.beta ? '（测试版）' : '（稳定版）') + '，点击「安装/更新内核」升级';
+						(cu.beta ? '（预发布版）' : '（正式版）') + '，点击「安装/更新内核」升级';
 					coreHint.className = 'agh-hint agh-warn';
 				} else {
 					hintText = '已安装，当前版本：' + (d.version || '未知');
-					if (isCoreBeta(d)) hintText += '（测试版，升级大版本前会自动备份配置）';
+					if (isCoreBeta(d)) hintText += '（预发布版，升级大版本前会自动备份配置）';
 					coreHint.className = 'agh-hint';
 				}
 				coreHint.textContent = hintText;

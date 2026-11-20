@@ -281,10 +281,10 @@
 						<div class="agh-field">
 							<label for="agh-set-channel">内核更新通道</label>
 							<select id="agh-set-channel">
-								<option value="stable">稳定版（推荐）</option>
-								<option value="beta">测试版（谨慎使用）</option>
+								<option value="stable">正式版（推荐）</option>
+								<option value="beta">预发布版（谨慎使用）</option>
 							</select>
-							<p class="agh-hint agh-mt-8">测试版取自 GitHub 预发布标签（可走上方反代），失败时依次回退官方测试通道与稳定版；升级前会自动备份 /etc/AdGuardHome.yaml。</p>
+							<p class="agh-hint agh-mt-8">预发布版取自 GitHub 预发布标签（可走上方反代），失败时依次回退官方预发布通道与正式版；升级前会自动备份 /etc/AdGuardHome.yaml。</p>
 						</div>
 
 						<div class="agh-field">
@@ -698,7 +698,7 @@
 					<h3>一、初始化配置</h3>
 				</div>
 				<ol class="agh-guide-list">
-					<li><b>安装内核：</b>在“概览 → 初始化配置”点击“安装/更新内核”，自动识别架构并下载官方最新稳定版。</li>
+					<li><b>安装内核：</b>在“概览 → 初始化配置”点击“安装/更新内核”，自动识别架构并下载官方最新正式版。</li>
 					<li><b>一键启用：</b>首次启用从内置模板生成配置，默认密码 admin123，默认用“接管 53 端口”。<b>装了 Clash 也可以保持“接管 53 端口”</b>；只有收回规则在你的固件上确实不生效、查询被 Clash 抢走时，才需要改成“Clash 前置”。</li>
 					<li><b>打开控制台：</b>用概览页显示的地址、账号和默认密码登录 AdGuard Home。</li>
 				</ol>
@@ -858,7 +858,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261119d"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261120a"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

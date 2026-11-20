@@ -54,16 +54,18 @@ function M.request(path, method, body, timeout)
         local cmd = string.format(
             "curl -s -m %d -o %q -w '%%{http_code}' --netrc-file %q",
             tonumber(timeout) or 8, res, netrc)
-        if method == "POST" then
+        -- PUT 用于 AdGuard Home v1.0 起新增的设置类接口（如 /control/safesearch/settings）
+        if method == "POST" or method == "PUT" then
             if body then
                 local f = io.open(req, "w")
                 if f then
                     f:write(body)
                     f:close()
                 end
-                cmd = cmd .. " -H 'Content-Type: application/json' -X POST --data-binary @" .. string.format("%q", req)
+                cmd = cmd .. " -H 'Content-Type: application/json' -X " .. method
+                    .. " --data-binary @" .. string.format("%q", req)
             else
-                cmd = cmd .. " -X POST"
+                cmd = cmd .. " -X " .. method
             end
         end
         sys.call(string.format("chmod 600 %q >/dev/null 2>&1", req))
@@ -99,6 +101,10 @@ function M.patch_dns_config(patch)
     end
     for key, value in pairs(patch or {}) do
         obj[key] = value
+    end
+    -- AdGuard Home v1.0.0 起不再接受空值的 upstream_mode，空值按等价的 load_balance 回写
+    if obj.upstream_mode == nil or obj.upstream_mode == "" then
+        obj.upstream_mode = "load_balance"
     end
     local code = M.request("/control/dns_config", "POST", jsonc.stringify(obj))
     if code ~= "200" then
