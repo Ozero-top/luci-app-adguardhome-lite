@@ -30,6 +30,11 @@ VER="${1:-}"
 CHANNEL="${2:-cn}"
 METHOD="${3:-source}"
 FORCE="${4:-0}"
+if [ "$METHOD" = "source" ]; then
+    METHOD_LABEL="通用模式"
+else
+    METHOD_LABEL="安装包模式"
+fi
 
 REPO="Ozero-top/luci-app-adguardhome-lite"
 GITHUB="https://github.com/$REPO"
@@ -106,7 +111,7 @@ case "$CHANNEL" in
         ;;
 esac
 
-say "开始更新插件：v$VER（渠道：$CHANNEL，方式：$METHOD）"
+say "开始更新插件：v$VER（渠道：$CHANNEL，方式：$METHOD_LABEL）"
 [ "$FORCE" = "1" ] && say "强制更新/降级模式"
 
 backup_config() {
@@ -151,7 +156,7 @@ install_package() {
         PM="apk"
         NAME="$(mval apk)"
         SHA="$(mval apk_sha256)"
-        # apk 不能安装 ipk，缺 apk 资产时直接回退源码覆盖
+        # apk 不能安装 ipk，缺 apk 资产时直接回退通用模式
         ALT_NAME=""
         ALT_SHA=""
     elif have opkg; then
@@ -218,21 +223,21 @@ install_package() {
 }
 
 install_source() {
-    say "下载源码包..."
+    say "下载插件文件包..."
     _tar="$TMP/src.tar.gz"
     _ok=0
     for _base in $SRC_MIRRORS; do
-        say "源码节点：$_base"
+        say "文件包节点：$_base"
         if download_file "$_base/archive/refs/tags/v$VER.tar.gz" "$_tar"; then
             [ -s "$_tar" ] && { _ok=1; break; }
         fi
     done
-    [ "$_ok" = "1" ] || { say "源码包下载失败"; return 1; }
+    [ "$_ok" = "1" ] || { say "插件文件包下载失败"; return 1; }
 
     mkdir -p "$TMP/src" || return 1
-    tar -xzf "$_tar" -C "$TMP/src" || { say "源码包解压失败"; return 1; }
+    tar -xzf "$_tar" -C "$TMP/src" || { say "插件文件包解压失败"; return 1; }
     _src="$(find "$TMP/src" -maxdepth 5 -type d -name 'luci-app-adguardhome-lite' -path '*/src/*' | head -n 1)"
-    [ -n "$_src" ] && [ -d "$_src/root" ] || { say "源码包结构不完整"; return 1; }
+    [ -n "$_src" ] && [ -d "$_src/root" ] || { say "插件文件包结构不完整"; return 1; }
 
     say "备份现有配置..."
     _keep=""
@@ -265,16 +270,16 @@ backup_config
 if [ "$METHOD" = "package" ]; then
     if install_package; then
         clear_caches
-        say "更新完成：v$VER（安装包方式）"
+        say "更新完成：v$VER（安装包模式）"
         echo 0 > "$CODE"
         exit 0
     fi
-    say "安装包方式失败，自动改用源码覆盖"
+    say "安装包模式失败，自动改用通用模式"
 fi
 
 if install_source; then
     clear_caches
-    say "更新完成：v$VER（源码覆盖）"
+    say "更新完成：v$VER（通用模式）"
     echo 0 > "$CODE"
     exit 0
 fi

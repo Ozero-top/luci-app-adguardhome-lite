@@ -68,7 +68,7 @@ function M.plugin_update(ctx)
         "目标版本：v%s\n更新渠道：%s\n更新方式：%s\n强制更新：%s\n",
         version,
         channel == "cn" and "国内加速" or "GitHub 直连",
-        method == "source" and "源码覆盖" or "安装包",
+        method == "source" and "通用模式" or "安装包模式",
         force and "是" or "否"))
 
     fs.remove(RUN .. "_plugin_update.code")
