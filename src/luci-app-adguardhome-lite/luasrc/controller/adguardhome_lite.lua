@@ -357,7 +357,7 @@ end
 
 -- 插件版本：取包管理器与 install.sh 记录中较新的一个，兼容 ipk 与脚本安装混用
 local function plugin_version()
-    -- 源码覆盖安装（含强制降级）以 install_version 为准，避免包管理器里的旧高版本覆盖显示
+    -- 通用模式安装（含强制降级）以 install_version 为准，避免包管理器里的旧高版本覆盖显示
     if fs.access(SHARE .. "/install_source") then
         local v = (fs.readfile(INSTALL_VERSION) or ""):gsub("%s+", "")
         if v:match("^%d+%.%d+") then
