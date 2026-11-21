@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 助手 - 检查内核是否有新版本（含预发布）
+# AdGuard Home 管理中心 - 检查内核是否有新版本（含预发布）
 # 由控制器在缓存过期时后台调用，结果写入 /var/run/adguardhome_lite_core_update
 #
 # 通道判定以 GitHub Releases API 的 prerelease 字段为准：正式版通道只取

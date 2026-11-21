@@ -1,4 +1,4 @@
--- AdGuard Home 助手 - logs 动作
+-- AdGuard Home 管理中心 - logs 动作
 -- 依赖由控制器通过 ctx 注入，保持原有行为不变。
 
 local M = {}

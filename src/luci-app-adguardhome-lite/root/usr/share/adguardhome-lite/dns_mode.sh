@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 助手 - DNS 接管模式管理
+# AdGuard Home 管理中心 - DNS 接管模式管理
 # 用法：dns_mode.sh apply|revert|status
 # 说明：自动保存和恢复 DNSMasq 原始设置，关闭服务或切换模式时不会破坏上网。
 
@@ -246,7 +246,7 @@ agh_nft_ensure() {
     # 否则同一优先级下谁先生效不确定，查询可能被 PassWall 抢走。
     _prio="-101"
     [ "$dns_mode" = "passwall" ] && _prio="-102"
-    _want="# AdGuard Home 助手：接管 53 端口时启用，避免被 Clash / PassWall 的 DNS 劫持绕过。
+    _want="# AdGuard Home 管理中心：接管 53 端口时启用，避免被 Clash / PassWall 的 DNS 劫持绕过。
 chain agh_dns_redirect {
     type nat hook prerouting priority $_prio; policy accept;
 ${_bypass}

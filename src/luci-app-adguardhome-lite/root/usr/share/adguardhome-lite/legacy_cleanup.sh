@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 助手 - 旧版残留检测与清理
+# AdGuard Home 管理中心 - 旧版残留检测与清理
 # 用法：
 #   legacy_cleanup.sh scan    输出 JSON 清单，不修改系统
 #   legacy_cleanup.sh clean   备份后清理旧插件文件与旧内核
