@@ -1,4 +1,4 @@
--- AdGuard Home 助手 - LuCI 控制器
+-- AdGuard Home 管理中心 - LuCI 控制器
 -- 负责菜单注册、状态查询、内核安装、服务控制和密码修改。
 module("luci.controller.adguardhome_lite", package.seeall)
 
@@ -655,7 +655,7 @@ end
 
 
 
--- 从 AdGuard Home 本地接口读取过滤统计，插件页面无需打开控制台。
+-- 从 AdGuard Home 本地接口读取过滤统计，插件页面无需打开 AGH 面板。
 -- 结果缓存 8 秒：页面 10 秒轮询时每次都能拿到新数据，又不会重复请求。
 collect_stats = function()
     local cached = read_cache(STATS_CACHE, 8)

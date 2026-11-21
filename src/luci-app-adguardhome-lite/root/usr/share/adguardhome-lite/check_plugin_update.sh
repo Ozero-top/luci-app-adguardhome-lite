@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 助手 - 检查插件是否有新版本
+# AdGuard Home 管理中心 - 检查插件是否有新版本
 # 由控制器在缓存过期时后台调用，结果写入 /var/run/adguardhome_lite_plugin_update
 # 说明：插件 Release 都是正式版，没有正式版 / 预发布版之分；
 #       用 releases.atom 取最新标签，且不受 api.github.com 限流影响，可走反代

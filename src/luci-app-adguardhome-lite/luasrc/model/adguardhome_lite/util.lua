@@ -1,4 +1,4 @@
--- AdGuard Home 助手：纯函数工具
+-- AdGuard Home 管理中心：纯函数工具
 -- 不依赖文件系统、网络或 LuCI 上下文，便于在设备外直接做 Lua 单元测试。
 
 local M = {}

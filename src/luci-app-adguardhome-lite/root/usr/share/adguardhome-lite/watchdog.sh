@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 助手 - DNS 接管看护
+# AdGuard Home 管理中心 - DNS 接管看护
 # 由 procd 作为独立实例运行；AGH 连续 30 秒无法运行时回退 DNS 接管，避免全网无 DNS。
 # 家长控制开启期间每 5 分钟探测一次 AdGuard 服务端，连不上时自动关闭家长控制。
 # 不调用 init.d 的停止动作，避免从看护进程递归获取 rc.common 的 procd 锁。
