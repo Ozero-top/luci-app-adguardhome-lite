@@ -622,7 +622,7 @@ function index()
     local root = entry(
         { "admin", "services", "adguardhome_lite" },
         template("adguardhome_lite/wrapper"),
-        "AdGuard Home 助手",
+        "AdGuard Home 管理中心",
         60
     )
     root.dependent = true

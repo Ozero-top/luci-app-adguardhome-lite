@@ -45,7 +45,7 @@ LEGACY = "luci-app-adguardhome-lite_%s-legacy_all.ipk" % PKG_VERSION
 OUTPUT = "luci-app-adguardhome-lite_%s.run" % PKG_VERSION
 
 INSTALL_SH = """#!/bin/sh
-# AdGuard Home 助手 - 离线安装脚本
+# AdGuard Home 管理中心 - 离线安装脚本
 set -u
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -55,7 +55,7 @@ MODERN="{modern}"
 LEGACY="{legacy}"
 
 echo "=============================================="
-echo " AdGuard Home 助手 - 离线安装"
+echo " AdGuard Home 管理中心 - 离线安装"
 echo "=============================================="
 
 if [ ! -f "$MODERN" ] || [ ! -f "$LEGACY" ]; then
@@ -85,14 +85,14 @@ fi
 
 echo ""
 echo "下一步："
-echo "  1. 打开 LuCI：服务 → AdGuard Home 助手"
-echo "  2. 安装内核 → 一键启用 → 打开控制台"
+echo "  1. 打开 LuCI：服务 → AdGuard Home 管理中心"
+echo "  2. 安装内核 → 一键启用 → 打开 AGH 面板"
 echo "  3. 默认账号 admin / 密码 admin123（请及时修改）"
 echo ""
 """
 
 HEADER = """#!/bin/sh
-# AdGuard Home 助手 - 离线安装包（自解压）
+# AdGuard Home 管理中心 - 离线安装包（自解压）
 # 用法：sh {output}
 # 说明：解压到临时目录后执行 install.sh，不会修改固件其他文件。
 set -u

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 助手 使用说明 · 1.3.6</title>
-<meta name="description" content="AdGuard Home 助手使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
+<title>AdGuard Home 管理中心 使用说明 · 1.3.6</title>
+<meta name="description" content="AdGuard Home 管理中心使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
 :root{
@@ -183,7 +183,7 @@ footer{
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 助手 <small>使用说明</small></div>
+  <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 管理中心 <small>使用说明</small></div>
   <div class="spacer"></div>
   <span class="pill"><span class="dot"></span>1.3.6</span>
 </header>
@@ -207,7 +207,7 @@ footer{
 
   <main>
     <div class="doc-head">
-      <h1>AdGuard Home 助手 使用说明</h1>
+      <h1>AdGuard Home 管理中心 使用说明</h1>
       <p>本插件只做三件事：<strong>装内核、接 DNS、看状态</strong>。过滤规则、查询日志、家长控制仍在 AdGuard Home 面板中设置。</p>
       <div class="meta">
         <span>适用版本 1.3.6</span>
@@ -222,9 +222,9 @@ footer{
           <thead><tr><th>步骤</th><th>做什么</th><th>位置</th></tr></thead>
           <tbody>
             <tr><td>1</td><td>安装插件</td><td>LuCI 上传 ipk，或 25.12 系统运行 <code>install.sh</code></td></tr>
-            <tr><td>2</td><td>安装内核</td><td>服务 → AdGuard Home 助手 → 概览</td></tr>
+            <tr><td>2</td><td>安装内核</td><td>服务 → AdGuard Home 管理中心 → 概览</td></tr>
             <tr><td>3</td><td>一键启用</td><td>概览 → 一键启用</td></tr>
-            <tr><td>4</td><td>打开控制台</td><td>概览 → 打开控制台</td></tr>
+            <tr><td>4</td><td>打开 AGH 面板</td><td>概览 → 打开 AGH 面板</td></tr>
           </tbody>
         </table>
       </div>
@@ -266,7 +266,7 @@ footer{
       <ol>
         <li>打开 <strong>系统 → 软件包 → 上传安装包</strong>；</li>
         <li>选择对应 <code>.ipk</code>，等待依赖安装完成；</li>
-        <li>在 <strong>服务</strong> 菜单打开 <strong>AdGuard Home 助手</strong>。</li>
+        <li>在 <strong>服务</strong> 菜单打开 <strong>AdGuard Home 管理中心</strong>。</li>
       </ol>
       <p>命令行安装：</p>
 <pre><code>opkg install /tmp/luci-app-adguardhome-lite_&lt;版本&gt;_all.ipk</code></pre>
@@ -310,7 +310,7 @@ sh install.sh --uninstall</code></pre>
 
       <h3>2.4 安装后检查</h3>
       <ul>
-        <li>「服务」菜单出现 <strong>AdGuard Home 助手</strong>；</li>
+        <li>「服务」菜单出现 <strong>AdGuard Home 管理中心</strong>；</li>
         <li>概览能显示运行状态；</li>
         <li>安装内核后显示实际内核版本（带 <code>-b</code> 的预发布版本会完整显示）；</li>
         <li>一键启用后显示「运行中」；</li>
@@ -351,8 +351,8 @@ nft list chain inet fw4 agh_dns_redirect</code></pre>
       <p>首次启用会从内置模板生成 <code>/etc/AdGuardHome.yaml</code>，并写入默认账号、中文界面、过滤规则、日志周期和 DNS 接管配置。</p>
       <p>默认采用「接管 53 端口」：AdGuard Home 监听 53，DNSMasq 移到 1745，上游指向 <code>127.0.0.1:1745</code>。</p>
 
-      <h3>第 3 步：打开控制台</h3>
-      <p>点击 <strong>打开控制台</strong>，用概览页显示的账号密码登录。过滤规则、上游 DNS、安全搜索、家长控制、查询日志都在 AdGuard Home 面板中操作。</p>
+      <h3>第 3 步：打开 AGH 面板</h3>
+      <p>点击 <strong>打开 AGH 面板</strong>，用概览页显示的账号密码登录。过滤规则、上游 DNS、安全搜索、家长控制、查询日志都在 AdGuard Home 面板中操作。</p>
     </section>
 
     <section class="card" id="s4">
@@ -608,7 +608,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 助手 · 使用说明 1.3.6 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 管理中心 · 使用说明 1.3.6 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {

@@ -1,6 +1,6 @@
-# AdGuard Home 管理助手
+# AdGuard Home 管理中心
 
-OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件，支持三步安装、低侵入 DNS 接管。
+OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、DNS 接管、过滤与看护一体化，支持三步上手、低侵入 DNS 接管。
 
 > 插件负责安装、DNS 接管、过滤与统计；更细的高级项仍可在 AdGuard Home 面板调整。
 
@@ -44,7 +44,7 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 ### 安装与内核
 
-- **三步上手**：安装内核 → 一键启用 → 打开控制台，每步给出状态与失败原因。
+- **三步上手**：安装内核 → 一键启用 → 打开 AGH 面板，每步给出状态与失败原因。
 - **官方内核**：自动识别架构下载官方版本，可选预发布版；升级前备份配置，预发布通道失败自动回退正式版。
 - **下载兜底**：进度实时可见，支持多个 GitHub 反代，失败自动回退官方 CDN 与直连；fake-IP 环境自动解析真实 IP。
 - **更新提示**：插件与内核有新版本时在页面提示，后台定期检查。
@@ -109,7 +109,7 @@ OpenWrt / ImmortalWrt / iStoreOS 轻量级 AdGuard Home LuCI 管理助手插件�
 
 1. 打开 `http://路由器IP` → **系统 → 软件包**；
 2. 找到 **上传安装包**，选择对应 `.ipk`；
-3. 等依赖装完，在 **服务** 菜单打开 **AdGuard Home 助手**。
+3. 等依赖装完，在 **服务** 菜单打开 **AdGuard Home 管理中心**。
 
 **命令行**
 
@@ -197,7 +197,7 @@ sh install.sh -v 1.3.6 -m https://gh-proxy.org
 
 1. **安装内核**：概览页点「安装/更新内核」，等进度完成；
 2. **一键启用**：点「一键启用」，插件从模板生成配置并接管 DNS；
-3. **打开控制台**：点「打开控制台」，用 `admin` / `admin123` 登录。
+3. **打开 AGH 面板**：点「打开 AGH 面板」，用 `admin` / `admin123` 登录。
 
 默认配置：
 
