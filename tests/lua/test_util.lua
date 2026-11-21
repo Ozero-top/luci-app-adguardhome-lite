@@ -37,6 +37,10 @@ check("stable newer than beta", util.version_newer("0.107.59", "0.107.59-b.2"), 
 check("beta newer than older stable", util.version_newer("0.108.0-b.1", "0.107.59"), true)
 check("same version", util.version_newer("0.107.59", "0.107.59"), false)
 check("numeric compare", util.version_newer("0.107.100", "0.107.99"), true)
+check("revision newer than base", util.version_newer("1.3.7-2", "1.3.7"), true)
+check("base older than revision", util.version_newer("1.3.7", "1.3.7-2"), false)
+check("revision newer than older revision", util.version_newer("1.3.7-2", "1.3.7-1"), true)
+check("revision newer than older base", util.version_newer("1.3.7-2", "1.3.6-1"), true)
 check("clean tag", util.clean_tag(" v1.2.3 "), "1.2.3")
 
 -- 词表
