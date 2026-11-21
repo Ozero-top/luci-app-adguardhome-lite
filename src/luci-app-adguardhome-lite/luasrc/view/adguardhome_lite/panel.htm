@@ -27,7 +27,7 @@
 			color-scheme: dark;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261119b">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261123a">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -37,6 +37,8 @@
 				statsClear:   "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[stats_clear]])%>",
 				coreInstall:  "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[core_install]])%>",
 				coreProgress: "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[core_progress]])%>",
+				pluginUpdate:   "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[plugin_update]])%>",
+				pluginProgress: "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[plugin_progress]])%>",
 				service:      "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[service]])%>",
 				password:     "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[password]])%>",
 				logs:         "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[logs_raw]])%>",
@@ -63,7 +65,7 @@
 			<div class="agh-hero-heading">
 				<h2>AdGuard Home 管理中心</h2>
 				<span id="agh-plugin-version" class="agh-hero-version-badge">读取中</span>
-				<a href="#" id="agh-plugin-update" class="agh-update-tip" target="_blank" rel="noopener" hidden>发现新版本</a>
+				<button type="button" id="agh-plugin-update" class="agh-update-tip" hidden>发现新版本</button>
 			</div>
 			<p>安装、接管、过滤、看护一体化；常用参数都在插件内配置，更细的高级项仍可在 AdGuard Home 面板完成。</p>
 		</div>
@@ -73,6 +75,15 @@
 			<a href="#" id="agh-header-console" class="agh-badge agh-badge-link is-disabled" target="_blank" rel="noopener" aria-disabled="true">打开 AGH 面板</a>
 			<span id="agh-hero-core" class="agh-hero-badge" title="正在读取内核版本">读取中</span>
 		</div>
+	</div>
+
+	<div class="agh-card" id="agh-plugin-update-progress" hidden>
+		<div class="agh-card-head">
+			<h3>插件更新</h3>
+			<span id="agh-plugin-update-phase" class="agh-hint">准备中...</span>
+		</div>
+		<div class="agh-progress-bar is-indeterminate" id="agh-plugin-update-bar"><i></i></div>
+		<pre class="agh-log" id="agh-plugin-update-log"></pre>
 	</div>
 
 	<nav class="agh-tabs" id="agh-tabs">
@@ -857,8 +868,39 @@
 		</footer>
 </div>
 
+<div class="agh-modal" id="agh-plugin-update-modal" hidden>
+	<div class="agh-modal-mask" id="agh-plugin-update-mask"></div>
+	<div class="agh-modal-body">
+		<h3>在线更新插件</h3>
+		<p id="agh-plugin-update-summary" class="agh-hint"></p>
+		<div class="agh-modal-row">
+			<span>更新渠道</span>
+			<label><input type="radio" name="agh-plugin-channel" value="cn" checked> 国内加速</label>
+			<label><input type="radio" name="agh-plugin-channel" value="github"> GitHub 直连</label>
+		</div>
+		<div class="agh-modal-row">
+			<span>更新方式</span>
+			<label><input type="radio" name="agh-plugin-method" value="source" checked> 自动（源码覆盖）</label>
+			<label><input type="radio" name="agh-plugin-method" value="package"> 安装包（可选）</label>
+		</div>
+		<div class="agh-modal-row">
+			<label><input type="checkbox" id="agh-plugin-force"> 强制更新 / 降级（高级）</label>
+		</div>
+		<div class="agh-modal-row" id="agh-plugin-version-row" hidden>
+			<span>目标版本</span>
+			<input type="text" id="agh-plugin-version-input" placeholder="如 1.3.5">
+		</div>
+		<p class="agh-hint" id="agh-plugin-force-hint" hidden>同版本为重装，低版本为降级；会先备份配置，降级可能遇到配置结构变化。</p>
+		<p class="agh-hint">默认使用源码覆盖，跨固件通用；安装包更快，但需要对应固件的 ipk/apk。更新会重启 AdGuard Home，DNS 会短暂中断。</p>
+		<div class="agh-modal-actions">
+			<button type="button" class="agh-btn agh-btn-secondary" id="agh-plugin-update-cancel">取消</button>
+			<button type="button" class="agh-btn agh-btn-primary" id="agh-plugin-update-start">开始更新</button>
+		</div>
+	</div>
+</div>
+
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261121a"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261123a"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

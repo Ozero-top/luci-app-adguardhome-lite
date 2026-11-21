@@ -47,6 +47,10 @@
 		filterBusy: false,
 		adultMigrated: false,
 		parentalNotified: false,
+		pluginLatest: '',
+		pluginUpdating: false,
+		pluginTimer: null,
+		pluginMiss: 0,
 		stepsCollapsed: null,
 		busy: false,
 		passShown: false,
@@ -312,9 +316,16 @@
 		if (ver) ver.textContent = (p && p.current) ? 'v' + p.current : '未知';
 		if (!tip) return;
 
+		if (state.pluginUpdating) {
+			tip.textContent = '更新中...';
+			tip.hidden = false;
+			tip.disabled = true;
+			return;
+		}
+		tip.disabled = false;
 		if (p && p.update && p.latest) {
-			tip.href = p.url || '#';
-			tip.textContent = '发现新版本 v' + p.latest + '，前往更新';
+			state.pluginLatest = p.latest;
+			tip.textContent = '发现 v' + p.latest + '，立即更新';
 			tip.hidden = false;
 		} else {
 			tip.hidden = true;
@@ -536,7 +547,7 @@
 
 	function updateSteps(d) {
 		if (!d) return;
-		var busy = state.busy || d.action_running || d.update_running;
+		var busy = state.busy || d.action_running || d.update_running || state.pluginUpdating;
 
 		var installBtn = $('agh-install-btn');
 		var enableBtn = $('agh-enable-btn');
@@ -1241,6 +1252,7 @@
 	}
 
 	function installCore() {
+		if (state.pluginUpdating) return;
 		if (!window.confirm('将从 AdGuard 官方源或 GitHub 反代下载最新内核，可能需要几分钟。确定继续？')) return;
 		showProgress('正在启动安装任务...');
 		state.busy = true;
@@ -1252,6 +1264,178 @@
 			updateSteps(state.status);
 			handleApiError(err);
 		});
+	}
+
+	// ===== 插件在线更新 =====
+	function openPluginUpdateModal() {
+		var p = (state.status && state.status.plugin) || {};
+		if (!p.update || !p.latest) return;
+		state.pluginLatest = p.latest;
+		var summary = $('agh-plugin-update-summary');
+		if (summary) summary.textContent = '当前 v' + (p.current || '未知') + ' → 最新 v' + p.latest;
+		var force = $('agh-plugin-force');
+		if (force) force.checked = false;
+		var row = $('agh-plugin-version-row');
+		if (row) row.hidden = true;
+		var hint = $('agh-plugin-force-hint');
+		if (hint) hint.hidden = true;
+		var input = $('agh-plugin-version-input');
+		if (input) input.value = p.latest;
+		var start = $('agh-plugin-update-start');
+		if (start) start.textContent = '开始更新';
+		var modal = $('agh-plugin-update-modal');
+		if (modal) modal.hidden = false;
+	}
+
+	function togglePluginForce() {
+		var force = $('agh-plugin-force');
+		var on = !!(force && force.checked);
+		var row = $('agh-plugin-version-row');
+		if (row) row.hidden = !on;
+		var hint = $('agh-plugin-force-hint');
+		if (hint) hint.hidden = !on;
+		var input = $('agh-plugin-version-input');
+		if (on && input && !input.value) input.value = state.pluginLatest;
+		var start = $('agh-plugin-update-start');
+		if (start) start.textContent = on ? '开始强制更新' : '开始更新';
+	}
+
+	function closePluginUpdateModal() {
+		var modal = $('agh-plugin-update-modal');
+		if (modal) modal.hidden = true;
+	}
+
+	function showPluginProgress() {
+		var card = $('agh-plugin-update-progress');
+		if (card) card.hidden = false;
+	}
+
+	function setPluginProgress(log, running, done) {
+		var bar = $('agh-plugin-update-bar');
+		if (bar) {
+			var fill = bar.querySelector('i');
+			var matches = String(log || '').match(/下载进度：\d+%/g);
+			var pct = -1;
+			if (matches && matches.length) {
+				pct = parseInt(matches[matches.length - 1].replace(/[^0-9]/g, ''), 10);
+			}
+			if (done) {
+				bar.classList.remove('is-indeterminate');
+				if (fill) fill.style.width = '100%';
+			} else if (running && pct >= 0) {
+				bar.classList.remove('is-indeterminate');
+				if (fill) fill.style.width = Math.max(2, Math.min(100, pct)) + '%';
+			} else {
+				bar.classList.add('is-indeterminate');
+				if (fill) fill.style.width = '';
+			}
+		}
+
+		var logEl = $('agh-plugin-update-log');
+		if (logEl) {
+			logEl.textContent = log || '';
+			logEl.scrollTop = logEl.scrollHeight;
+		}
+
+		var phase = $('agh-plugin-update-phase');
+		if (phase) {
+			var lines = String(log || '').trim().split('\n');
+			phase.textContent = done ? '完成' : (lines[lines.length - 1] || '准备中...');
+		}
+	}
+
+	function pollPluginProgress() {
+		state.pluginTimer = null;
+		apiGet(U.pluginProgress).then(function (d) {
+			showPluginProgress();
+			setPluginProgress(d.log || '', !!d.running, typeof d.code === 'number' && d.code === 0);
+			if (d.running) {
+				state.pluginUpdating = true;
+				if (state.status) updatePluginVersion(state.status);
+				state.pluginTimer = setTimeout(pollPluginProgress, 1500);
+				return;
+			}
+			if (typeof d.code === 'number') {
+				state.pluginUpdating = false;
+				if (state.status) updatePluginVersion(state.status);
+				if (d.code === 0) {
+					showToast('插件更新完成，页面即将刷新', 'ok');
+					setTimeout(function () { window.location.reload(); }, 2500);
+				} else {
+					showToast('插件更新失败，请查看更新日志', 'bad');
+				}
+			} else if (state.pluginUpdating && state.pluginMiss < 4) {
+				// 任务刚启动，等 running 标记出现
+				state.pluginMiss += 1;
+				state.pluginTimer = setTimeout(pollPluginProgress, 800);
+			} else if (state.pluginUpdating) {
+				state.pluginUpdating = false;
+				if (state.status) updatePluginVersion(state.status);
+				showToast('未能启动更新任务，请查看运行日志', 'bad');
+			}
+		}).catch(function (err) {
+			state.pluginUpdating = false;
+			if (state.status) updatePluginVersion(state.status);
+			handleApiError(err);
+		});
+	}
+
+	function startPluginUpdate() {
+		if (!state.pluginLatest) return;
+		var forceEl = $('agh-plugin-force');
+		var force = !!(forceEl && forceEl.checked);
+		var versionInput = $('agh-plugin-version-input');
+		var target = force ? ((versionInput && versionInput.value) || '').replace(/\s+/g, '') : state.pluginLatest;
+		if (!target) {
+			showToast('请输入目标版本号', 'bad');
+			return;
+		}
+		if (force && !/^\d+\.\d+\.\d+[\w.-]*$/.test(target)) {
+			showToast('版本号格式不正确，例如 1.3.5', 'bad');
+			return;
+		}
+		if (force && !window.confirm('强制更新到 v' + target + '？\n\n同版本为重装，低版本为降级；会先备份配置，降级可能遇到配置结构变化。')) {
+			return;
+		}
+		var channelEl = document.querySelector('input[name="agh-plugin-channel"]:checked');
+		var methodEl = document.querySelector('input[name="agh-plugin-method"]:checked');
+		closePluginUpdateModal();
+		state.pluginUpdating = true;
+		state.pluginMiss = 0;
+		showPluginProgress();
+		setPluginProgress('正在启动更新任务...\n', true, false);
+		if (state.status) updatePluginVersion(state.status);
+		apiPost(U.pluginUpdate, {
+			version: target,
+			channel: channelEl ? channelEl.value : 'cn',
+			method: methodEl ? methodEl.value : 'source',
+			force: force ? 1 : 0
+		}).then(function () {
+			state.pluginTimer = setTimeout(pollPluginProgress, 800);
+		}).catch(function (err) {
+			state.pluginUpdating = false;
+			if (state.status) updatePluginVersion(state.status);
+			var card = $('agh-plugin-update-progress');
+			if (card) card.hidden = true;
+			handleApiError(err);
+		});
+	}
+
+	// 页面重新打开时恢复未完成的更新进度
+	function resumePluginUpdate() {
+		apiGet(U.pluginProgress).then(function (d) {
+			if (d && d.running) {
+				state.pluginUpdating = true;
+				showPluginProgress();
+				setPluginProgress(d.log || '', true, false);
+				if (state.status) updatePluginVersion(state.status);
+				pollPluginProgress();
+			} else if (d && typeof d.code === 'number' && d.code !== 0) {
+				// 上次更新失败：保留日志，方便排查
+				showPluginProgress();
+				setPluginProgress(d.log || '', false, false);
+			}
+		}).catch(function () { /* 忽略 */ });
 	}
 
 	function setSelectValue(id, value) {
@@ -1902,6 +2086,12 @@
 		if ($('agh-upstream-form')) $('agh-upstream-form').onsubmit = saveSettings;
 		if ($('agh-crypto-form')) $('agh-crypto-form').onsubmit = saveSettings;
 
+		if ($('agh-plugin-update')) $('agh-plugin-update').onclick = openPluginUpdateModal;
+		if ($('agh-plugin-update-cancel')) $('agh-plugin-update-cancel').onclick = closePluginUpdateModal;
+		if ($('agh-plugin-update-mask')) $('agh-plugin-update-mask').onclick = closePluginUpdateModal;
+		if ($('agh-plugin-update-start')) $('agh-plugin-update-start').onclick = startPluginUpdate;
+		if ($('agh-plugin-force')) $('agh-plugin-force').onchange = togglePluginForce;
+
 		bindFilterSwitch('agh-filter-enabled', 'filtering');
 		bindParentalSwitch();
 		bindFilterSwitch('agh-filter-safesearch', 'safesearch');
@@ -2084,6 +2274,7 @@
 		if (!hash) hash = 'overview';
 		switchTab(hash, false);
 		refreshStatus();
+		resumePluginUpdate();
 		loadLegacyScan();
 		setInterval(function () {
 			if (document.hidden || state.busy) return;

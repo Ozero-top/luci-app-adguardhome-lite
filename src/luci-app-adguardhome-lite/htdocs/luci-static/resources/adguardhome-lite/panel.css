@@ -1450,3 +1450,85 @@ code {
 .agh-dark .agh-toast.is-warn {
 	border-color: #574a2c;
 }
+
+/* 插件在线更新弹窗 */
+button.agh-update-tip {
+	border: 0;
+	background: transparent;
+	font: inherit;
+	padding: 0;
+	cursor: pointer;
+}
+
+.agh-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.agh-modal[hidden] {
+	display: none;
+}
+
+.agh-modal-mask {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.45);
+}
+
+.agh-modal-body {
+	position: relative;
+	width: min(560px, calc(100vw - 32px));
+	padding: 20px;
+	border-radius: 12px;
+	background: var(--agh-surface, #fffdf7);
+	color: var(--agh-text, #2b2b2b);
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+}
+
+.agh-modal-body h3 {
+	margin: 0 0 8px;
+}
+
+.agh-modal-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 14px;
+	margin: 12px 0;
+}
+
+.agh-modal-row > span {
+	min-width: 72px;
+	color: var(--agh-muted, #7a7466);
+}
+
+.agh-modal-row label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.agh-modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.agh-dark .agh-modal-body {
+	background: #1e1f22;
+	color: #e8e6e3;
+}
+
+#agh-plugin-version-input {
+	width: 160px;
+}
+
+.agh-card[hidden],
+.agh-update-tip[hidden] {
+	display: none;
+}

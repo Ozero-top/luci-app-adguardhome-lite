@@ -154,6 +154,46 @@ def build_payload(modern, legacy):
     return buffer.getvalue()
 
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_manifest(modern, legacy, run_path, out_dir=None):
+    """生成在线更新清单：文件名与校验值集中在这里维护。"""
+    out_dir = out_dir or DIST
+    with open(VERSION_FILE, "r", encoding="utf-8") as f:
+        tag_version = f.read().strip()
+    pkgver = "%s-%s" % (VERSION, RELEASE)
+    apk_name = "luci-app-adguardhome-lite_%s_all.apk" % pkgver
+    apk_path = os.path.join(out_dir, apk_name)
+    manifest_name = "manifest-%s.txt" % tag_version
+    manifest_path = os.path.join(out_dir, manifest_name)
+
+    lines = [
+        "version=%s" % tag_version,
+        "pkgver=%s" % pkgver,
+        "modern=%s" % MODERN,
+        "modern_sha256=%s" % sha256_file(modern),
+        "legacy=%s" % LEGACY,
+        "legacy_sha256=%s" % sha256_file(legacy),
+        "run=%s" % OUTPUT,
+        "run_sha256=%s" % sha256_file(run_path),
+        "source=v%s" % tag_version,
+    ]
+    if os.path.isfile(apk_path):
+        lines += [
+            "apk=%s" % apk_name,
+            "apk_sha256=%s" % sha256_file(apk_path),
+        ]
+    with open(manifest_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lines) + "\n")
+    return manifest_path, manifest_name
+
+
 def main():
     modern, legacy = ensure_ipks()
     payload = build_payload(modern, legacy)
@@ -177,8 +217,19 @@ def main():
     lines = []
     if os.path.isfile(sums_path):
         with open(sums_path, "r", encoding="utf-8") as f:
-            lines = [line for line in f.read().splitlines() if OUTPUT not in line]
+            lines = [line for line in f.read().splitlines()
+                     if OUTPUT not in line and "manifest-" not in line
+                     and not line.endswith(".apk")]
     lines.append("%s  %s" % (digest, OUTPUT))
+
+    manifest_path, manifest_name = write_manifest(modern, legacy, out_path)
+    lines.append("%s  %s" % (sha256_file(manifest_path), manifest_name))
+
+    apk_name = "luci-app-adguardhome-lite_%s-%s_all.apk" % (VERSION, RELEASE)
+    apk_path = os.path.join(DIST, apk_name)
+    if os.path.isfile(apk_path):
+        lines.append("%s  %s" % (sha256_file(apk_path), apk_name))
+
     with open(sums_path, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
 
@@ -186,6 +237,7 @@ def main():
     print("  %s" % out_path)
     print("  大小: %.1f KB" % (len(data) / 1024.0))
     print("  SHA256: %s" % digest)
+    print("更新清单：%s" % manifest_path)
     print("校验文件：%s" % sums_path)
 
 
