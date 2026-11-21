@@ -15,14 +15,18 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
 
-fetch_tag() {
+fetch_tags() {
     _out=$(curl -fsS --connect-timeout 6 -m 12 "$1" 2>/dev/null) || return 1
-    printf '%s' "$_out" | grep -o 'releases/tag/[^"]*' | head -n 1 | sed 's#.*tag/##'
+    printf '%s' "$_out" | grep -o 'releases/tag/[^"]*' | sed 's#.*tag/##' | sed 's#^[vV]##'
 }
 
 latest=""
 for prefix in "" "https://gh-proxy.org/" "https://ghfast.top/"; do
-    latest=$(fetch_tag "$prefix$FEED")
+    tags=$(fetch_tags "$prefix$FEED")
+    [ -n "$tags" ] || continue
+    # GitHub 会把 1.3.7-2 当成 1.3.7 的预发布排在其后，这里自行取最高版本
+    latest=$(printf '%s\n' "$tags" | sort -V 2>/dev/null | tail -n 1)
+    [ -n "$latest" ] || latest=$(printf '%s\n' "$tags" | head -n 1)
     [ -n "$latest" ] && break
 done
 

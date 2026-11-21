@@ -65,6 +65,7 @@ function M.valid_client_spec(spec)
 end
 
 -- 版本号拆成「基础版本 + 预发布后缀」：1.0.0-b.2 → base {1,0,0}，pre "b"，pre_num 2
+-- 纯数字后缀是修订号：1.3.7-2 → {1,3,7,2}，排在 1.3.7 之后
 function M.version_info(v)
     local s = tostring(v or ""):lower()
     s = s:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^v", "")
@@ -77,6 +78,12 @@ function M.version_info(v)
     local parts = {}
     for n in base:gmatch("%d+") do
         parts[#parts + 1] = tonumber(n)
+    end
+
+    local rev = rest:match("^[%.%-_~]+(%d+)$")
+    if rev then
+        parts[#parts + 1] = tonumber(rev)
+        return { parts = parts, pre = "", pre_num = 0 }
     end
 
     local pre, pre_num = rest:match("^[%.%-_~]*([%a]+)[%.%-_~]*(%d*)")
