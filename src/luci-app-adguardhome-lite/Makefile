@@ -11,8 +11,8 @@ PKG_NAME:=luci-app-adguardhome-lite
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_MAINTAINER:=Ozero-top
 
-LUCI_TITLE:=AdGuard Home 助手
-LUCI_DESCRIPTION:=面向零基础用户的 AdGuard Home LuCI 插件：一键安装内核、一键接管 DNS、中文引导
+LUCI_TITLE:=AdGuard Home 管理中心
+LUCI_DESCRIPTION:=在路由器上一体化管理 AdGuard Home：一键安装内核、DNS 接管、过滤规则、运行看护与统计
 LUCI_DEPENDS:=+luci-base +luci-compat +luci-lib-jsonc +curl +wget-ssl +ca-bundle
 LUCI_PKGARCH:=all
 
@@ -42,7 +42,7 @@ if [ -x /etc/init.d/adguardhome_lite ]; then
 fi
 if [ -x /usr/share/adguardhome-lite/dns_mode.sh ]; then
 	/usr/share/adguardhome-lite/dns_mode.sh revert >/dev/null 2>&1 || {
-		echo "AdGuard Home 助手：无法恢复 DNSMasq 设置，已中止卸载以保护网络。" >&2
+		echo "AdGuard Home 管理中心：无法恢复 DNSMasq 设置，已中止卸载以保护网络。" >&2
 		exit 1
 	}
 fi

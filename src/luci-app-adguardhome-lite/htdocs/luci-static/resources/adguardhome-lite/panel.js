@@ -583,7 +583,7 @@
 			if (d.running) {
 				panelLink.href = panelUrl(d.web_port);
 				panelLink.className = 'agh-btn agh-btn-secondary';
-				panelLink.textContent = '打开控制台';
+				panelLink.textContent = '打开 AGH 面板';
 				panelLink.removeAttribute('aria-disabled');
 			} else {
 				panelLink.href = '#';

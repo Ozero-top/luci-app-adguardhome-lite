@@ -234,7 +234,7 @@ Maintainer: {maintainer}
 Architecture: all
 Installed-Size: {installed}
 SourceDateEpoch: {epoch}
-Description: AdGuard Home 助手：自动安装官方最新内核、一键接管 DNS、内置中文引导。
+Description: AdGuard Home 管理中心：自动安装官方最新内核、DNS 接管、过滤规则与运行看护。
 """.format(
         name=PKG_NAME,
         version=version,
@@ -275,7 +275,7 @@ if [ -x /etc/init.d/adguardhome_lite ]; then
 fi
 if [ -x /usr/share/adguardhome-lite/dns_mode.sh ]; then
 	/usr/share/adguardhome-lite/dns_mode.sh revert >/dev/null 2>&1 || {
-		echo "AdGuard Home 助手：无法恢复 DNSMasq 设置，已中止卸载以保护网络。" >&2
+		echo "AdGuard Home 管理中心：无法恢复 DNSMasq 设置，已中止卸载以保护网络。" >&2
 		exit 1
 	}
 fi

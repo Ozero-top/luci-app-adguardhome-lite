@@ -7,7 +7,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>AdGuard Home 助手</title>
+	<title>AdGuard Home 管理中心</title>
 	<script>
 		// 首屏前应用主题，避免暗色用户刷新时闪一下浅色背景
 		(function () {
@@ -61,7 +61,7 @@
 	<div class="agh-hero">
 		<div class="agh-hero-main">
 			<div class="agh-hero-heading">
-				<h2>AdGuard Home 助手</h2>
+				<h2>AdGuard Home 管理中心</h2>
 				<span id="agh-plugin-version" class="agh-hero-version-badge">读取中</span>
 				<a href="#" id="agh-plugin-update" class="agh-update-tip" target="_blank" rel="noopener" hidden>发现新版本</a>
 			</div>
@@ -70,7 +70,7 @@
 		<div class="agh-hero-actions">
 			<button type="button" id="agh-theme-toggle" class="agh-theme-btn" title="切换暗色 / 浅色主题">切换为暗色</button>
 			<span id="agh-header-status" class="agh-pill agh-pill-muted">读取中</span>
-			<a href="#" id="agh-header-console" class="agh-badge agh-badge-link is-disabled" target="_blank" rel="noopener" aria-disabled="true">打开控制台</a>
+			<a href="#" id="agh-header-console" class="agh-badge agh-badge-link is-disabled" target="_blank" rel="noopener" aria-disabled="true">打开 AGH 面板</a>
 			<span id="agh-hero-core" class="agh-hero-badge" title="正在读取内核版本">读取中</span>
 		</div>
 	</div>
@@ -110,7 +110,7 @@
 						<div class="agh-metric-label">成人内容（家长控制）</div>
 					</div>
 				</div>
-				<p id="agh-stats-hint" class="agh-hint">数据直接取自 AdGuard Home 统计接口，无需打开控制台；服务未运行时无法读取。</p>
+				<p id="agh-stats-hint" class="agh-hint">数据直接取自 AdGuard Home 统计接口，无需打开 AGH 面板；服务未运行时无法读取。</p>
 			</div>
 
 			<div class="agh-card">
@@ -180,7 +180,7 @@
 							<div class="agh-step-title">打开 AdGuard Home 面板</div>
 							<p>首次登录可使用状态卡片中的默认密码。登录后可添加过滤规则、查看拦截统计。</p>
 							<div class="agh-inline">
-								<a href="#" id="agh-panel-link" class="agh-btn agh-btn-secondary" target="_blank" rel="noopener">打开控制台</a>
+								<a href="#" id="agh-panel-link" class="agh-btn agh-btn-secondary" target="_blank" rel="noopener">打开 AGH 面板</a>
 								<span id="agh-console-hint" class="agh-hint"></span>
 							</div>
 						</div>
@@ -215,7 +215,7 @@
 					<h3>新手提示</h3>
 				</div>
 				<ul class="agh-tips">
-					<li><b>只要普通过滤：</b>安装内核 → 一键启用 → 打开控制台，之后在 AdGuard Home 面板添加过滤器。</li>
+					<li><b>只要普通过滤：</b>安装内核 → 一键启用 → 打开 AGH 面板添加过滤器。</li>
 					<li><b>停止后上网异常：</b>点击“停止并关闭自启”，插件会自动恢复 DNSMasq 原始设置。</li>
 					<li><b>忘记面板密码：</b>到“基础设置 → 插件配置”重新设置。</li>
 					<li><b>磁盘空间不足：</b>到“基础设置”把内核安装位置改为“内存临时”，或清理路由器空间。</li>
@@ -700,7 +700,7 @@
 				<ol class="agh-guide-list">
 					<li><b>安装内核：</b>在“概览 → 初始化配置”点击“安装/更新内核”，自动识别架构并下载官方最新正式版。</li>
 					<li><b>一键启用：</b>首次启用从内置模板生成配置，默认密码 admin123，默认用“接管 53 端口”。<b>装了 Clash 也可以保持“接管 53 端口”</b>；只有收回规则在你的固件上确实不生效、查询被 Clash 抢走时，才需要改成“Clash 前置”。</li>
-					<li><b>打开控制台：</b>用概览页显示的地址、账号和默认密码登录 AdGuard Home。</li>
+					<li><b>打开 AGH 面板：</b>用概览页显示的地址、账号和默认密码登录 AdGuard Home。</li>
 				</ol>
 				<p class="agh-hint">国内网络如果下载失败，可在“基础设置 → 插件配置”选择 GitHub 反代（推荐 gh-proxy.org）；反代不可用时自动回退直连。内置规则订阅走 jsDelivr CDN，通常无需反代。</p>
 			</div>
@@ -771,7 +771,7 @@
 					<li><b>PassWall 前置：</b>设备查询先被插件收回 53 交给 AdGuard Home 过滤，剩下的再交给 PassWall 自己的 DNS 做国内外分流；PassWall 的 DNS 劫持保持开启即可，不需要关闭。<br>
 					<b>什么时候用：</b>已经在用 PassWall 做分流，又想保留 AdGuard Home 的过滤与逐设备统计。<br>
 					<b>要注意：</b>插件按 PassWall 运行时端口自动设置上游（默认从 11400 起分配），PassWall 重启后如果换了端口，回来重新保存一次设置即可；该模式不支持“不参与接管”的接口/客户端排除，排除的设备会直接走 PassWall。</li>
-					<li><b>仅面板模式：</b>什么 DNS 都不改，只把 13800 控制台开起来。<br>
+					<li><b>仅面板模式：</b>什么 DNS 都不改，只把 13800 面板开起来。<br>
 					<b>什么时候用：</b>只想先看看界面，或者你已经有别的 DNS 方案（比如另一台软路由）。</li>
 				</ul>
 				<p class="agh-hint">切换方式时，插件会先把 DNSMasq 恢复成你原来的设置，再按新方式配置，所以来回切换不会越配越乱。停止服务或卸载插件也会自动恢复。</p>
@@ -849,7 +849,7 @@
 		</main>
 
 		<footer class="agh-footer">
-			<span>AdGuard Home 助手</span>
+			<span>AdGuard Home 管理中心</span>
 			<span class="agh-footer-links">
 				<span class="agh-footer-link"><a href="https://agh.ozero.asia" target="_blank" rel="noopener">云盘下载</a></span>
 				<span class="agh-footer-link"><a href="https://github.com/Ozero-top/luci-app-adguardhome-lite" target="_blank" rel="noopener">GitHub 项目地址</a></span>

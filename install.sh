@@ -1,5 +1,5 @@
 #!/bin/sh
-# AdGuard Home 助手 - 一键安装脚本（适用于 OpenWrt 24.10 / 25.12 等 apk 系统，也兼容 opkg）
+# AdGuard Home 管理中心 - 一键安装脚本（适用于 OpenWrt 24.10 / 25.12 等 apk 系统，也兼容 opkg）
 #
 # 用法：
 #   curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh
@@ -43,7 +43,7 @@ die() { printf '错误：%s\n' "$*" >&2; exit 1; }
 
 usage() {
 	cat <<'EOF'
-AdGuard Home 助手 安装脚本
+AdGuard Home 管理中心 安装脚本
 
   -v VERSION   指定版本号（默认 1.3.6，latest 表示最新 Release）
   -f, --force  强制更新：忽略版本标签，直接用 main 分支最新代码覆盖安装
@@ -374,7 +374,7 @@ main_install() {
 
 	log ""
 	log "安装完成（版本 $VERSION，包管理器：${PKG_MGR:-未知}）。"
-	log "下一步：打开 LuCI → 服务 → AdGuard Home 助手 → 安装内核 → 一键启用。"
+	log "下一步：打开 LuCI → 服务 → AdGuard Home 管理中心 → 安装内核 → 一键启用。"
 	log "卸载：运行本脚本并加 --uninstall（加 --purge 可同时删除配置与内核）。"
 }
 
