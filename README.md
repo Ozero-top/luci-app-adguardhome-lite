@@ -65,7 +65,7 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 - **广告根域兜底**：`$third-party` 规则降级为纯域规则，并对广告根域整域兜底，补上动态子域漏拦。
 - **一键开关**：安全搜索、浏览安全、家长控制、成人内容拦截（HaGeZi NSFW）、DoH 服务器拦截，各自独立开关。
 - **家长控制保护**：开启前先试拨 AdGuard 服务端，连不上直接拒绝；运行中连不上由看护进程自动关闭，避免全屋断网。
-- **订阅维护**：支持手动立即更新全部订阅；自动检测 Clash 代理，内置订阅走 jsDelivr CDN；统计与日志保留天数可调。
+- **订阅维护**：预置规则可选 jsDelivr（默认）/ GitHub 直连 / 自建备用三个下载源，切换后已有列表原地改到新源并立即重下；自动检测 Clash 代理；统计与日志保留天数可调。
 - **异常回退**：看护进程由 procd 托管，内核异常退出自动恢复 DNSMasq。
 
 ### 可观测与维护
@@ -163,14 +163,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-3_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-6_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.7-3` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.7-6` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -188,7 +188,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.7-3 -m https://gh-proxy.org
+sh install.sh -v 1.3.7-6 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -474,6 +474,12 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.7-6
+
+- **三个下载源**：过滤规则页档位右侧新增「下载源」，可选 jsDelivr（默认）/ GitHub 直连 / 自建备用（`agh.ozero.top`）；切换后已有预置列表原地改到新源并立即重新下载，不新增列表也不留备份，某个源失败会按顺序换其它源重试
+- **移除手动更新**：切换下载源或档位本身就会立即重新下载，原「手动更新」按钮与后端刷新动作一并删除，避免与切换源并发冲突
+- **日志可追溯**：每次切换下载源写入「运行日志 → 订阅更新日志」（保留最近 100 次）
 
 ### 1.3.7-3
 

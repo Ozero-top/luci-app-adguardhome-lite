@@ -6,8 +6,24 @@ local M = {}
 local parental_service = require "luci.model.adguardhome_lite.parental"
 
 -- 预置规则来自自建规则仓库，按设备内存分三档，每档由若干已去重的分类文件组成
-local PRESET_BASE = "https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist/"
-local PRESET_RAW = "https://raw.githubusercontent.com/Ozero-top/AdguardHome-Rrules/dist/"
+-- 三个下载源目录结构一致，可随时切换，默认 jsDelivr
+local PRESET_SOURCES = {
+    jsdelivr = "https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist/",
+    github = "https://raw.githubusercontent.com/Ozero-top/AdguardHome-Rrules/dist/",
+    custom = "https://agh.ozero.top/git/AdguardHome-Rrules/agh-dist/"
+}
+local PRESET_SOURCE_DEFAULT = "jsdelivr"
+-- 首选源失败时的尝试顺序（不含首选源本身）
+local PRESET_SOURCE_ORDER = { "github", "jsdelivr", "custom" }
+
+local function preset_source(cfg)
+    local s = tostring(cfg("preset_source", PRESET_SOURCE_DEFAULT) or "")
+    if not PRESET_SOURCES[s] then
+        s = PRESET_SOURCE_DEFAULT
+    end
+    return s
+end
+
 local PRESET_TIERS = {
     ["512"] = { "security", "chinese", "ads" },
     ["1024"] = { "security", "chinese", "tracking", "ads" },
@@ -38,13 +54,11 @@ local LEGACY_WHITELIST = "8680/GOODBYEADS"
 
 -- 识别预置规则地址（含反代前缀），返回 allowlist.txt 或 512/ads.txt 这样的相对路径
 local function preset_path(url)
-    local i = url:find(PRESET_BASE, 1, true)
-    if i then
-        return url:sub(i + #PRESET_BASE)
-    end
-    i = url:find(PRESET_RAW, 1, true)
-    if i then
-        return url:sub(i + #PRESET_RAW)
+    for _, base in pairs(PRESET_SOURCES) do
+        local i = url:find(base, 1, true)
+        if i then
+            return url:sub(i + #base)
+        end
     end
     return nil
 end
@@ -104,6 +118,7 @@ function M.filters_get(ctx)
         filtering_enabled = (data.enabled == true) or (data.filtering_enabled == true),
         filters = filters,
         user_rules = data.user_rules or {},
+        preset_source = preset_source(cfg),
         safesearch = safesearch,
         parental = parental,
         safebrowsing = safebrowsing
@@ -177,6 +192,73 @@ function M.filters_save(ctx)
         end
         path = "/control/filtering/set_rules"
         body = jsonc.stringify({ rules = rules })
+    elseif act == "preset_source" then
+        -- 切换预置规则下载源：保存选择，并把已有的内置列表改到新源
+        local src = http.formvalue("source") or ""
+        if not PRESET_SOURCES[src] then
+            json_error("不支持的下载源。", nil, "invalid_rule_source")
+            return
+        end
+        uci:set(CONF, "main", "preset_source", src)
+        uci:commit(CONF)
+
+        local _, sresp = agh_api("/control/filtering/status", "GET")
+        local st = jsonc.parse(sresp)
+        if not st or type(st) ~= "table" then
+            json_error("读取规则列表失败，请确认 AdGuard Home 正在运行。", nil, "rule_fetch_failed")
+            return
+        end
+
+        local base = PRESET_SOURCES[src]
+        local migrated, failed = 0, {}
+        local function repoint(list, whitelist)
+            for _, f in ipairs(list or {}) do
+                local p = f.url and preset_path(f.url)
+                if p and (base .. p) ~= f.url then
+                    if agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
+                        url = f.url,
+                        whitelist = whitelist,
+                        data = {
+                            name = f.name or p,
+                            url = base .. p,
+                            enabled = f.enabled ~= false,
+                            whitelist = whitelist
+                        }
+                    })) == "200" then
+                        migrated = migrated + 1
+                    else
+                        failed[#failed + 1] = p
+                    end
+                end
+            end
+        end
+        repoint(st.filters, false)
+        repoint(st.whitelist_filters, true)
+
+        -- 切换源会立即重新下载列表，记入订阅更新日志
+        local logfile = RUN .. "_filter.log"
+        local hist = fs.readfile(logfile) or ""
+        local stamp = os.date("%Y-%m-%d %H:%M:%S")
+        local labels = { jsdelivr = "jsDelivr", github = "GitHub 直连", custom = "自建备用" }
+        local line = string.format("%s 切换下载源为 %s：迁移 %d 个列表%s\n", stamp, labels[src], migrated,
+            #failed > 0 and ("，失败 " .. #failed .. " 个") or "")
+        local kept = {}
+        for item in (hist .. "\n"):gmatch("([^\n]*)\n") do
+            if item ~= "" then
+                kept[#kept + 1] = item
+            end
+        end
+        if #kept >= 100 then
+            local trimmed = {}
+            for i = #kept - 99, #kept do
+                trimmed[#trimmed + 1] = kept[i]
+            end
+            kept = trimmed
+        end
+        fs.writefile(logfile, table.concat(kept, "\n") .. "\n" .. line)
+
+        http.write_json({ ok = true, source = src, migrated = migrated, failed = failed })
+        return
     elseif act == "trim" then
         -- 切换预置规则档位：写入目标档位的内置列表，移除其它档位的
         local tier = http.formvalue("tier") or "512"
@@ -209,9 +291,15 @@ function M.filters_save(ctx)
             end
         end
 
-        -- 部分网络下 AGH 直连 jsDelivr / GitHub 会失败，按「直连 → 配置的反代 → ghfast」顺序重试
+        -- 优先用当前选定的下载源，失败后按顺序换其它源；反代只作用于 GitHub 直连地址
         local function add_preset(name, path, whitelist)
-            local urls = { PRESET_BASE .. path, PRESET_RAW .. path }
+            local primary = preset_source(cfg)
+            local urls = { PRESET_SOURCES[primary] .. path }
+            for _, key in ipairs(PRESET_SOURCE_ORDER) do
+                if key ~= primary then
+                    urls[#urls + 1] = PRESET_SOURCES[key] .. path
+                end
+            end
             local proxy = tostring(cfg("github_proxy", "gh-proxy.org") or "")
                 :gsub("^%s+", ""):gsub("%s+$", ""):gsub("^https?://", ""):gsub("/+$", "")
             local proxies = {}
@@ -222,7 +310,7 @@ function M.filters_save(ctx)
                 proxies[#proxies + 1] = "ghfast.top"
             end
             for _, m in ipairs(proxies) do
-                urls[#urls + 1] = "https://" .. m .. "/" .. PRESET_RAW .. path
+                urls[#urls + 1] = "https://" .. m .. "/" .. PRESET_SOURCES.github .. path
             end
 
             for _, url in ipairs(urls) do
@@ -336,79 +424,6 @@ function M.filters_save(ctx)
         http.header("Cache-Control", "no-store")
         http.prepare_content("application/json")
         http.write_json({ ok = true, tier = tier, changed = changed, kept = kept })
-        return
-    elseif act == "refresh" then
-        -- 手动更新订阅：AGH 的黑名单与白名单要分别触发刷新。
-        -- 超时分别设为 45 秒与 20 秒，两者之和小于前端 90 秒，避免客户端先超时。
-        local updated, reported = 0, false
-        local white_error = ""
-
-        local code, resp = agh_api("/control/filtering/refresh", "POST",
-            jsonc.stringify({ whitelist = false }), 45)
-        if code ~= "200" then
-            local detail = tostring(resp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-            if #detail > 120 then
-                detail = detail:sub(1, 120) .. "..."
-            end
-            json_error(detail == "" and "更新失败，AdGuard Home 可能未运行。" or ("更新失败：" .. detail),
-                nil, "rule_action_failed")
-            return
-        end
-        local okr, parsed = pcall(jsonc.parse, resp)
-        if okr and type(parsed) == "table" and tonumber(parsed.updated) ~= nil then
-            updated = updated + tonumber(parsed.updated)
-            reported = true
-        end
-
-        -- 白名单没有订阅或下载失败都不该让整次操作失败：黑名单已更新成功，
-        -- 这里只把原因回传给前端提示。
-        local wcode, wresp = agh_api("/control/filtering/refresh", "POST",
-            jsonc.stringify({ whitelist = true }), 20)
-        if wcode == "200" then
-            local wok, wparsed = pcall(jsonc.parse, wresp)
-            if wok and type(wparsed) == "table" and tonumber(wparsed.updated) ~= nil then
-                updated = updated + tonumber(wparsed.updated)
-                reported = true
-            end
-        else
-            white_error = tostring(wresp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-            if #white_error > 120 then
-                white_error = white_error:sub(1, 120) .. "..."
-            end
-            if white_error == "" then
-                white_error = "白名单更新失败"
-            end
-        end
-
-        -- 记入插件日志：出问题时不用同时翻 AGH 面板日志
-        local logfile = RUN .. "_filter.log"
-        local hist = fs.readfile(logfile) or ""
-        local stamp = os.date("%Y-%m-%d %H:%M:%S")
-        local line = string.format("%s 手动更新订阅：更新 %d 个列表%s\n", stamp, updated,
-            white_error ~= "" and ("，白名单失败：" .. white_error) or "")
-        local kept = {}
-        for item in (hist .. "\n"):gmatch("([^\n]*)\n") do
-            if item ~= "" then
-                kept[#kept + 1] = item
-            end
-        end
-        if #kept >= 100 then
-            local trimmed = {}
-            for i = #kept - 99, #kept do
-                trimmed[#trimmed + 1] = kept[i]
-            end
-            kept = trimmed
-        end
-        fs.writefile(logfile, table.concat(kept, "\n") .. "\n" .. line)
-
-        http.header("Cache-Control", "no-store")
-        http.prepare_content("application/json")
-        http.write_json({
-            ok = true,
-            updated = updated,
-            reported = reported,
-            white_error = white_error
-        })
         return
     elseif act == "feature" then
         local feature = http.formvalue("feature") or ""

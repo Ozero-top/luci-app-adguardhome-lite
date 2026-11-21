@@ -45,6 +45,7 @@
 		logLevel: '',
 		rulesDirty: false,
 		filterBusy: false,
+		presetSource: 'jsdelivr',
 		adultMigrated: false,
 		parentalNotified: false,
 		pluginLatest: '',
@@ -957,6 +958,9 @@
 			state.filters = toList(d.filters);
 			setFilterFlags(d);
 			renderFilters(d);
+			state.presetSource = d.preset_source || 'jsdelivr';
+			var srcSel = $('agh-preset-source');
+			if (srcSel) srcSel.value = state.presetSource;
 			setMsg(msg, '', '');
 		} catch (err) {
 			if (silent) return;
@@ -1017,8 +1021,8 @@
 				b.disabled = value;
 			});
 		}
-		var refreshBtn = $('agh-filters-refresh');
-		if (refreshBtn) refreshBtn.disabled = value;
+		var srcSel = $('agh-preset-source');
+		if (srcSel) srcSel.disabled = value;
 	}
 
 	// 按设备内存切换预置规则档位
@@ -1051,6 +1055,39 @@
 				}
 			};
 		});
+	}
+
+	// 切换预置订阅下载源：保存后把已有内置列表改到新源
+	function bindPresetSource() {
+		var sel = $('agh-preset-source');
+		if (!sel) return;
+		sel.onchange = async function () {
+			if (state.filterBusy) {
+				sel.value = state.presetSource || 'jsdelivr';
+				return;
+			}
+			var msg = $('agh-filters-msg');
+			var prev = state.presetSource || 'jsdelivr';
+			var val = sel.value;
+			setFilterBusy(true);
+			if (msg) msg.textContent = '正在切换下载源...';
+			try {
+				var d = await apiPost(U.filtersSave, { action: 'preset_source', source: val });
+				state.presetSource = val;
+				var text = '下载源已切换，迁移 ' + (d.migrated || 0) + ' 个列表';
+				if (d.failed && d.failed.length) text += '，失败 ' + d.failed.length + ' 个';
+				if (msg) msg.textContent = text;
+				showToast('已切换下载源', 'ok');
+				await loadFilters(true);
+			} catch (err) {
+				sel.value = prev;
+				if (msg) msg.textContent = '';
+				handleApiError(err, msg);
+				await loadFilters(true);
+			} finally {
+				setFilterBusy(false);
+			}
+		};
 	}
 
 	function renderQueryLog(items) {
@@ -2097,39 +2134,7 @@
 		bindFilterSwitch('agh-filter-safesearch', 'safesearch');
 		bindFilterSwitch('agh-filter-safebrowsing', 'safebrowsing');
 		bindMemoryTrim();
-
-		// 手动更新订阅：让 AGH 立即重新下载所有列表，而不是等它按周期刷新
-		if ($('agh-filters-refresh')) {
-			$('agh-filters-refresh').onclick = async function () {
-				if (state.filterBusy) return;
-				var msg = $('agh-memory-trim-msg');
-				setFilterBusy(true);
-				if (msg) msg.textContent = '正在更新订阅，请稍候...';
-				try {
-					// 后端黑名单 45 秒 + 白名单 20 秒，前端留 90 秒余量；
-					// 预留足够时间，避免客户端先超时而后台仍在刷新。
-					var d = await apiPost(U.filtersSave, { action: 'refresh' }, 90000);
-					var text;
-					if (!d.reported) {
-						text = '更新完成（AdGuard Home 未返回明细）';
-					} else if (d.updated) {
-						text = '已更新 ' + d.updated + ' 个列表';
-					} else {
-						text = '订阅已是最新';
-					}
-					if (d.white_error) text += '；白名单刷新失败：' + d.white_error;
-					if (msg) msg.textContent = text;
-					showToast(d.white_error ? '订阅已更新，白名单刷新失败' : '订阅已更新',
-						d.white_error ? 'bad' : 'ok');
-					await loadFilters();
-				} catch (err) {
-					if (msg) msg.textContent = '';
-					handleApiError(err, msg);
-				} finally {
-					setFilterBusy(false);
-				}
-			};
-		}
+		bindPresetSource();
 
 		// 成人内容拦截与家长控制功能重叠，开启其中一个时自动关闭另一个
 		if ($('agh-filter-adult')) {

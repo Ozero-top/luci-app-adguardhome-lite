@@ -27,7 +27,7 @@
 			color-scheme: dark;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261123a">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261123c">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -529,9 +529,14 @@
 						<button type="button" data-tier="2048">2GB 及以上</button>
 					</div>
 					<span id="agh-memory-trim-msg" class="agh-hint"></span>
-					<button type="button" id="agh-filters-refresh" class="agh-ghost-btn agh-small-btn agh-refresh-btn" title="立即让 AdGuard Home 重新下载所有订阅列表">手动更新</button>
+					<label for="agh-preset-source" class="agh-hint">下载源</label>
+					<select id="agh-preset-source" class="agh-preset-source" title="预置订阅从哪个源下载，切换后已有列表会自动改到新源">
+						<option value="jsdelivr">jsDelivr（默认）</option>
+						<option value="github">GitHub 直连</option>
+						<option value="custom">自建备用</option>
+					</select>
 				</div>
-				<p class="agh-hint">预置规则分三档：512MB 订阅 3 个列表，1GB 订阅 4 个，2GB 及以上订阅 5 个，各列表之间已去重。切换档位会移除其它档位的预置列表，白名单和自定义订阅不受影响。内置白名单默认添加但不启用，需要放行时手动开启。点「手动更新」可立即重新下载全部订阅，不必等自动更新周期。</p>
+				<p class="agh-hint">预置规则分三档：512MB 订阅 3 个列表，1GB 订阅 4 个，2GB 及以上订阅 5 个，各列表之间已去重。切换档位会移除其它档位的预置列表，白名单和自定义订阅不受影响。内置白名单默认添加但不启用，需要放行时手动开启。下载源可选 jsDelivr（默认）、GitHub 直连或自建备用，切换后已有列表会自动改到新源并立即重新下载；某个源失败时会自动换其它源重试。</p>
 
 				<div id="agh-filter-list" class="agh-rule-list"><div class="agh-empty">读取中...</div></div>
 
@@ -795,10 +800,10 @@
 				<ul class="agh-tips">
 					<li><b>基础设置 → 插件配置：</b>启用/停止服务、DNS 接管方式、管理面板端口、内核安装位置与更新通道、GitHub 反代、数据工作目录、不参与接管的接口 / 客户端；下方同时提供面板密码修改和统计与日志保留（按天设置，保存后重启生效）。</li>
 					<li><b>基础设置 → DNS 解析：</b>上游 DNS 可选“自动（按接管方式）”或“自定义”；自定义支持 IP、<code>tls://</code>、<code>https://</code>、<code>quic://</code> 以及 <code>[/域名/]IP</code> 条件转发。DNS 缓存可设 8～128MB、最小/最大 TTL 和乐观缓存；加密上游（DoH/DoT/DoQ）只在“Clash 前置”模式生效。</li>
-					<li><b>基础设置 → 过滤规则：</b>总开关控制全部订阅与自定义规则是否生效；成人内容拦截（HaGeZi NSFW）、家长控制、安全搜索、浏览安全可一键启停；订阅支持添加、启停、删除，列表类型选“白名单（放行）”即作为白名单使用；预置规则按设备内存分 512MB / 1GB / 2GB+ 三档（分别 3 / 4 / 5 个分类列表，档内已去重），切换档位会自动移除其它档位的列表并清理已下线分类，白名单和自定义订阅不受影响；内置白名单默认添加但不启用，需要放行时手动开启；自定义规则支持 <code>@@</code> 白名单语法。以上修改立即生效，不需要重启；点档位右侧「手动更新」可立即重新下载全部订阅。</li>
+					<li><b>基础设置 → 过滤规则：</b>总开关控制全部订阅与自定义规则是否生效；成人内容拦截（HaGeZi NSFW）、家长控制、安全搜索、浏览安全可一键启停；订阅支持添加、启停、删除，列表类型选“白名单（放行）”即作为白名单使用；预置规则按设备内存分 512MB / 1GB / 2GB+ 三档（分别 3 / 4 / 5 个分类列表，档内已去重），切换档位会自动移除其它档位的列表并清理已下线分类，白名单和自定义订阅不受影响；内置白名单默认添加但不启用，需要放行时手动开启；自定义规则支持 <code>@@</code> 白名单语法。以上修改立即生效，不需要重启；切换下载源会立即重新下载已有列表。</li>
 					<li><b>拦截 DoH 服务器：</b>自定义规则输入框右侧的开关，一键写入 9 条常见加密 DNS（<code>dns.google</code>、<code>cloudflare-dns.com</code>、<code>dns.quad9.net</code>、<code>doh.pub</code> 等）的拦截规则，防止浏览器和应用用加密 DNS 绕过 AdGuard Home；关闭时按域名移除，裸域名与 <code>||domain^</code> 两种写法都会清理干净。</li>
 					<li><b>概览 → DNS 自检：</b>点“开始检测”只读检查内核文件、进程、13800 面板端口和本机 53 查询链路，不修改任何配置；失败项会直接给出原因，保存设置或切换接管方式后可先用它确认。</li>
-					<li><b>运行日志：</b>查看系统日志中的 AdGuard 记录、内核安装日志和最近一次服务操作日志，支持自动刷新与下载；级别可选“全部 / 仅错误 / 仅警告”，每条记录带原因码（如 <code>dns_hijack_conflict</code>、<code>core_integrity_failed</code>）。“查询日志”子页显示最近 20 条查询与拦截结果；末尾的“订阅更新日志”记录每次手动更新订阅的结果（保留最近 100 次）。</li>
+					<li><b>运行日志：</b>查看系统日志中的 AdGuard 记录、内核安装日志和最近一次服务操作日志，支持自动刷新与下载；级别可选“全部 / 仅错误 / 仅警告”，每条记录带原因码（如 <code>dns_hijack_conflict</code>、<code>core_integrity_failed</code>）。“查询日志”子页显示最近 20 条查询与拦截结果；末尾的“订阅更新日志”记录每次切换下载源的结果（保留最近 100 次）。</li>
 					<li><b>高级配置：</b>直接编辑 <code>/etc/AdGuardHome.yaml</code>，保存前自动执行 <code>--check-config</code>，校验失败不覆盖原文件，并保留 <code>.bak</code> 备份。</li>
 					<li><b>概览：</b>过滤统计（DNS 查询、已拦截、恶意/钓鱼、成人内容）直接取自 AdGuard Home 统计接口，可用“清空统计”重置；服务停止时数值显示“-”。</li>
 				</ul>
@@ -900,7 +905,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261123a"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261123c"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

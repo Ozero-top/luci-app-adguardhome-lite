@@ -1133,9 +1133,23 @@ code {
 	margin-top: 12px;
 }
 
-/* 手动更新按钮固定在档位行右侧 */
-.agh-refresh-btn {
-	margin-left: auto;
+/* 预置订阅下载源选择：与档位行同高、不占满整行 */
+.agh-preset-source {
+	width: auto;
+	max-width: 190px;
+	padding: 6px 8px;
+	border-radius: 8px;
+	border: 1px solid var(--agh-border);
+	background: var(--agh-surface-2);
+	color: var(--agh-text);
+	font-size: 13px;
+	line-height: 1.4;
+	outline: none;
+}
+
+.agh-preset-source:focus {
+	border-color: var(--agh-primary);
+	box-shadow: 0 0 0 3px var(--agh-primary-soft);
 }
 
 .agh-seg {
