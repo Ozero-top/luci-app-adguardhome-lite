@@ -9,7 +9,10 @@
 				"/var/run/adguardhome_lite_update.log": [ "read" ],
 				"/var/run/adguardhome_lite_action.log": [ "read" ],
 				"/var/run/adguardhome_lite_filter.log": [ "read" ],
-				"/var/run/adguardhome_lite_bootstrap.log": [ "read" ]
+				"/var/run/adguardhome_lite_bootstrap.log": [ "read" ],
+				"/var/run/adguardhome_lite_plugin_update.log": [ "read" ],
+				"/var/run/adguardhome_lite_plugin_update.code": [ "read" ],
+				"/var/run/adguardhome_lite_plugin_update.running": [ "read" ]
 			}
 		},
 		"write": {
@@ -20,7 +23,8 @@
 				"/var/run/adguardhome_lite_update.log": [ "write" ],
 				"/var/run/adguardhome_lite_action.log": [ "write" ],
 				"/var/run/adguardhome_lite_filter.log": [ "write" ],
-				"/var/run/adguardhome_lite_bootstrap.log": [ "write" ]
+				"/var/run/adguardhome_lite_bootstrap.log": [ "write" ],
+				"/var/run/adguardhome_lite_plugin_update.log": [ "write" ]
 			}
 		}
 	}

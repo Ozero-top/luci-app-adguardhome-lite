@@ -253,6 +253,7 @@ Description: AdGuard Home 管理中心：自动安装官方最新内核、DNS �
 mkdir -p /etc/AdGuardHome /usr/bin/AdGuardHome 2>/dev/null
 chmod 755 /etc/init.d/adguardhome_lite 2>/dev/null
 chmod 755 /usr/share/adguardhome-lite/*.sh 2>/dev/null
+rm -f /usr/share/adguardhome-lite/install_source 2>/dev/null
 rm -f /tmp/luci-indexcache /tmp/luci-indexcache.* 2>/dev/null
 
 # 升级/重装时如果配置里仍启用服务，则重建自启链接并重启

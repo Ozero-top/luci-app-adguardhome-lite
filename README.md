@@ -76,6 +76,7 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 - **旧版清理**：自动检测旧版插件文件与旧内核，一键清理并先备份。
 - **安全复原**：默认密码可重置；停止服务或卸载时自动恢复 DNSMasq 设置。
 - **一键自检**：只读检查内核、进程、管理端口与本机 53 链路，不修改任何配置。
+- **在线更新**：发现新版本后可页面内更新，可选国内加速 / GitHub 直连，以及源码覆盖 / 安装包两种方式。
 - **主题**：支持暗色 / 浅色切换。
 
 ---
@@ -162,14 +163,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.6-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.6` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.7` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -187,7 +188,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.6 -m https://gh-proxy.org
+sh install.sh -v 1.3.7 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -473,6 +474,14 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.7
+
+- **插件在线更新**：发现新版本后可在页面内直接更新，支持国内加速（jsDelivr → gh-proxy → ghfast → 直连）与 GitHub 直连两种渠道，源码覆盖与安装包两种方式，实时显示下载百分比、阶段与日志，失败自动回退
+- **强制更新 / 降级**：高级选项可重装当前版本或指定历史版本；更新前自动备份 UCI 配置；源码安装写入版本标记，避免降级后仍显示包管理器里的旧高版本
+- **家长控制保护**：开启前试拨 AdGuard 服务端，连不上拒绝开启；运行中由看护进程每 30 秒探测，连不上自动关闭，避免全屋断网
+- **显示名统一**：「AdGuard Home 管理中心」，包名、UCI 配置与菜单路由保持不变
+- **发布基础设施**：新增 apk 产物（实验性）、`manifest-<版本>.txt` 清单与 SHA256 校验；Release 资产自动同步到 `dist` 分支，供 jsDelivr 国内加速
 
 ### 1.3.6
 

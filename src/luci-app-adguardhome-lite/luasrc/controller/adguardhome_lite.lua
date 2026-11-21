@@ -357,6 +357,15 @@ end
 
 -- 插件版本：取包管理器与 install.sh 记录中较新的一个，兼容 ipk 与脚本安装混用
 local function plugin_version()
+    -- 源码覆盖安装（含强制降级）以 install_version 为准，避免包管理器里的旧高版本覆盖显示
+    if fs.access(SHARE .. "/install_source") then
+        local v = (fs.readfile(INSTALL_VERSION) or ""):gsub("%s+", "")
+        if v:match("^%d+%.%d+") then
+            fs.writefile(RUN .. "_plugin_version", v)
+            return v
+        end
+    end
+
     local cached = read_cache(RUN .. "_plugin_version", 3600)
     if cached and cached ~= "" then
         return cached
@@ -641,6 +650,8 @@ function index()
     entry({ "admin", "services", "adguardhome_lite", "retention_save" }, call("action_retention_save")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "core_install" }, call("action_core_install")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "core_progress" }, call("action_core_progress")).leaf = true
+    entry({ "admin", "services", "adguardhome_lite", "plugin_update" }, call("action_plugin_update")).leaf = true
+    entry({ "admin", "services", "adguardhome_lite", "plugin_progress" }, call("action_plugin_progress")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "service" }, call("action_service")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "password" }, call("action_password")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "logs_raw" }, call("action_logs")).leaf = true
@@ -782,6 +793,7 @@ end
 -- ===== 动作层：具体实现已拆分到 model/adguardhome_lite/actions/ =====
 local dashboard_actions = require "luci.model.adguardhome_lite.actions.dashboard"
 local core_actions = require "luci.model.adguardhome_lite.actions.core"
+local plugin_actions = require "luci.model.adguardhome_lite.actions.plugin"
 local service_actions = require "luci.model.adguardhome_lite.actions.service"
 local settings_actions = require "luci.model.adguardhome_lite.actions.settings"
 local rules_actions = require "luci.model.adguardhome_lite.actions.rules"
@@ -858,6 +870,8 @@ function action_stats() return dashboard_actions.stats(action_ctx()) end
 function action_stats_clear() return dashboard_actions.stats_clear(action_ctx()) end
 function action_core_install() return core_actions.core_install(action_ctx()) end
 function action_core_progress() return core_actions.core_progress(action_ctx()) end
+function action_plugin_update() return plugin_actions.plugin_update(action_ctx()) end
+function action_plugin_progress() return plugin_actions.plugin_progress(action_ctx()) end
 function action_service() return service_actions.service(action_ctx()) end
 function action_password() return service_actions.password(action_ctx()) end
 function action_selftest() return service_actions.selftest(action_ctx()) end
