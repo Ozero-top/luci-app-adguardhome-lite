@@ -1,0 +1,11 @@
+version=1.3.7-2
+pkgver=1.3.7-2
+modern=luci-app-adguardhome-lite_1.3.7-2_all.ipk
+modern_sha256=b5ceb40b5618dc4c71bc7bee4f253ee81e094a0f0ea2f14d74ae5e44a760381b
+legacy=luci-app-adguardhome-lite_1.3.7-2-legacy_all.ipk
+legacy_sha256=d046d48db716eed61ed781c11d36b7e6f854c1960815197b0a2532f01fc735ae
+run=luci-app-adguardhome-lite_1.3.7-2.run
+run_sha256=c669db0b86bbae4d7645d5fa6c58bc83e0582f99afd8b9497ed68db3d21893da
+source=v1.3.7-2
+apk=luci-app-adguardhome-lite_1.3.7-2_all.apk
+apk_sha256=3ab31c944e80c6a17ae1518e4b3d12ad5603e16657439f383a4a36430eaedb58
