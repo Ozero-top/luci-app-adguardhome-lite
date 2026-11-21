@@ -163,14 +163,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-2_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-3_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.7-2` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.7-3` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -188,7 +188,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.7-2 -m https://gh-proxy.org
+sh install.sh -v 1.3.7-3 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -474,6 +474,12 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.7-3
+
+- **档位切换修正**：AdGuard Home 没有黑名单订阅时返回 `filters: null`，不再误报「读取规则列表失败」
+- **预置列表拉取兜底**：直连 jsDelivr / GitHub 失败时，自动按配置的 GitHub 反代（默认 `gh-proxy.org`）与 `ghfast.top` 重试
+- **失败可见**：预置列表添加失败不再静默返回成功，会指出具体列表并提示检查网络或更换反代
 
 ### 1.3.7-2
 

@@ -13,6 +13,7 @@ COMMON = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "common.sh").rea
 APPLY = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "apply_settings.sh").read_text(encoding="utf-8")
 DNS_MODE = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "dns_mode.sh").read_text(encoding="utf-8")
 KEEP = (SRC / "root" / "lib" / "upgrade" / "keep.d" / "luci-app-adguardhome-lite").read_text(encoding="utf-8")
+RULES = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "rules.lua").read_text(encoding="utf-8")
 
 
 class ReliabilityTest(unittest.TestCase):
@@ -62,6 +63,15 @@ class ReliabilityTest(unittest.TestCase):
         self.assertIn('"$_cur" = "$_hj"', DNS_MODE)
         # 恢复后的自检必须查询 DNSMasq 实际端口，而不是写死 53
         self.assertIn('-port="$_chk_port"', DNS_MODE)
+
+    def test_rule_trim_handles_empty_filters_and_proxy_fallback(self):
+        # AGH 没有任何黑名单订阅时返回 "filters": null，不能当成读取失败
+        self.assertIn('type(st) ~= "table"', RULES)
+        self.assertNotIn("type(st.filters) ~= \"table\"", RULES)
+        # 直连拿不到预置列表时按配置的反代重试
+        self.assertIn("add_preset", RULES)
+        self.assertIn("github_proxy", RULES)
+        self.assertIn("preset_path", RULES)
 
 
 if __name__ == "__main__":

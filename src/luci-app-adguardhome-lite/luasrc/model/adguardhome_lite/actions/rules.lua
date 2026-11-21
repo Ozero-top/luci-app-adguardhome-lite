@@ -7,7 +7,7 @@ local parental_service = require "luci.model.adguardhome_lite.parental"
 
 -- 预置规则来自自建规则仓库，按设备内存分三档，每档由若干已去重的分类文件组成
 local PRESET_BASE = "https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist/"
-local PRESET_ALLOW = PRESET_BASE .. "allowlist.txt"
+local PRESET_RAW = "https://raw.githubusercontent.com/Ozero-top/AdguardHome-Rrules/dist/"
 local PRESET_TIERS = {
     ["512"] = { "security", "chinese", "ads" },
     ["1024"] = { "security", "chinese", "tracking", "ads" },
@@ -35,6 +35,19 @@ local LEGACY_PATTERNS = {
     "hagezi/dns-blocklists"
 }
 local LEGACY_WHITELIST = "8680/GOODBYEADS"
+
+-- 识别预置规则地址（含反代前缀），返回 allowlist.txt 或 512/ads.txt 这样的相对路径
+local function preset_path(url)
+    local i = url:find(PRESET_BASE, 1, true)
+    if i then
+        return url:sub(i + #PRESET_BASE)
+    end
+    i = url:find(PRESET_RAW, 1, true)
+    if i then
+        return url:sub(i + #PRESET_RAW)
+    end
+    return nil
+end
 
 local function matches_any(url, patterns)
     for _, p in ipairs(patterns) do
@@ -174,15 +187,20 @@ function M.filters_save(ctx)
 
         local _, sresp = agh_api("/control/filtering/status", "GET")
         local st = jsonc.parse(sresp)
-        if not st or type(st.filters) ~= "table" then
+        -- AGH 在没有黑名单订阅时返回 "filters": null，不能当成接口失败
+        if not st or type(st) ~= "table" then
             json_error("读取规则列表失败，请确认 AdGuard Home 正在运行。", nil, "rule_fetch_failed")
             return
         end
 
-        local existing, existing_white = {}, {}
+        local existing, existing_white, preset_existing = {}, {}, {}
         for _, f in ipairs(st.filters or {}) do
             if f.url then
                 existing[f.url] = f
+                local path = preset_path(f.url)
+                if path and not preset_existing[path] then
+                    preset_existing[path] = f.url
+                end
             end
         end
         for _, f in ipairs(st.whitelist_filters or {}) do
@@ -191,67 +209,128 @@ function M.filters_save(ctx)
             end
         end
 
-        local want, changed = {}, 0
+        -- 部分网络下 AGH 直连 jsDelivr / GitHub 会失败，按「直连 → 配置的反代 → ghfast」顺序重试
+        local function add_preset(name, path, whitelist)
+            local urls = { PRESET_BASE .. path, PRESET_RAW .. path }
+            local proxy = tostring(cfg("github_proxy", "gh-proxy.org") or "")
+                :gsub("^%s+", ""):gsub("%s+$", ""):gsub("^https?://", ""):gsub("/+$", "")
+            local proxies = {}
+            if proxy ~= "" then
+                proxies[#proxies + 1] = proxy
+            end
+            if proxy ~= "ghfast.top" then
+                proxies[#proxies + 1] = "ghfast.top"
+            end
+            for _, m in ipairs(proxies) do
+                urls[#urls + 1] = "https://" .. m .. "/" .. PRESET_RAW .. path
+            end
+
+            for _, url in ipairs(urls) do
+                if agh_api("/control/filtering/add_url", "POST", jsonc.stringify({
+                    name = name,
+                    url = url,
+                    whitelist = whitelist
+                })) == "200" then
+                    return true, url
+                end
+            end
+            return false
+        end
+
+        local want, changed, failed = {}, 0, {}
         for _, cat in ipairs(PRESET_TIERS[tier]) do
-            want[PRESET_BASE .. tier .. "/" .. cat .. ".txt"] = PRESET_NAMES[cat]
+            want[tier .. "/" .. cat .. ".txt"] = PRESET_NAMES[cat]
         end
 
         -- 先移除其它档位以及已下线分类的内置列表，避免重复或残留；
         -- 不能遍历分类表，否则从分类表里删掉的旧分类（如 social）会残留。
         for url in pairs(existing) do
-            if url:sub(1, #PRESET_BASE) == PRESET_BASE and not want[url] then
-                local tier_of = url:sub(#PRESET_BASE + 1):match("^(%d+)/")
-                if tier_of and PRESET_TIERS[tier_of] then
-                    agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({ url = url, whitelist = false }))
-                    changed = changed + 1
+            local path = preset_path(url)
+            -- 同一列表同时存在直连与反代地址时，只保留一个
+            local duplicated = path and want[path] and preset_existing[path] ~= url
+            if path then
+                local tier_of = path:match("^(%d+)/")
+                if (tier_of and PRESET_TIERS[tier_of] and not want[path]) or duplicated then
+                    if agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({
+                        url = url,
+                        whitelist = false
+                    })) == "200" then
+                        changed = changed + 1
+                    end
                 end
             end
         end
 
         -- 清理旧版模板内置的第三方整包订阅，用户自行添加的订阅不匹配特征串，保持不动
         for url in pairs(existing) do
-            if not want[url] and matches_any(url, LEGACY_PATTERNS) then
-                agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({ url = url, whitelist = false }))
-                changed = changed + 1
+            if not preset_path(url) and matches_any(url, LEGACY_PATTERNS) then
+                if agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({
+                    url = url,
+                    whitelist = false
+                })) == "200" then
+                    changed = changed + 1
+                end
             end
         end
         for url in pairs(existing_white) do
             if url:find(LEGACY_WHITELIST, 1, true) then
-                agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({ url = url, whitelist = true }))
-                changed = changed + 1
+                if agh_api("/control/filtering/remove_url", "POST", jsonc.stringify({
+                    url = url,
+                    whitelist = true
+                })) == "200" then
+                    changed = changed + 1
+                end
             end
         end
 
         local kept = 0
-        for url, name in pairs(want) do
-            local f = existing[url]
-            if not f then
-                agh_api("/control/filtering/add_url", "POST", jsonc.stringify({ name = name, url = url, whitelist = false }))
-                changed = changed + 1
-            elseif not f.enabled then
-                agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
-                    url = url,
-                    whitelist = false,
-                    data = { name = name, url = url, enabled = true, whitelist = false }
-                }))
-                changed = changed + 1
+        for path, name in pairs(want) do
+            local url = preset_existing[path]
+            if not url then
+                if add_preset(name, path, false) then
+                    changed = changed + 1
+                else
+                    failed[#failed + 1] = path
+                end
+            else
+                local f = existing[url]
+                if f and not f.enabled then
+                    if agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
+                        url = url,
+                        whitelist = false,
+                        data = { name = name, url = url, enabled = true, whitelist = false }
+                    })) == "200" then
+                        changed = changed + 1
+                    end
+                end
+                kept = kept + 1
             end
-            kept = kept + 1
         end
 
         -- 白名单与档位无关，缺失时补上；AGH 新增订阅默认启用，这里按旧版惯例保持关闭
-        if not existing_white[PRESET_ALLOW] then
-            agh_api("/control/filtering/add_url", "POST", jsonc.stringify({
-                name = "AGH 白名单",
-                url = PRESET_ALLOW,
-                whitelist = true
-            }))
-            agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
-                url = PRESET_ALLOW,
-                whitelist = true,
-                data = { name = "AGH 白名单", url = PRESET_ALLOW, enabled = false, whitelist = true }
-            }))
-            changed = changed + 1
+        local has_allow = false
+        for url in pairs(existing_white) do
+            if preset_path(url) == "allowlist.txt" then
+                has_allow = true
+            end
+        end
+        if not has_allow then
+            local added, added_url = add_preset("AGH 白名单", "allowlist.txt", true)
+            if added then
+                agh_api("/control/filtering/set_url", "POST", jsonc.stringify({
+                    url = added_url,
+                    whitelist = true,
+                    data = { name = "AGH 白名单", url = added_url, enabled = false, whitelist = true }
+                }))
+                changed = changed + 1
+            end
+        end
+
+        if #failed > 0 then
+            json_error(string.format(
+                "规则列表添加失败：%s。请检查路由器能否访问 GitHub / jsDelivr，或在插件配置中更换 GitHub 反代。",
+                failed[1]), nil, "rule_action_failed")
+            return
         end
 
         http.header("Cache-Control", "no-store")
