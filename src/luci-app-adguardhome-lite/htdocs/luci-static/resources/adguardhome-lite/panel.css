@@ -84,11 +84,11 @@ code {
 	color: var(--agh-primary);
 }
 
-/* 页面容器：保持原有宽度，卡片直接贴到背景边缘 */
+/* 页面容器：背景与内部卡片留出呼吸空间 */
 .agh-app {
 	max-width: 1400px;
 	margin: 0 auto;
-	padding: 0;
+	padding: 30px;
 }
 
 .agh-pill {
@@ -1095,6 +1095,7 @@ code {
 
 /* 响应式 */
 @media (max-width: 800px) {
+	.agh-app { padding: 16px; }
 	.agh-hero { flex-direction: column; padding: 15px; }
 	.agh-hero-actions { justify-content: flex-start; }
 	.agh-step { gap: 10px; padding: 11px; }
