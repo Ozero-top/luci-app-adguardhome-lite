@@ -23,11 +23,14 @@
 	<style>
 		/* 首屏关键样式：CSS 文件加载前先用暗色兜底，避免白闪 */
 		html.agh-dark, html.agh-dark body {
-			background: #141517;
+			background: transparent;
 			color-scheme: dark;
 		}
+		html.agh-dark .agh-app {
+			background: #141517;
+		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261125k">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261125j">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
