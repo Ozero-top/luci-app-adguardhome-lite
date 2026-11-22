@@ -85,10 +85,9 @@ code {
 	color: var(--agh-primary);
 }
 
-/* 页面容器 */
+/* 页面容器：宽度随分辨率与内容自适应，不再固定上限 */
 .agh-app {
-	max-width: 1400px;
-	margin: 0 auto;
+	width: 100%;
 	padding: 16px 18px 28px;
 }
 
