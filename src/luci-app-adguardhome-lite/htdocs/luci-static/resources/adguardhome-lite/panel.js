@@ -46,7 +46,7 @@
 		logText: '',
 		queryStatus: '',
 		querySearch: '',
-		queryAuto: 0,
+		queryAuto: 5,
 		queryPage: 0,
 		queryPages: [],
 		queryCursors: [''],
@@ -2467,8 +2467,7 @@
 			};
 		}
 		if ($('agh-querylog-auto')) {
-			$('agh-querylog-auto').onchange = function () {
-				state.queryAuto = Number(this.value) || 0;
+			var startQueryTimer = function () {
 				if (state.queryTimer) {
 					clearInterval(state.queryTimer);
 					state.queryTimer = null;
@@ -2482,6 +2481,13 @@
 					}, state.queryAuto * 1000);
 				}
 			};
+			$('agh-querylog-auto').onchange = function () {
+				state.queryAuto = Number(this.value) || 0;
+				startQueryTimer();
+			};
+			// 默认每 5 秒自动刷新
+			state.queryAuto = Number($('agh-querylog-auto').value) || 0;
+			startQueryTimer();
 		}
 		if ($('agh-set-cache-enabled')) $('agh-set-cache-enabled').onchange = applyCacheLocks;
 		if ($('agh-set-upstream-source')) $('agh-set-upstream-source').onchange = applyUpstreamLocks;
