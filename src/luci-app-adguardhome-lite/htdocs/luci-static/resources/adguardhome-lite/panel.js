@@ -43,6 +43,15 @@
 		settingsSubtab: 'svc',
 		logSubtab: 'sys',
 		logLevel: '',
+		logText: '',
+		queryStatus: '',
+		querySearch: '',
+		queryAuto: 0,
+		queryPage: 0,
+		queryPages: [],
+		queryCursors: [''],
+		queryMore: [],
+		queryTimer: null,
 		rulesDirty: false,
 		filterBusy: false,
 		presetSource: 'jsdelivr',
@@ -50,6 +59,7 @@
 		parentalNotified: false,
 		pluginLatest: '',
 		pluginUpdating: false,
+		pluginChecking: false,
 		pluginTimer: null,
 		pluginMiss: 0,
 		stepsCollapsed: null,
@@ -305,16 +315,11 @@
 		return html;
 	}
 
-	function setBusy(value) {
-		state.busy = value;
-		updateSteps(state.status);
-	}
-
 	function updatePluginVersion(d) {
 		var ver = $('agh-plugin-version');
 		var tip = $('agh-plugin-update');
 		var p = d && d.plugin;
-		if (ver) ver.textContent = (p && p.current) ? 'v' + p.current : '未知';
+		if (ver && !state.pluginChecking) ver.textContent = (p && p.current) ? 'v' + p.current : '未知';
 		if (!tip) return;
 
 		if (state.pluginUpdating) {
@@ -330,6 +335,53 @@
 			tip.hidden = false;
 		} else {
 			tip.hidden = true;
+		}
+	}
+
+	// 点击版本号手动检测更新：清缓存后触发后台检查，轮询状态等结果
+	async function checkPluginUpdate() {
+		if (state.pluginChecking || state.pluginUpdating) return;
+		state.pluginChecking = true;
+
+		var ver = $('agh-plugin-version');
+		var original = ver ? ver.textContent : '';
+		if (ver) {
+			ver.classList.add('is-checking');
+			ver.textContent = '检测中…';
+		}
+
+		try {
+			await apiPost(U.pluginCheck, {});
+			var found = null;
+			for (var i = 0; i < 16; i++) {
+				await new Promise(function (resolve) { setTimeout(resolve, 1500); });
+				var d = await apiGet(U.status);
+				if (d && d.plugin && d.plugin.latest) {
+					found = d.plugin;
+					break;
+				}
+			}
+
+			state.pluginChecking = false;
+			if (ver) {
+				ver.classList.remove('is-checking');
+				if (!found) ver.textContent = original;
+			}
+
+			if (!found) {
+				showToast('检测超时，请检查网络或 GitHub 反代设置', 'bad');
+				return;
+			}
+
+			refreshStatus(true);
+			showToast(found.update ? ('发现新版本 v' + found.latest) : '已是最新版本', 'ok');
+		} catch (err) {
+			state.pluginChecking = false;
+			if (ver) {
+				ver.classList.remove('is-checking');
+				ver.textContent = original;
+			}
+			handleApiError(err);
 		}
 	}
 
@@ -509,9 +561,14 @@
 			}
 		}
 
+		var wide = { '当前链路': 1, '面板地址': 1 };
 		var html = '';
 		for (var i = 0; i < rows.length; i++) {
-			html += '<div class="agh-status-item"><span class="agh-k">' + esc(rows[i][0]) + '</span><span class="agh-v">' + rows[i][1] + '</span></div>';
+			var label = rows[i][0];
+			var cls = 'agh-status-item';
+			if (wide[label]) cls += ' agh-status-wide';
+			if (label === '配置建议') cls += ' agh-status-full';
+			html += '<div class="' + cls + '"><span class="agh-k">' + esc(label) + '</span><span class="agh-v">' + rows[i][1] + '</span></div>';
 		}
 		var grid = $('agh-status-grid');
 		if (grid) grid.innerHTML = html;
@@ -1090,41 +1147,99 @@
 		};
 	}
 
-	function renderQueryLog(items) {
+	function queryTime(t) {
+		return String(t || '').replace('T', ' ').slice(5, 19);
+	}
+
+	function queryClient(item) {
+		if (item.client_name) return item.client_name + ' (' + item.client + ')';
+		return item.client || '';
+	}
+
+	function renderQueryLog(items, append) {
 		var el = $('agh-querylog-list');
 		if (!el) return;
-		if (!items || !items.length) {
-			el.innerHTML = '<div class="agh-empty">暂无查询记录</div>';
+
+		var list = items || [];
+		if (!list.length && !append) {
+			el.innerHTML = '<tr><td colspan="6"><div class="agh-empty">没有符合条件的查询记录</div></td></tr>';
 			return;
 		}
 
-		var html = '';
-		for (var i = 0; i < items.length; i++) {
-			var it = items[i];
-			var t = String(it.time || '').replace('T', ' ').slice(5, 19);
-			var reason = String(it.reason || '');
-			var blocked = reason.indexOf('Filtered') >= 0 || reason.indexOf('Blocked') >= 0;
-			var label = blocked ? '已拦截' : '已放行';
-			html += '<div class="agh-log-row">' +
-				'<span class="agh-rule-meta">' + esc(t) + '</span>' +
-				'<span class="agh-rule-meta agh-log-client">' + esc(it.client || '') + '</span>' +
-				'<span class="agh-log-domain">' + esc(it.domain || '') + '</span>' +
-				'<span class="' + (blocked ? 'agh-log-block' : 'agh-log-ok') + '">' +
-				esc(label) + '</span>' +
-				'</div>';
-		}
-		el.innerHTML = html;
+		var html = list.map(function (it) {
+			var blocked = it.blocked !== undefined
+				? !!it.blocked
+				: (String(it.reason || '').indexOf('Filtered') >= 0);
+			var rule = it.rule || '';
+			if (it.filter_name) rule += (rule ? ' · ' : '') + it.filter_name;
+			var elapsed = it.elapsed_ms ? (Number(it.elapsed_ms).toFixed(0) + 'ms') : '';
+			return '<tr>' +
+				'<td class="agh-query-time">' + esc(queryTime(it.time)) + '</td>' +
+				'<td class="agh-query-client" title="' + esc(it.client) + '">' + esc(queryClient(it)) + '</td>' +
+				'<td class="agh-query-domain" title="' + esc(it.domain) + '">' + esc(it.domain) + '</td>' +
+				'<td class="agh-query-rule" title="' + esc(rule) + '">' + esc(rule || '-') + '</td>' +
+				'<td class="agh-query-elapsed">' + esc(elapsed) + '</td>' +
+				'<td class="' + (blocked ? 'agh-log-block' : 'agh-log-ok') + '">' +
+				(blocked ? '已拦截' : '已放行') + '</td>' +
+				'</tr>';
+		}).join('');
+
+		if (append) el.insertAdjacentHTML('beforeend', html);
+		else el.innerHTML = html;
 	}
 
-	async function loadQueryLog() {
-		var el = $('agh-querylog-list');
-		try {
-			var d = await apiGet(U.querylog);
-			if (!d.ok) throw new Error(d.error || '读取失败');
-			renderQueryLog(d.data || []);
-		} catch (err) {
-			if (el) el.innerHTML = '<div class="agh-empty">' + esc(err.message || '读取失败') + '</div>';
+	async function loadQueryPage(index) {
+		var list = $('agh-querylog-list');
+		var info = $('agh-querylog-pageinfo');
+		var prev = $('agh-querylog-prev');
+		var next = $('agh-querylog-next');
+
+		if (index < 0) index = 0;
+		state.queryPage = index;
+		if (info) info.textContent = '第 ' + (index + 1) + ' 页';
+		if (prev) prev.disabled = index === 0;
+		if (next) next.disabled = true;
+
+		if (!state.queryPages[index]) {
+			// 已有内容时保留旧行，避免刷新瞬间表格塌缩
+			if (list && list.querySelectorAll('tr').length <= 1) {
+				list.innerHTML = '<tr><td colspan="6"><div class="agh-empty">读取中...</div></td></tr>';
+			}
+			var params = new URLSearchParams();
+			params.set('limit', '20');
+			if (state.queryStatus) params.set('status', state.queryStatus);
+			if (state.querySearch) params.set('search', state.querySearch);
+			var cursor = state.queryCursors[index] || '';
+			if (cursor) params.set('older_than', cursor);
+			try {
+				var d = await apiGet(U.querylog + '?' + params.toString());
+				if (!d.ok) throw new Error(d.error || '读取失败');
+				var items = Array.isArray(d.data) ? d.data : [];
+				state.queryPages[index] = items;
+				state.queryMore[index] = !!d.more;
+				if (items.length) {
+					state.queryCursors[index + 1] = d.cursor || items[items.length - 1].time;
+				}
+			} catch (err) {
+				if (list) list.innerHTML = '<tr><td colspan="6"><div class="agh-empty">' + esc(err.message || '读取失败') + '</div></td></tr>';
+				return;
+			}
 		}
+
+		renderQueryLog(state.queryPages[index] || [], false);
+		if (next) next.disabled = !state.queryMore[index];
+	}
+
+	function resetQueryLog() {
+		state.queryPages = [];
+		state.queryCursors = [''];
+		state.queryMore = [];
+		loadQueryPage(0);
+	}
+
+	function reloadQueryPage() {
+		delete state.queryPages[state.queryPage];
+		loadQueryPage(state.queryPage);
 	}
 
 	function setSelectDays(id, days, fallback) {
@@ -1925,18 +2040,82 @@
 		try {
 			var url = U.logs + (state.logLevel ? ('?level=' + encodeURIComponent(state.logLevel)) : '');
 			var text = await apiText(url);
-			box.textContent = text || '暂无相关日志。';
-			box.scrollTop = box.scrollHeight;
+			state.logText = text || '';
+			renderLogSections(text);
 		} catch (err) {
-			box.textContent = '读取日志失败：' + (err && err.message ? err.message : err);
+			box.innerHTML = '<div class="agh-empty">读取日志失败：' + esc(err && err.message ? err.message : err) + '</div>';
 			handleApiError(err);
 		}
 	}
 
-	function downloadLogs() {
+	// 把后端拼接的日志按 ***** 标题 ***** 拆成独立区块
+	function renderLogSections(text) {
 		var box = $('agh-log-box');
 		if (!box) return;
-		var blob = new Blob([box.textContent || ''], { type: 'text/plain;charset=utf-8' });
+
+		var raw = String(text || '').replace(/\r\n/g, '\n');
+		var sections = [];
+		var title = '系统日志';
+		var lastIndex = 0;
+		var re = /^\s*[=*]{5}\s*(.+?)\s*[=*]{5}\s*$/gm;
+		var m;
+
+		while ((m = re.exec(raw)) !== null) {
+			var body = raw.slice(lastIndex, m.index).replace(/^\n+|\n+$/g, '');
+			if (body || sections.length) {
+				sections.push({ title: title, body: body });
+			}
+			title = m[1];
+			lastIndex = re.lastIndex;
+		}
+
+		var tail = raw.slice(lastIndex).replace(/^\n+|\n+$/g, '');
+		if (tail) sections.push({ title: title, body: tail });
+
+		if (!sections.length) {
+			box.innerHTML = '<div class="agh-empty">暂无相关日志。</div>';
+			return;
+		}
+
+		function rankOf(title) {
+			if (title.indexOf('持久化状态') === 0) return 0;
+			if (title.indexOf('服务操作') >= 0) return 1;
+			if (title.indexOf('订阅更新') === 0) return 2;
+			if (title.indexOf('系统日志') === 0) return 3;
+			if (title.indexOf('内核安装') === 0) return 4;
+			return 99;
+		}
+
+		sections.sort(function (a, b) { return rankOf(a.title) - rankOf(b.title); });
+		for (var si = 0; si < sections.length; si++) {
+			if (sections[si].title.indexOf('服务操作') >= 0) {
+				sections[si].title = '服务操作日志';
+			}
+		}
+
+		box.innerHTML = sections.map(function (s) {
+			var main = s.title.indexOf('系统日志') === 0 ? ' agh-log-section-main' : '';
+			var tall = (s.title.indexOf('服务操作') >= 0 || s.title.indexOf('订阅更新') === 0)
+				? ' agh-log-section-tall' : '';
+			var body = s.body || '';
+			// 系统日志按时间倒序，最新的记录排在最前
+			if (main && body) {
+				body = body.replace(/\n+$/, '').split('\n').reverse().join('\n');
+			}
+			return '<section class="agh-log-section' + main + tall + '">' +
+				'<h4 class="agh-log-section-title">' + esc(s.title) + '</h4>' +
+				'<pre class="agh-log agh-log-tall">' + esc(body || '（暂无记录）') + '</pre>' +
+				'</section>';
+		}).join('');
+	}
+
+	function downloadLogs() {
+		var text = state.logText || '';
+		if (!text) {
+			showToast('没有可下载的日志', 'bad');
+			return;
+		}
+		var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
 		var a = document.createElement('a');
 		var d = new Date();
 		var stamp = d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2)
@@ -2044,7 +2223,7 @@
 			cards[j].classList.toggle('is-active', cards[j].getAttribute('data-logpanel') === name);
 		}
 		state.logSubtab = name;
-		if (name === 'query') loadQueryLog();
+		if (name === 'query') resetQueryLog();
 		else loadLogs();
 	}
 
@@ -2124,6 +2303,15 @@
 		if ($('agh-crypto-form')) $('agh-crypto-form').onsubmit = saveSettings;
 
 		if ($('agh-plugin-update')) $('agh-plugin-update').onclick = openPluginUpdateModal;
+		if ($('agh-plugin-version')) {
+			$('agh-plugin-version').onclick = checkPluginUpdate;
+			$('agh-plugin-version').onkeydown = function (e) {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					checkPluginUpdate();
+				}
+			};
+		}
 		if ($('agh-plugin-update-cancel')) $('agh-plugin-update-cancel').onclick = closePluginUpdateModal;
 		if ($('agh-plugin-update-mask')) $('agh-plugin-update-mask').onclick = closePluginUpdateModal;
 		if ($('agh-plugin-update-start')) $('agh-plugin-update-start').onclick = startPluginUpdate;
@@ -2210,7 +2398,53 @@
 				}
 			};
 		}
-		if ($('agh-querylog-refresh')) $('agh-querylog-refresh').onclick = loadQueryLog;
+		if ($('agh-querylog-refresh')) {
+			$('agh-querylog-refresh').onclick = function () { resetQueryLog(); };
+		}
+		if ($('agh-querylog-prev')) {
+			$('agh-querylog-prev').onclick = function () { loadQueryPage(state.queryPage - 1); };
+		}
+		if ($('agh-querylog-next')) {
+			$('agh-querylog-next').onclick = function () { loadQueryPage(state.queryPage + 1); };
+		}
+		var qfilter = document.querySelectorAll('#agh-querylog-filter button');
+		for (var qi = 0; qi < qfilter.length; qi++) {
+			qfilter[qi].onclick = function () {
+				state.queryStatus = this.getAttribute('data-qstatus') || '';
+				for (var k = 0; k < qfilter.length; k++) {
+					qfilter[k].classList.toggle('is-active', qfilter[k] === this);
+				}
+				resetQueryLog();
+			};
+		}
+		var qsearchTimer = null;
+		if ($('agh-querylog-search')) {
+			$('agh-querylog-search').oninput = function () {
+				var value = this.value;
+				if (qsearchTimer) clearTimeout(qsearchTimer);
+				qsearchTimer = setTimeout(function () {
+					state.querySearch = value.replace(/^\s+|\s+$/g, '');
+					resetQueryLog();
+				}, 400);
+			};
+		}
+		if ($('agh-querylog-auto')) {
+			$('agh-querylog-auto').onchange = function () {
+				state.queryAuto = Number(this.value) || 0;
+				if (state.queryTimer) {
+					clearInterval(state.queryTimer);
+					state.queryTimer = null;
+				}
+				if (state.queryAuto > 0) {
+					state.queryTimer = setInterval(function () {
+						if (document.hidden || state.logSubtab !== 'query') return;
+						var panel = $('agh-tab-logs');
+						if (!panel || !panel.classList.contains('is-active')) return;
+						reloadQueryPage();
+					}, state.queryAuto * 1000);
+				}
+			};
+		}
 		if ($('agh-set-cache-enabled')) $('agh-set-cache-enabled').onchange = applyCacheLocks;
 		if ($('agh-set-upstream-source')) $('agh-set-upstream-source').onchange = applyUpstreamLocks;
 		if ($('agh-set-dns-crypto')) $('agh-set-dns-crypto').onchange = applyCryptoLocks;
@@ -2239,7 +2473,21 @@
 		if ($('agh-yaml-save')) $('agh-yaml-save').onclick = saveYaml;
 		if ($('agh-yaml-editor')) $('agh-yaml-editor').oninput = updateYamlCount;
 
-		if ($('agh-log-refresh')) $('agh-log-refresh').onclick = loadLogs;
+		if ($('agh-log-refresh')) {
+			$('agh-log-refresh').onclick = async function () {
+				var btn = this;
+				if (btn.disabled) return;
+				var label = btn.textContent;
+				btn.disabled = true;
+				btn.textContent = '刷新中...';
+				try {
+					await loadLogs();
+				} finally {
+					btn.disabled = false;
+					btn.textContent = label;
+				}
+			};
+		}
 		if ($('agh-log-level')) {
 			$('agh-log-level').onchange = function () {
 				state.logLevel = this.value || '';
@@ -2255,10 +2503,22 @@
 				}
 				if (this.checked) {
 					state.logTimer = setInterval(function () {
-						if ($('agh-tab-logs') && state.logSubtab === 'sys') loadLogs();
+						if (document.hidden || state.logSubtab !== 'sys') return;
+						var panel = $('agh-tab-logs');
+						if (!panel || !panel.classList.contains('is-active')) return;
+						loadLogs();
 					}, 5000);
 				}
 			};
+			// 默认开启 5 秒自动刷新
+			if ($('agh-log-auto').checked) {
+				state.logTimer = setInterval(function () {
+					if (document.hidden || state.logSubtab !== 'sys') return;
+					var panel = $('agh-tab-logs');
+					if (!panel || !panel.classList.contains('is-active')) return;
+					loadLogs();
+				}, 5000);
+			}
 		}
 
 		window.addEventListener('hashchange', function () {

@@ -503,12 +503,50 @@ function M.filters_save(ctx)
     http.write_json({ ok = true })
 end
 
+local function url_quote(value)
+    return (tostring(value or ""):gsub("([^%w%-%._~])", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end))
+end
+
+-- 查询日志：支持筛选、搜索、分页，并补充命中规则和客户端主机名
 function M.querylog_get(ctx)
-    local fs, http, sys, uci, util, codes, agh, selftest, split_words, join_words, valid_iface_name, valid_client_spec, version_newer, clean_tag, CONF, SHARE, RUN, STATS_CACHE, VERSION_CACHE, CORE_UPDATE, PLUGIN_UPDATE, INSTALL_VERSION, RELEASE_URL, collect_stats, read_cache, cfg, CACHE_YAML_KEYS, yaml_cache_scalar, yaml_list_values, yaml_safe_search_enabled, yaml_section_scalar, yaml_set_section_scalar, cache_option, IGNORED_IFACE_PATTERNS, iface_ignored, net_devices, is_enabled, core_version, core_update_info, plugin_version, plugin_update_info, service_running, openclash_hijack_port, openclash_running, openclash_upstream_agh, passwall_enabled, passwall_dns_port, read_number, update_running, action_running, start_action, check_token, require_post, default_reason, json_error, state_value, agh_client, agh_request, agh_api, interval_days = ctx.fs, ctx.http, ctx.sys, ctx.uci, ctx.util, ctx.codes, ctx.agh, ctx.selftest, ctx.split_words, ctx.join_words, ctx.valid_iface_name, ctx.valid_client_spec, ctx.version_newer, ctx.clean_tag, ctx.CONF, ctx.SHARE, ctx.RUN, ctx.STATS_CACHE, ctx.VERSION_CACHE, ctx.CORE_UPDATE, ctx.PLUGIN_UPDATE, ctx.INSTALL_VERSION, ctx.RELEASE_URL, ctx.collect_stats, ctx.read_cache, ctx.cfg, ctx.CACHE_YAML_KEYS, ctx.yaml_cache_scalar, ctx.yaml_list_values, ctx.yaml_safe_search_enabled, ctx.yaml_section_scalar, ctx.yaml_set_section_scalar, ctx.cache_option, ctx.IGNORED_IFACE_PATTERNS, ctx.iface_ignored, ctx.net_devices, ctx.is_enabled, ctx.core_version, ctx.core_update_info, ctx.plugin_version, ctx.plugin_update_info, ctx.service_running, ctx.openclash_hijack_port, ctx.openclash_running, ctx.openclash_upstream_agh, ctx.passwall_enabled, ctx.passwall_dns_port, ctx.read_number, ctx.update_running, ctx.action_running, ctx.start_action, ctx.check_token, ctx.require_post, ctx.default_reason, ctx.json_error, ctx.state_value, ctx.agh_client, ctx.agh_request, ctx.agh_api, ctx.interval_days
+    local fs, http = ctx.fs, ctx.http
+    local agh_api = ctx.agh_api
+
     http.header("Cache-Control", "no-store")
     http.prepare_content("application/json")
 
-    local code, resp = agh_api("/control/querylog?limit=20", "GET")
+    local limit = tonumber(http.formvalue("limit") or "50") or 50
+    if limit < 1 then
+        limit = 50
+    elseif limit > 500 then
+        limit = 500
+    end
+
+    local status = (http.formvalue("status") or ""):lower()
+    if status ~= "blocked" and status ~= "allowed" then
+        status = ""
+    end
+
+    local search = (http.formvalue("search") or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    local older = (http.formvalue("older_than") or ""):gsub("%s+", "")
+
+    local path = "/control/querylog?limit=" .. limit
+    if status == "blocked" then
+        path = path .. "&response_status=blocked"
+    elseif status == "allowed" then
+        -- AGH 把未过滤的放行查询标记为 processed
+        path = path .. "&response_status=processed"
+    end
+    if search ~= "" then
+        path = path .. "&search=" .. url_quote(search)
+    end
+    if older ~= "" then
+        path = path .. "&older_than=" .. url_quote(older)
+    end
+
+    local code, resp = agh_api(path, "GET")
     if code ~= "200" then
         http.write_json({ ok = false, error = "读取查询日志失败，请确认 AdGuard Home 正在运行。" })
         return
@@ -516,28 +554,80 @@ function M.querylog_get(ctx)
 
     local okc, jsonc = pcall(require, "luci.jsonc")
     local data = okc and jsonc.parse(resp) or nil
-    local items = {}
-    if data and data.data then
-        for _, e in ipairs(data.data) do
-            local q = e.question or {}
-            local first = q[1] or q
-            local client = e.client or ""
-            if e.client_info and e.client_info.name and e.client_info.name ~= "" then
-                client = e.client_info.name
+    if not data or type(data.data) ~= "table" then
+        http.write_json({ ok = false, error = "查询日志返回格式异常。" })
+        return
+    end
+
+    -- 订阅 id -> 名称，让每条记录能看出被哪份规则拦下
+    local filter_names = {}
+    local fcode, fresp = agh_api("/control/filtering/status", "GET")
+    if fcode == "200" then
+        local fdata = okc and jsonc.parse(fresp or "") or nil
+        for _, f in ipairs((fdata and fdata.filters) or {}) do
+            if f.id and f.name then
+                filter_names[tostring(f.id)] = f.name
             end
-            items[#items + 1] = {
-                time = e.time or "",
-                client = client,
-                domain = first.name or "",
-                qtype = first.type or "",
-                status = e.status or (e.result and e.result.status) or "",
-                reason = e.reason or "",
-                upstream = e.upstream or ""
-            }
         end
     end
 
-    http.write_json({ ok = true, data = items })
+    -- DHCP 租约：把客户端 IP 补成主机名
+    local lease_names = {}
+    local leases = fs.readfile("/tmp/dhcp.leases") or ""
+    for line in leases:gmatch("[^\n]+") do
+        local ip, name = line:match("^%d+%s+%S+%s+(%d+%.%d+%.%d+%.%d+)%s+(%S+)")
+        if ip and name and name ~= "*" then
+            lease_names[ip] = name
+        end
+    end
+
+    local items = {}
+    for _, e in ipairs(data.data) do
+        local q = e.question or {}
+        local first = q[1] or q
+        local client = e.client or ""
+        local client_name = ""
+        if e.client_info and e.client_info.name and e.client_info.name ~= "" then
+            client_name = e.client_info.name
+        elseif lease_names[client] then
+            client_name = lease_names[client]
+        end
+
+        local rule_text, rule_list = "", ""
+        if type(e.rules) == "table" and e.rules[1] then
+            rule_text = tostring(e.rules[1].text or "")
+            local fid = e.rules[1].filter_list_id
+            if fid then
+                rule_list = filter_names[tostring(fid)] or ""
+            end
+        end
+
+        local reason = e.reason or ""
+        local blocked = (reason:find("Filtered") ~= nil and reason:find("Whitelist") == nil)
+            or reason:find("Blocked") ~= nil
+
+        items[#items + 1] = {
+            time = e.time or "",
+            client = client,
+            client_name = client_name,
+            domain = first.name or "",
+            qtype = first.type or "",
+            status = e.status or (e.result and e.result.status) or "",
+            blocked = blocked,
+            reason = reason,
+            upstream = e.upstream or "",
+            rule = rule_text,
+            filter_name = rule_list,
+            elapsed_ms = e.elapsedMs or ""
+        }
+    end
+
+    http.write_json({
+        ok = true,
+        data = items,
+        more = #items >= limit,
+        cursor = (items[#items] and items[#items].time) or ""
+    })
 end
 
 function M.retention_save(ctx)

@@ -163,14 +163,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-6_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-7_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.7-6` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.7-7` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -188,7 +188,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.7-6 -m https://gh-proxy.org
+sh install.sh -v 1.3.7-7 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -474,6 +474,15 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.7-7
+
+- **界面更清爽**：整体配色向 AdGuard Home 原生风格靠拢，深色模式更统一；「运行状态」改为紧凑排列，去掉多余留白
+- **查询日志更好用**：可按「全部 / 已拦截 / 已放行」筛选，支持搜索域名或设备、翻页查看；每条记录显示命中的规则与所属订阅，刷新时不再闪烁
+- **日志分区显示**：运行日志按「持久化状态 / 服务操作 / 订阅更新 / 系统日志 / 内核安装」分开，最新的系统日志排在最前，默认每 5 秒自动刷新
+- **手动检查更新**：点击标题旁的版本号即可立即检查新版本
+- **设置页更紧凑**：基础设置与高级配置的间距和输入框高度收紧，长页面更省滚动
+- **显示更统一**：英文与数字使用内置字体，不再受设备字体影响
 
 ### 1.3.7-6
 

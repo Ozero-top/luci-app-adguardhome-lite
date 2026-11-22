@@ -100,4 +100,27 @@ function M.plugin_progress(ctx)
     })
 end
 
+-- 手动检测插件更新：清除 24 小时缓存并立即触发一次后台检查
+function M.plugin_check(ctx)
+    local fs, http = ctx.fs, ctx.http
+    local require_post = ctx.require_post
+
+    if not require_post() then
+        return
+    end
+
+    fs.remove(ctx.PLUGIN_UPDATE)
+    local info = ctx.plugin_update_info()
+
+    http.header("Cache-Control", "no-store")
+    http.prepare_content("application/json")
+    http.write_json({
+        ok = true,
+        checking = true,
+        current = info.current or "",
+        latest = info.latest or "",
+        update = info.update and true or false
+    })
+end
+
 return M

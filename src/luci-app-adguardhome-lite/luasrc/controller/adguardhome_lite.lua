@@ -215,7 +215,6 @@ local function yaml_set_section_scalar(path, section, key, value)
     return true
 end
 
-
 -- 缓存配置以 AdGuard Home 的 YAML 为准（AGH 面板与插件 UI 共用同一份），
 -- YAML 不存在或缺少字段时才回退到 UCI / 默认值。
 local function cache_option(configpath, key, default)
@@ -642,7 +641,6 @@ function index()
 
     -- 独立管理页面的 JSON 接口（不出现在菜单中）
     entry({ "admin", "services", "adguardhome_lite", "status" }, call("action_status")).leaf = true
-    entry({ "admin", "services", "adguardhome_lite", "stats" }, call("action_stats")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "stats_clear" }, call("action_stats_clear")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "filters_get" }, call("action_filters_get")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "filters_save" }, call("action_filters_save")).leaf = true
@@ -651,6 +649,7 @@ function index()
     entry({ "admin", "services", "adguardhome_lite", "core_install" }, call("action_core_install")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "core_progress" }, call("action_core_progress")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "plugin_update" }, call("action_plugin_update")).leaf = true
+    entry({ "admin", "services", "adguardhome_lite", "plugin_check" }, call("action_plugin_check")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "plugin_progress" }, call("action_plugin_progress")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "service" }, call("action_service")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "password" }, call("action_password")).leaf = true
@@ -663,8 +662,6 @@ function index()
     entry({ "admin", "services", "adguardhome_lite", "legacy_clean" }, call("action_legacy_clean")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "selftest" }, call("action_selftest")).leaf = true
 end
-
-
 
 -- 从 AdGuard Home 本地接口读取过滤统计，插件页面无需打开 AGH 面板。
 -- 结果缓存 8 秒：页面 10 秒轮询时每次都能拿到新数据，又不会重复请求。
@@ -734,10 +731,7 @@ collect_stats = function()
     return data
 end
 
-
-
 -- 清空 AdGuard Home 统计：调用官方 /control/stats_reset，并删除插件侧缓存
-
 
 -- 历史调用名保持不变，内部统一走 netrc 凭据方式
 local agh_api = agh_request
@@ -756,37 +750,9 @@ local function interval_days(value, default)
     return n
 end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 -- DNS 自检：只读检查内核、进程、面板端口与 DNS 查询链路，不修改任何配置
 
-
 -- 旧版残留扫描：只读，返回 JSON 清单
-
 
 -- 旧版残留清理：先备份，再删除旧插件文件、移动旧内核
 
@@ -866,11 +832,11 @@ local function action_ctx()
 end
 
 function action_status() return dashboard_actions.status(action_ctx()) end
-function action_stats() return dashboard_actions.stats(action_ctx()) end
 function action_stats_clear() return dashboard_actions.stats_clear(action_ctx()) end
 function action_core_install() return core_actions.core_install(action_ctx()) end
 function action_core_progress() return core_actions.core_progress(action_ctx()) end
 function action_plugin_update() return plugin_actions.plugin_update(action_ctx()) end
+function action_plugin_check() return plugin_actions.plugin_check(action_ctx()) end
 function action_plugin_progress() return plugin_actions.plugin_progress(action_ctx()) end
 function action_service() return service_actions.service(action_ctx()) end
 function action_password() return service_actions.password(action_ctx()) end

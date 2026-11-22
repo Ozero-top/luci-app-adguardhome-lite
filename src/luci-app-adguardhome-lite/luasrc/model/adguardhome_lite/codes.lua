@@ -73,8 +73,4 @@ function M.level(code)
     return M.codes[code] or "error"
 end
 
-function M.known(code)
-    return M.codes[code] ~= nil
-end
-
 return M

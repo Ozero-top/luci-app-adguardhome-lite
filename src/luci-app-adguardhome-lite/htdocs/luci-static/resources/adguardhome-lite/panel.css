@@ -1,3 +1,11 @@
+/* 内置字体：英文/数字使用 Space Grotesk，中文回退系统无衬线 */
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/space-grotesk-400.woff2") format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:500;font-display:swap;src:url("fonts/space-grotesk-500.woff2") format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:600;font-display:swap;src:url("fonts/space-grotesk-600.woff2") format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:700;font-display:swap;src:url("fonts/space-grotesk-700.woff2") format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/jetbrains-mono-400.woff2") format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:700;font-display:swap;src:url("fonts/jetbrains-mono-700.woff2") format("woff2")}
+
 /* AdGuard Home 管理中心 - 右侧独立插件页面（浅色草绿 / 米黄）
    本文件只作用于 iframe 内部，不加载任何 LuCI 主题样式。 */
 
@@ -21,8 +29,8 @@
 	--agh-warning-soft: #f7edd8;
 	--agh-shadow: 0 10px 26px rgba(61, 80, 49, 0.08);
 	--agh-radius: 14px;
-	--agh-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
-	--agh-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+	--agh-font: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
+	--agh-mono: "JetBrains Mono", ui-monospace, monospace;
 	color-scheme: light;
 }
 
@@ -245,6 +253,24 @@ code {
 	background: var(--agh-primary-soft);
 	border: 1px solid #cfdcbf;
 	white-space: nowrap;
+	cursor: pointer;
+	transition: border-color .2s, opacity .2s;
+}
+
+.agh-hero-version-badge:hover,
+.agh-hero-version-badge:focus-visible {
+	border-color: var(--agh-primary);
+	outline: none;
+}
+
+.agh-hero-version-badge.is-checking {
+	cursor: progress;
+	animation: aghBadgePulse 1s ease-in-out infinite;
+}
+
+@keyframes aghBadgePulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: .45; }
 }
 
 .agh-update-tip {
@@ -283,8 +309,8 @@ code {
 
 /* 卡片 */
 .agh-card {
-	margin-bottom: 14px;
-	padding: 17px 19px;
+	margin-bottom: 12px;
+	padding: 14px 16px;
 	background: var(--agh-surface);
 	border: 1px solid var(--agh-border);
 	border-radius: var(--agh-radius);
@@ -315,16 +341,28 @@ code {
 /* 状态 */
 .agh-status-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-	grid-auto-rows: 1fr;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
 	gap: 10px;
+}
+
+.agh-status-wide { grid-column: span 2; }
+
+.agh-status-full { grid-column: 1 / -1; }
+
+@media (max-width: 1200px) {
+	.agh-status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 800px) {
+	.agh-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.agh-status-wide { grid-column: span 2; }
 }
 
 .agh-status-item {
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
-	padding: 10px 13px;
+	padding: 8px 11px;
 	border-radius: 11px;
 	background: var(--agh-surface-2);
 	border: 1px solid var(--agh-border);
@@ -448,7 +486,8 @@ code {
 
 .agh-hint {
 	color: var(--agh-muted);
-	font-size: 12px;
+	font-size: 11.5px;
+	line-height: 1.5;
 }
 
 .agh-stats-notice {
@@ -500,13 +539,6 @@ code {
 	color: var(--agh-danger);
 }
 .agh-btn-danger:hover { background: #f3dcd6; }
-
-.agh-btn-ghost {
-	background: transparent;
-	border-color: var(--agh-border);
-	color: var(--agh-muted);
-}
-.agh-btn-ghost:hover { color: var(--agh-primary); background: var(--agh-primary-soft); }
 
 .agh-ghost-btn {
 	border: 1px solid var(--agh-border);
@@ -598,14 +630,14 @@ code {
 /* 表单 */
 .agh-form {
 	display: grid;
-	gap: 15px;
+	gap: 11px;
 	margin-top: 6px;
 }
 
 .agh-form-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-	gap: 14px;
+	gap: 11px 14px;
 }
 
 /* 基础设置固定三列，排成整齐的两行 */
@@ -799,7 +831,7 @@ code {
 .agh-field label {
 	display: block;
 	font-weight: 700;
-	margin-bottom: 5px;
+	margin-bottom: 4px;
 	color: #324a2c;
 }
 
@@ -807,8 +839,8 @@ code {
 .agh-field select,
 .agh-field textarea {
 	width: 100%;
-	padding: 9px 11px;
-	border-radius: 10px;
+	padding: 7px 10px;
+	border-radius: 8px;
 	border: 1px solid var(--agh-border);
 	background: var(--agh-surface-2);
 	color: var(--agh-text);
@@ -817,7 +849,7 @@ code {
 }
 
 .agh-field textarea {
-	min-height: 78px;
+	min-height: 70px;
 	resize: vertical;
 	font-family: var(--agh-mono);
 	font-size: 12.5px;
@@ -1336,33 +1368,30 @@ code {
 
 /* 暗色主题：对齐 AdGuard Home 原生暗色（近黑底 + 灰阶卡片 + 薄荷绿高亮） */
 .agh-dark {
-	--agh-bg: #141517;
-	--agh-surface: #1d1f22;
-	--agh-surface-2: #24262a;
-	--agh-text: #e3e5e8;
-	--agh-muted: #969ba1;
-	--agh-border: #2f3237;
-	--agh-primary: #5cc47d;
-	--agh-primary-2: #7bd89a;
-	--agh-primary-soft: #1f2b23;
+	--agh-bg: #1a1a1a;
+	--agh-surface: #232323;
+	--agh-surface-2: #2b2b2b;
+	--agh-text: #e8e8e8;
+	--agh-muted: #9b9b9b;
+	--agh-border: #333333;
+	--agh-primary: #67b279;
+	--agh-primary-2: #7ec48e;
+	--agh-primary-soft: #1e2a21;
 	--agh-accent: #c2a86f;
 	--agh-accent-soft: #2a261c;
-	--agh-success: #5cc47d;
+	--agh-success: #67b279;
 	--agh-success-soft: #1c2a22;
 	--agh-danger: #e07a6b;
 	--agh-danger-soft: #2e211e;
 	--agh-warning: #d8b06a;
 	--agh-warning-soft: #2b2618;
-	--agh-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+	--agh-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 	color-scheme: dark;
-	background:
-		radial-gradient(900px 460px at 8% -10%, rgba(92, 196, 125, 0.08), transparent 60%),
-		radial-gradient(800px 400px at 100% 0%, rgba(255, 255, 255, 0.03), transparent 55%),
-		var(--agh-bg);
+	background: var(--agh-bg);
 }
 
 .agh-dark .agh-hero {
-	background: linear-gradient(135deg, #202327, #1a1c1f 62%);
+	background: linear-gradient(135deg, #262626, #202020 62%);
 	border-color: var(--agh-border);
 }
 
@@ -1399,7 +1428,6 @@ code {
 
 .agh-dark .agh-hero-badge,
 .agh-dark .agh-hero-version-badge,
-.agh-dark .agh-step-index,
 .agh-dark .agh-step-no,
 .agh-dark .agh-switch-state.is-on,
 .agh-dark .agh-subtab.is-active,
@@ -1437,11 +1465,11 @@ code {
 
 .agh-dark .agh-log,
 .agh-dark .agh-code {
-	background: #111315;
+	background: #1b1b1b;
 }
 
 .agh-dark .agh-switch span {
-	background: #3a3f45;
+	background: #3a3a3a;
 }
 
 .agh-dark .agh-switch span::after {
@@ -1545,4 +1573,133 @@ button.agh-update-tip {
 .agh-card[hidden],
 .agh-update-tip[hidden] {
 	display: none;
+}
+
+/* 查询日志与最近拦截 */
+.agh-querylog-search,
+.agh-querylog-select {
+	padding: 5px 8px;
+	border: 1px solid var(--agh-border);
+	border-radius: 7px;
+	background: var(--agh-surface-2);
+	color: var(--agh-text);
+	font-size: 12.5px;
+	font-family: var(--agh-font);
+}
+
+.agh-querylog-search { width: 170px; }
+
+.agh-querylog-search:focus,
+.agh-querylog-select:focus {
+	outline: none;
+	border-color: var(--agh-primary);
+}
+
+.agh-log-sections {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.agh-log-section-title {
+	margin: 0 0 6px;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--agh-muted);
+}
+
+.agh-log-section .agh-log {
+	margin: 0;
+	height: 120px;
+	min-height: 0;
+	max-height: none;
+}
+
+.agh-log-section-main .agh-log {
+	height: 220px;
+}
+
+.agh-log-section-tall .agh-log {
+	height: 150px;
+}
+
+.agh-query-table {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: collapse;
+	font-size: 12px;
+}
+
+.agh-query-table th,
+.agh-query-table td {
+	padding: 6px 8px;
+	text-align: left;
+	vertical-align: middle;
+	border-bottom: 1px solid var(--agh-border);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.agh-query-table th {
+	font-weight: 600;
+	color: var(--agh-muted);
+}
+
+.agh-query-table tbody tr:last-child td { border-bottom: 0; }
+
+.agh-query-table .agh-col-time { width: 110px; }
+.agh-query-table .agh-col-client { width: 270px; }
+.agh-query-table .agh-col-domain { width: 230px; }
+.agh-query-table .agh-col-elapsed { width: 58px; }
+.agh-query-table .agh-col-status { width: 66px; }
+
+.agh-query-time,
+.agh-query-elapsed {
+	color: var(--agh-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.agh-query-client,
+.agh-query-rule { color: var(--agh-muted); }
+
+
+@media (max-width: 800px) {
+	.agh-query-table th:nth-child(2),
+	.agh-query-table td:nth-child(2),
+	.agh-query-table th:nth-child(4),
+	.agh-query-table td:nth-child(4) { display: none; }
+	.agh-query-table .agh-col-time { width: 104px; }
+	.agh-query-table .agh-col-elapsed { width: 48px; }
+	.agh-query-table .agh-col-status { width: 58px; }
+	.agh-querylog-search { width: 128px; }
+}
+
+.agh-log-list {
+	width: 100%;
+}
+
+.agh-pager {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	padding-top: 10px;
+}
+
+.agh-pager button[disabled] {
+	opacity: .45;
+	cursor: not-allowed;
+}
+
+.agh-ghost-btn[disabled] {
+	opacity: .55;
+	cursor: progress;
+}
+
+.agh-pager-info {
+	min-width: 64px;
+	text-align: center;
+	font-size: 12px;
+	color: var(--agh-muted);
 }
