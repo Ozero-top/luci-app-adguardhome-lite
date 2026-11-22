@@ -142,6 +142,44 @@
 		}, 4500);
 	}
 
+	// 统一确认弹窗，替代浏览器原生 confirm，外观与面板保持一致
+	function aghConfirm(text) {
+		var modal = $('agh-confirm-modal');
+		var textEl = $('agh-confirm-text');
+		var okBtn = $('agh-confirm-ok');
+		var cancelBtn = $('agh-confirm-cancel');
+		var mask = $('agh-confirm-mask');
+		if (!modal || !textEl || !okBtn || !cancelBtn) {
+			return Promise.resolve(window.confirm(text));
+		}
+
+		var resolveFn = null;
+		textEl.textContent = text;
+		modal.hidden = false;
+		okBtn.focus();
+
+		function onKey(e) {
+			if (e.key === 'Escape') finish(false);
+		}
+
+		function finish(result) {
+			modal.hidden = true;
+			okBtn.onclick = null;
+			cancelBtn.onclick = null;
+			if (mask) mask.onclick = null;
+			document.removeEventListener('keydown', onKey);
+			var done = resolveFn;
+			resolveFn = null;
+			if (done) done(result);
+		}
+
+		okBtn.onclick = function () { finish(true); };
+		cancelBtn.onclick = function () { finish(false); };
+		if (mask) mask.onclick = function () { finish(false); };
+		document.addEventListener('keydown', onKey);
+		return new Promise(function (resolve) { resolveFn = resolve; });
+	}
+
 	function setMsg(el, text, kind) {
 		if (!el) return;
 		el.textContent = text || '';
@@ -759,7 +797,7 @@
 	}
 
 	async function clearStats() {
-		if (!window.confirm('将清空 AdGuard Home 的 DNS 查询与拦截统计，确定继续？')) return;
+		if (!(await aghConfirm('将清空 AdGuard Home 的 DNS 查询与拦截统计，确定继续？'))) return;
 		var btn = $('agh-stats-clear');
 		if (btn) btn.disabled = true;
 		try {
@@ -834,7 +872,7 @@
 	}
 
 	async function cleanLegacy() {
-		if (!window.confirm('将停止并禁用旧服务、删除旧版插件文件，删除前自动备份。确定继续？')) return;
+		if (!(await aghConfirm('将停止并禁用旧服务、删除旧版插件文件，删除前自动备份。确定继续？'))) return;
 		var btn = $('agh-legacy-clean');
 		if (btn) btn.disabled = true;
 		try {
@@ -993,9 +1031,9 @@
 			};
 		});
 		Array.prototype.slice.call(list.querySelectorAll('.agh-filter-remove')).forEach(function (el) {
-			el.onclick = function () {
+			el.onclick = async function () {
 				var row = el.closest('.agh-rule');
-				if (!window.confirm('删除规则列表「' + row.getAttribute('data-name') + '」？')) return;
+				if (!(await aghConfirm('删除规则列表「' + row.getAttribute('data-name') + '」？'))) return;
 				filtersAction({
 					action: 'remove',
 					url: row.getAttribute('data-url'),
@@ -1092,7 +1130,7 @@
 				if (state.filterBusy) return;
 				var tier = btn.getAttribute('data-tier');
 				var label = tier === '512' ? '512MB' : (tier === '1024' ? '1GB' : '2GB 及以上');
-				if (!window.confirm('切换到 ' + label + ' 规则档位？会移除其它档位的预置列表。')) return;
+				if (!(await aghConfirm('切换到 ' + label + ' 规则档位？会移除其它档位的预置列表。'))) return;
 				Array.prototype.slice.call(wrap.querySelectorAll('button')).forEach(function (b) {
 					b.classList.toggle('is-active', b === btn);
 				});
@@ -1291,8 +1329,8 @@
 		tick();
 	}
 
-	function postService(action, confirmText) {
-		if (confirmText && !window.confirm(confirmText)) return;
+	async function postService(action, confirmText) {
+		if (confirmText && !(await aghConfirm(confirmText))) return;
 		state.busy = true;
 		updateSteps(state.status);
 		apiPost(U.service, { action: action }).then(function () {
@@ -1403,9 +1441,9 @@
 		tick();
 	}
 
-	function installCore() {
+	async function installCore() {
 		if (state.pluginUpdating) return;
-		if (!window.confirm('将从 AdGuard 官方源或 GitHub 反代下载最新内核，可能需要几分钟。确定继续？')) return;
+		if (!(await aghConfirm('将从 AdGuard 官方源或 GitHub 反代下载最新内核，可能需要几分钟。确定继续？'))) return;
 		showProgress('正在启动安装任务...');
 		state.busy = true;
 		updateSteps(state.status);
@@ -1532,7 +1570,7 @@
 		});
 	}
 
-	function startPluginUpdate() {
+	async function startPluginUpdate() {
 		if (!state.pluginLatest) return;
 		var forceEl = $('agh-plugin-force');
 		var force = !!(forceEl && forceEl.checked);
@@ -1546,7 +1584,7 @@
 			showToast('版本号格式不正确，例如 1.3.5', 'bad');
 			return;
 		}
-		if (force && !window.confirm('强制更新到 v' + target + '？\n\n同版本为重装，低版本为降级；会先备份配置，降级可能遇到配置结构变化。')) {
+		if (force && !(await aghConfirm('强制更新到 v' + target + '？\n\n同版本为重装，低版本为降级；会先备份配置，降级可能遇到配置结构变化。'))) {
 			return;
 		}
 		var channelEl = document.querySelector('input[name="agh-plugin-channel"]:checked');
@@ -2016,7 +2054,7 @@
 		var msgEl = $('agh-yaml-msg');
 		var btn = $('agh-yaml-save');
 		if (!editor) return;
-		if (!window.confirm('将校验并保存 AdGuardHome.yaml，随后重启服务。确定继续？')) return;
+		if (!(await aghConfirm('将校验并保存 AdGuardHome.yaml，随后重启服务。确定继续？'))) return;
 		if (btn) btn.disabled = true;
 		setMsg(msgEl, '正在校验配置...', '');
 		try {
@@ -2466,8 +2504,8 @@
 			});
 		}
 		if ($('agh-password-form')) $('agh-password-form').onsubmit = savePassword;
-		if ($('agh-yaml-load')) $('agh-yaml-load').onclick = function () {
-			if (state.yamlLoaded && !window.confirm('重新加载会丢弃当前未保存的修改。确定继续？')) return;
+		if ($('agh-yaml-load')) $('agh-yaml-load').onclick = async function () {
+			if (state.yamlLoaded && !(await aghConfirm('重新加载会丢弃当前未保存的修改。确定继续？'))) return;
 			loadYaml();
 		};
 		if ($('agh-yaml-save')) $('agh-yaml-save').onclick = saveYaml;

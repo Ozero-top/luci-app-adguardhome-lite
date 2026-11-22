@@ -1566,6 +1566,19 @@ button.agh-update-tip {
 	color: #e8e6e3;
 }
 
+/* 确认弹窗：替代浏览器原生 confirm，外观与面板保持一致 */
+.agh-confirm-body {
+	width: min(420px, calc(100vw - 32px));
+	padding: 18px 20px;
+}
+
+.agh-confirm-text {
+	margin: 0 0 4px;
+	white-space: pre-line;
+	line-height: 1.6;
+	color: var(--agh-text);
+}
+
 #agh-plugin-version-input {
 	width: 160px;
 }
