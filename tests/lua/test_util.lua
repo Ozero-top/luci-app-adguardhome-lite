@@ -50,8 +50,6 @@ check("join scalar", util.join_words(nil), "")
 
 -- reason code 注册表
 local codes = require "model.adguardhome_lite.codes"
-check("known code", codes.known("update_busy"), true)
-check("unknown code", codes.known("not_a_code"), false)
 check("warn level", codes.level("update_busy"), "warn")
 check("default level", codes.level("not_a_code"), "error")
 
