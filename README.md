@@ -163,14 +163,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-7_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-8_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.7-7` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.7-8` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -188,7 +188,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.7-7 -m https://gh-proxy.org
+sh install.sh -v 1.3.7-8 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -474,6 +474,13 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.7-8
+
+- **确认框统一**：清空统计、删除订阅、切换档位等操作改为面板内确认框，不再弹出浏览器原生对话框
+- **查询日志自动刷新**：默认每 5 秒刷新一次，可在下拉框调整间隔或关闭
+- **间距统一**：标签页、页头、卡片与页脚之间的间距统一为 8px，页面更整齐
+- **使用引导更新**：说明与当前功能对齐，补充查询日志筛选、版本检查与在线更新
 
 ### 1.3.7-7
 
