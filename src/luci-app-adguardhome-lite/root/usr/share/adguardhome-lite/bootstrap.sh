@@ -62,6 +62,10 @@ EOF
     url: $_base/$_tier/annoyances.txt
     name: AGH 网页干扰
     id: 605
+  - enabled: true
+    url: $_base/$_tier/intl.txt
+    name: AGH 外语分区
+    id: 606
 EOF
 }
 

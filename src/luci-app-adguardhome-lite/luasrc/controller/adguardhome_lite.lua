@@ -641,6 +641,8 @@ function index()
 
     -- 独立管理页面的 JSON 接口（不出现在菜单中）
     entry({ "admin", "services", "adguardhome_lite", "status" }, call("action_status")).leaf = true
+    -- 手机 App 登录后取得会话令牌，避免解析页面 HTML
+    entry({ "admin", "services", "adguardhome_lite", "session" }, call("action_session")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "stats_clear" }, call("action_stats_clear")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "filters_get" }, call("action_filters_get")).leaf = true
     entry({ "admin", "services", "adguardhome_lite", "filters_save" }, call("action_filters_save")).leaf = true
@@ -765,6 +767,7 @@ local settings_actions = require "luci.model.adguardhome_lite.actions.settings"
 local rules_actions = require "luci.model.adguardhome_lite.actions.rules"
 local logs_actions = require "luci.model.adguardhome_lite.actions.logs"
 local legacy_actions = require "luci.model.adguardhome_lite.actions.legacy"
+local session_actions = require "luci.model.adguardhome_lite.actions.session"
 
 local function action_ctx()
     return {
@@ -832,6 +835,7 @@ local function action_ctx()
 end
 
 function action_status() return dashboard_actions.status(action_ctx()) end
+function action_session() return session_actions.session(action_ctx()) end
 function action_stats_clear() return dashboard_actions.stats_clear(action_ctx()) end
 function action_core_install() return core_actions.core_install(action_ctx()) end
 function action_core_progress() return core_actions.core_progress(action_ctx()) end

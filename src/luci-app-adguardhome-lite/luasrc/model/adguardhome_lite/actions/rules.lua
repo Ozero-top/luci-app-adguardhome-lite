@@ -27,14 +27,15 @@ end
 local PRESET_TIERS = {
     ["512"] = { "security", "chinese", "ads" },
     ["1024"] = { "security", "chinese", "tracking", "ads" },
-    ["2048"] = { "security", "chinese", "tracking", "ads", "annoyances" }
+    ["2048"] = { "security", "chinese", "tracking", "ads", "annoyances", "intl" }
 }
 local PRESET_NAMES = {
     security = "AGH 安全防护",
     chinese = "AGH 中文广告",
     ads = "AGH 全站广告",
     tracking = "AGH 跟踪统计",
-    annoyances = "AGH 网页干扰"
+    annoyances = "AGH 网页干扰",
+    intl = "AGH 外语分区"
 }
 
 -- 旧版模板内置的第三方整包订阅，切换档位时一并清理，避免重复生效
@@ -603,8 +604,9 @@ function M.querylog_get(ctx)
         end
 
         local reason = e.reason or ""
-        local blocked = (reason:find("Filtered") ~= nil and reason:find("Whitelist") == nil)
-            or reason:find("Blocked") ~= nil
+        -- 只有 Filtered* 才是拦截；NotFiltered* 和 Rewritten 都是放行。
+        local blocked = (reason:find("^Filtered") ~= nil and reason:find("WhiteList") == nil)
+            or reason:find("^Blocked") ~= nil
 
         items[#items + 1] = {
             time = e.time or "",

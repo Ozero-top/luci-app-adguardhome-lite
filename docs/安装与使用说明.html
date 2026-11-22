@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 管理中心 使用说明 · 1.3.7-8</title>
+<title>AdGuard Home 管理中心 使用说明 · 1.3.7-9</title>
 <meta name="description" content="AdGuard Home 管理中心使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 管理中心 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.7-8</span>
+  <span class="pill"><span class="dot"></span>1.3.7-9</span>
 </header>
 
 <div class="layout">
@@ -200,6 +200,7 @@ footer{
       <li><a href="#s6">6. 常见问题</a></li>
       <li><a href="#s7">7. 卸载与回滚</a></li>
       <li><a href="#s8">8. 构建（可选）</a></li>
+      <li><a href="#s-android">Android App</a></li>
       <li><a href="#s9">9. 版本记录</a></li>
       <li><a href="#s10">10. 安全建议</a></li>
     </ol>
@@ -210,7 +211,7 @@ footer{
       <h1>AdGuard Home 管理中心 使用说明</h1>
       <p>本插件负责<strong>安装、DNS 接管、过滤、看护与统计</strong>；更细的高级项仍可在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.7-8</span>
+        <span>适用版本 1.3.7-9</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -533,16 +534,29 @@ python tools/build_apk.py      # 实验性 apk（需在 25.12 实测）
 python tools/build_run.py      # 离线 .run + manifest-&lt;版本&gt;.txt</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.7-8_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.7-8-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.7-8_all.apk</code>（实验性）</li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.7-8.run</code></li>
-        <li><code>dist/manifest-1.3.7-8.txt</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.7-9_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.7-9-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.7-9_all.apk</code>（实验性）</li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.7-9.run</code></li>
+        <li><code>dist/manifest-1.3.7-9.txt</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
 <pre><code>make menuconfig     # LuCI → Applications → luci-app-adguardhome-lite
 make package/luci-app-adguardhome-lite/compile</code></pre>
+    </section>
+
+    <section class="card" id="s-android">
+      <h2 class="sec">Android App（AGHTools 管理器）</h2>
+      <p>配套客户端与插件共用同一套管理接口，安装包见 Release 中的 <code>AGHTools&lt;版本&gt;.apk</code>。</p>
+      <ul>
+        <li><b>路由器管理：</b>填写路由器地址、端口和 LuCI 账号，登录后可管理概览、日志、规则、设置、内核与插件更新。</li>
+        <li><b>仅客户端过滤：</b>登录页底部选择「仅使用客户端过滤（不连接路由器）」，授权 VPN 后仅接管手机 DNS，不影响其它流量。</li>
+        <li><b>规则：</b>内置基础清单，可在客户端页更新 2GB 档位六类规则（安全、中文、跟踪、广告、网页干扰、外语）。</li>
+        <li><b>分流与自启：</b>支持全部应用 / 仅选中应用 / 排除选中应用，支持开机自启、通知栏与快捷磁贴暂停 30 秒。</li>
+        <li><b>拦截日志：</b>客户端页记录最近 300 条被本机拦截的域名，每页 15 条，可清空。</li>
+      </ul>
+      <p>Release 中的 <code>luci-app-adguardhome-lite_&lt;版本&gt;_all.apk</code> 是 OpenWrt 25.12 的插件包，不是 Android App；Android 包名为 <code>AGHTools&lt;版本&gt;.apk</code>。</p>
     </section>
 
     <section class="card" id="s9">
@@ -551,6 +565,10 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
         <table>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
+            <tr>
+              <td><span class="tag">1.3.7-9</span></td>
+              <td>新增 AGHTools 管理器 Android App（路由器管理 + 本机 DNS 过滤）；插件新增 <code>/session</code> 接口供 App 鉴权；修正查询日志「已放行」误标拦截；2GB 档位补齐外语分区（共 6 类）</td>
+            </tr>
             <tr>
               <td><span class="tag">1.3.7-8</span></td>
               <td>清空统计、删除订阅、切换档位等操作改用面板内确认框，不再弹出浏览器原生对话框；查询日志默认每 5 秒刷新，可调间隔或关闭；标签页、页头、卡片与页脚间距统一为 8px；设置页说明改为要点列表、字段间距更松，过滤规则页 5 个开关卡片等高更紧凑；使用引导按当前功能更新</td>
@@ -589,7 +607,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
             </tr>
             <tr>
               <td><span class="tag">1.3.4</span></td>
-              <td>预置过滤规则改为自建规则仓库提供：每 7 天自动抓取上游规则、跨源去重并按分类重新生成，按设备内存分 512MB / 1GB / 2GB+ 三档（各 3 / 4 / 5 个分类列表），切换档位自动移除其它档位的列表；修复把带路径或修饰符的广告规则压成整域拦截的问题（此前可能导致 baidu.com、qq.com 等整站无法打开）；白名单改为默认添加但保持关闭；档位切换会一并清理已下线分类的残留订阅</td>
+              <td>预置过滤规则改为自建规则仓库提供：每 7 天自动抓取上游规则、跨源去重并按分类重新生成，按设备内存分 512MB / 1GB / 2GB+ 三档（各 3 / 4 / 6 个分类列表），切换档位自动移除其它档位的列表；修复把带路径或修饰符的广告规则压成整域拦截的问题（此前可能导致 baidu.com、qq.com 等整站无法打开）；白名单改为默认添加但保持关闭；档位切换会一并清理已下线分类的残留订阅</td>
             </tr>
             <tr>
               <td><span class="tag">1.3.3</span></td>
@@ -635,7 +653,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 管理中心 · 使用说明 1.3.7-8 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 管理中心 · 使用说明 1.3.7-9 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {

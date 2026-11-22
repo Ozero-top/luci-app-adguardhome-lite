@@ -61,7 +61,7 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 ### 过滤与看护
 
 - **规则管理**：启用/停用规则、增删订阅、编辑自定义规则，修改立即生效。
-- **预置档位**：按内存 512MB / 1GB / 2GB+ 一键切换 3 / 4 / 5 个分类订阅，由[自建规则仓库](https://github.com/Ozero-top/AdguardHome-Rrules)定期抓取去重生成，三档共用白名单。
+- **预置档位**：按内存 512MB / 1GB / 2GB+ 一键切换 3 / 4 / 6 个分类订阅，由[自建规则仓库](https://github.com/Ozero-top/AdguardHome-Rrules)定期抓取去重生成，三档共用白名单。
 - **广告根域兜底**：`$third-party` 规则降级为纯域规则，并对广告根域整域兜底，补上动态子域漏拦。
 - **一键开关**：安全搜索、浏览安全、家长控制、成人内容拦截（HaGeZi NSFW）、DoH 服务器拦截，各自独立开关。
 - **家长控制保护**：开启前先试拨 AdGuard 服务端，连不上直接拒绝；运行中连不上由看护进程自动关闭，避免全屋断网。
@@ -95,6 +95,17 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 
 ---
 
+## Android App（AGHTools 管理器）
+
+配套 Android 客户端提供两种模式：
+
+- **路由器管理**：连接同一局域网内的 LuCI，管理服务、日志、过滤规则、设置、内核与插件更新。
+- **本机客户端过滤**：不连接路由器，使用本机 VPN 仅接管 DNS，内置 2GB 六类规则，支持应用分流、开机自启、通知栏 / 快捷磁贴暂停 30 秒与拦截日志。
+
+到 [Releases](../../releases) 下载 `AGHTools<版本>.apk`；首次开启本机过滤需授权 VPN。详见 [android/README.md](android/README.md)。
+
+---
+
 ## 安装
 
 ### 方式一：安装包（ipk / run）
@@ -106,6 +117,7 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 | `luci-app-adguardhome-lite_<版本>_all.ipk` | OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 等新版 LuCI |
 | `luci-app-adguardhome-lite_<版本>-legacy_all.ipk` | OpenWrt 22.03 及更早的原生 Lua LuCI |
 | `luci-app-adguardhome-lite_<版本>.run` | 离线自解压包，内含上述两个 ipk，自动选择可用版本 |
+| `AGHTools<版本>.apk` | Android 手机客户端（路由器管理 / 本机 DNS 过滤） |
 
 **LuCI 上传（推荐）**
 
@@ -163,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-8_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-9_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.7-8` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.7-9` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -188,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.7-8 -m https://gh-proxy.org
+sh install.sh -v 1.3.7-9 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -428,6 +440,7 @@ nft list chain inet fw4 agh_dns_redirect
 │   ├── root/etc/init.d/                 # procd 服务脚本
 │   └── Makefile                         # OpenWrt SDK 构建入口
 ├── install.sh                          # 脚本安装入口（25.12 / apk 系统，无需安装包）
+├── android/                            # AGHTools Android 客户端（Kotlin + Compose）
 ├── tools/build_ipk.py                   # 免 SDK 直接构建 ipk
 ├── tools/build_run.py                   # 构建离线自解压 .run 安装包
 ├── docs/安装与使用说明.md                # 安装、验证与排障文档
@@ -474,6 +487,13 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.7-9
+
+- **AGHTools 管理器 Android App**：路由器管理与本机 DNS 过滤两种模式
+- **路由器管理**：服务启停、查询 / 系统日志、过滤规则与成人内容开关、设置、内核与插件更新
+- **本机过滤**：仅接管 DNS，2GB 六类规则，应用分流、开机自启、通知栏 / 磁贴暂停、拦截日志分页
+- **插件适配**：新增 `/session` 接口供 App 鉴权；修正查询日志「已放行」误标拦截；2GB 档位补齐外语分区（共 6 类）
 
 ### 1.3.7-8
 
