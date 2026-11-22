@@ -84,10 +84,10 @@ code {
 	color: var(--agh-primary);
 }
 
-/* 页面容器：卡片直接贴到背景边缘，不再留白 */
+/* 页面容器：保持原有宽度，卡片直接贴到背景边缘 */
 .agh-app {
-	max-width: none;
-	margin: 0;
+	max-width: 1400px;
+	margin: 0 auto;
 	padding: 0;
 }
 
