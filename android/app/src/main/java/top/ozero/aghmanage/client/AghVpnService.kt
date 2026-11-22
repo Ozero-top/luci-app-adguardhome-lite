@@ -22,7 +22,7 @@ import top.ozero.aghmanage.MainActivity
 import top.ozero.aghmanage.R
 
 /**
- * 仅接管 DNS 的本机 VPN：系统把 DNS 查询送到 10.111.222.1，
+ * 仅接管 DNS 的手机 VPN：系统把 DNS 查询送到 10.111.222.1，
  * 这里读取 tun 内的 UDP:53 报文，命中规则则直接返回 NXDOMAIN，
  * 其余转发到上游 DNS，不代理其它任何流量。
  */
@@ -317,7 +317,7 @@ class AghVpnService : VpnService() {
             "客户端过滤",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "本机 DNS 过滤运行状态"
+            description = "客户端 DNS 过滤运行状态"
             setShowBadge(false)
         }
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
