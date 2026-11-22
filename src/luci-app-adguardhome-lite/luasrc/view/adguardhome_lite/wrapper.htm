@@ -15,7 +15,7 @@
 		min-height: 0;
 		border: 0;
 		border-radius: 8px;
-		background: transparent;
+		background: #f3eddf;
 		overflow: hidden;
 	}
 	@media (max-width: 800px) {
@@ -24,6 +24,26 @@
 		}
 	}
 </style>
+<script>
+	(function () {
+		var frame = document.getElementById('agh-frame');
+		if (!frame) return;
+
+		// iframe 自身底色跟随插件主题，避免内页加载前闪一下浅色
+		function syncFrameBg() {
+			var theme = '';
+			try { theme = localStorage.getItem('agh-theme') || ''; } catch (e) { /* 忽略 */ }
+			if (theme !== 'dark' && theme !== 'light') {
+				theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+			}
+			frame.style.background = theme === 'dark' ? '#141517' : '#f3eddf';
+		}
+
+		frame.addEventListener('load', syncFrameBg);
+		window.addEventListener('storage', syncFrameBg);
+		syncFrameBg();
+	})();
+</script>
 <script>
 	(function () {
 		var frame = document.getElementById('agh-frame');

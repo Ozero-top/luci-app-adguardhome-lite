@@ -51,7 +51,10 @@ body {
 	font-size: 14px;
 	line-height: 1.6;
 	color: var(--agh-text);
-	background: transparent;
+	background:
+		radial-gradient(900px 460px at 8% -10%, rgba(111, 154, 78, 0.12), transparent 60%),
+		radial-gradient(800px 400px at 100% 0%, rgba(200, 164, 90, 0.10), transparent 55%),
+		var(--agh-bg);
 	-webkit-font-smoothing: antialiased;
 	text-rendering: optimizeLegibility;
 }
@@ -82,17 +85,12 @@ code {
 	color: var(--agh-primary);
 }
 
-/* 页面容器：背景只覆盖内容区，宽度自适应并居中 */
+/* 页面容器：内容区 1200px 居中，背景铺满整个页面宽度 */
 .agh-app {
 	width: 100%;
 	max-width: 1200px;
 	margin: 0 auto;
 	padding: 16px 18px 28px;
-	border-radius: var(--agh-radius);
-	background:
-		radial-gradient(900px 460px at 8% -10%, rgba(111, 154, 78, 0.12), transparent 60%),
-		radial-gradient(800px 400px at 100% 0%, rgba(200, 164, 90, 0.10), transparent 55%),
-		var(--agh-bg);
 }
 
 .agh-pill {
@@ -1391,6 +1389,7 @@ code {
 	--agh-warning-soft: #2b2618;
 	--agh-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 	color-scheme: dark;
+	background: var(--agh-bg);
 }
 
 .agh-dark .agh-hero {
