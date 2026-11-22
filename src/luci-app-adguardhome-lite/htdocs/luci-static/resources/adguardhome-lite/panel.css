@@ -491,8 +491,23 @@ code {
 .agh-hint {
 	color: var(--agh-muted);
 	font-size: 11.5px;
-	line-height: 1.5;
+	line-height: 1.6;
 }
+
+/* 设置说明列表：替代整段长文字，降低视觉密度 */
+.agh-hint-list {
+	margin: 0;
+	padding-left: 18px;
+	color: var(--agh-muted);
+	font-size: 11.5px;
+	line-height: 1.65;
+	display: grid;
+	gap: 3px;
+}
+
+.agh-hint-list li { padding-left: 2px; }
+
+.agh-hint-list b { color: #46603c; }
 
 .agh-stats-notice {
 	margin: 0 auto 0 0;
@@ -634,14 +649,15 @@ code {
 /* 表单 */
 .agh-form {
 	display: grid;
-	gap: 11px;
-	margin-top: 6px;
+	gap: 14px;
+	margin-top: 10px;
 }
 
 .agh-form-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-	gap: 11px 14px;
+	gap: 14px 16px;
+	align-items: start;
 }
 
 /* 基础设置固定三列，排成整齐的两行 */
@@ -653,12 +669,15 @@ code {
 .agh-form-grid.agh-form-grid-5 {
 	grid-template-columns: repeat(5, minmax(0, 1fr));
 	gap: 8px;
+	align-items: stretch;
 }
 
 /* 五列时压缩卡片内边距，标题不换行 */
 .agh-form-grid-5 .agh-field-switch-stack {
 	padding: 10px;
-	gap: 4px;
+	gap: 5px;
+	min-height: 104px;
+	justify-content: flex-start;
 }
 
 .agh-form-grid-5 .agh-switch-head {
@@ -684,8 +703,8 @@ code {
 }
 
 .agh-form-grid-5 .agh-hint {
-	font-size: 12px;
-	line-height: 1.55;
+	font-size: 11.5px;
+	line-height: 1.5;
 	word-break: break-word;
 }
 
@@ -719,6 +738,7 @@ code {
 @media (max-width: 1200px) {
 	.agh-form-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.agh-form-grid.agh-form-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+	.agh-form-grid-5 .agh-field-switch-stack { min-height: 0; }
 }
 
 @media (max-width: 800px) {
@@ -835,9 +855,11 @@ code {
 .agh-field label {
 	display: block;
 	font-weight: 700;
-	margin-bottom: 4px;
+	margin-bottom: 6px;
 	color: #324a2c;
 }
+
+.agh-field > .agh-hint { margin: 6px 0 0; }
 
 .agh-field input,
 .agh-field select,
@@ -976,6 +998,7 @@ code {
 	align-items: center;
 	gap: 12px;
 	flex-wrap: wrap;
+	margin-top: 2px;
 }
 
 .agh-code {
@@ -1397,6 +1420,8 @@ code {
 	background: linear-gradient(135deg, #262626, #202020 62%);
 	border-color: var(--agh-border);
 }
+
+.agh-dark .agh-hint-list b { color: #b9cdb2; }
 
 .agh-dark .agh-hero h2,
 .agh-dark .agh-card-head h3,

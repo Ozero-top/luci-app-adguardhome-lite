@@ -30,7 +30,7 @@
 			background: #141517;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261125m">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261125p">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -261,7 +261,11 @@
 						</label>
 					</div>
 
-					<p class="agh-hint"> <b>想统计每台设备、让所有域名都先过滤 → 选「接管 53 端口」</b>；装了 Clash、开着 DNS 劫持也能用，插件会把设备的 53 查询收回 53，不会再被 Clash 抢走。<b>装了 PassWall、又不想关它的 DNS 劫持 → 选「PassWall 前置」</b>：AdGuard Home 占 53 先过滤，再交给 PassWall 自己的 DNS 分流。<b>不想让 AdGuard Home 占 53，或不在乎逐设备统计 → 选「Clash 前置」</b>（这种模式下面板里来源全是 127.0.0.1）。切换时会自动恢复原来的 DNS 设置，不会叠加。</p>
+					<ul class="agh-hint-list">
+						<li><b>想统计每台设备、让所有域名都先过滤</b>：选「接管 53 端口」。装了 Clash、开着 DNS 劫持也能用，设备的 53 查询会被收回，不会再被 Clash 抢走。</li>
+						<li><b>装了 PassWall、又不想关它的 DNS 劫持</b>：选「PassWall 前置」。AdGuard Home 占 53 先过滤，再交给 PassWall 自己的 DNS 分流。</li>
+						<li><b>不想让 AdGuard Home 占 53，或不在乎逐设备统计</b>：选「Clash 前置」，面板里的来源会显示为 127.0.0.1。</li>
+					</ul>
 
 				<div class="agh-form-grid agh-form-grid-3">
 						<div class="agh-field">
@@ -288,6 +292,7 @@
 								<option value="/usr/bin/AdGuardHome/AdGuardHome">内置存储（推荐，重启保留）</option>
 								<option value="/tmp/AdGuardHome/AdGuardHome">内存临时（重启后需重新安装）</option>
 							</select>
+							<p class="agh-hint">内置存储重启后保留；内存临时会随重启清空，需重新安装内核。</p>
 						</div>
 
 
@@ -318,6 +323,7 @@
 								<option value="/etc/AdGuardHome">内置存储（推荐，数据保留）</option>
 								<option value="/tmp/AdGuardHome">内存临时（减少闪存写入）</option>
 							</select>
+							<p class="agh-hint">保存统计与过滤缓存；内存临时可减少闪存写入，重启后统计清空。</p>
 						</div>
 					</div>
 
