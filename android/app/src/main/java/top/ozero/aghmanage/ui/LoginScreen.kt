@@ -197,7 +197,7 @@ fun LoginScreen(
                 contentColor = Color(0xFF2F3B2A)
             )
         ) {
-            Text("仅使用客户端过滤（不连接路由器）")
+            Text("仅使用手机端过滤（不连接路由器）")
         }
     }
 }

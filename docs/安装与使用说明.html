@@ -548,13 +548,13 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
 
     <section class="card" id="s-android">
       <h2 class="sec">Android App（AGHTools 管理器）</h2>
-      <p>配套客户端与插件共用同一套管理接口，安装包见 Release 中的 <code>AGHTools&lt;版本&gt;.apk</code>。</p>
+      <p>配套手机端与插件共用同一套管理接口，安装包见 Release 中的 <code>AGHTools&lt;版本&gt;.apk</code>。</p>
       <ul>
         <li><b>路由器管理：</b>填写路由器地址、端口和 LuCI 账号，登录后可管理概览、日志、规则、设置、内核与插件更新。</li>
-        <li><b>仅客户端过滤：</b>登录页底部选择「仅使用客户端过滤（不连接路由器）」，授权 VPN 后仅接管手机 DNS，不影响其它流量。</li>
-        <li><b>规则：</b>内置基础清单，可在客户端页更新 2GB 档位六类规则（安全、中文、跟踪、广告、网页干扰、外语）。</li>
+        <li><b>仅手机端过滤：</b>登录页底部选择「仅使用手机端过滤（不连接路由器）」，授权 VPN 后仅接管手机 DNS，不影响其它流量。</li>
+        <li><b>规则：</b>内置基础清单，可在手机端页面更新 2GB 档位六类规则（安全、中文、跟踪、广告、网页干扰、外语）。</li>
         <li><b>分流与自启：</b>支持全部应用 / 仅选中应用 / 排除选中应用，支持开机自启、通知栏与快捷磁贴暂停 30 秒。</li>
-        <li><b>拦截日志：</b>客户端页记录最近 300 条被客户端拦截的域名，每页 15 条，可清空。</li>
+        <li><b>拦截日志：</b>手机端页面记录最近 300 条被手机端拦截的域名，每页 15 条，可清空。</li>
       </ul>
       <p>Release 中的 <code>luci-app-adguardhome-lite_&lt;版本&gt;_all.apk</code> 是 OpenWrt 25.12 的插件包，不是 Android App；Android 包名为 <code>AGHTools&lt;版本&gt;.apk</code>。</p>
     </section>
@@ -567,7 +567,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
           <tbody>
             <tr>
               <td><span class="tag">1.3.7-9</span></td>
-              <td>新增 AGHTools 管理器 Android App（路由器管理 + 客户端 DNS 过滤）；插件新增 <code>/session</code> 接口供 App 鉴权；修正查询日志「已放行」误标拦截；2GB 档位补齐外语分区（共 6 类）</td>
+              <td>新增 AGHTools 管理器 Android App（路由器管理 + 手机端 DNS 过滤）；插件新增 <code>/session</code> 接口供 App 鉴权；修正查询日志「已放行」误标拦截；2GB 档位补齐外语分区（共 6 类）</td>
             </tr>
             <tr>
               <td><span class="tag">1.3.7-8</span></td>

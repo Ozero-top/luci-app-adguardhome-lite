@@ -25,6 +25,7 @@ jobs:
           fi
           mkdir -p assets
           gh release download "$TAG" -D assets --clobber
+          rm -f assets/AGHTools*.apk assets/*.zip
 
       - name: 同步到 dist 分支
         run: |

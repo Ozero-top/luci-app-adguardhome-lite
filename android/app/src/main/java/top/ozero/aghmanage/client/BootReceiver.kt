@@ -6,7 +6,7 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 
-/** 开机后按上次状态自动开启客户端过滤。 */
+/** 开机后按上次状态自动开启手机端过滤。 */
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {

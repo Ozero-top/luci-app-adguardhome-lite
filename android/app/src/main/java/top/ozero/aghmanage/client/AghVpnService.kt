@@ -95,7 +95,7 @@ class AghVpnService : VpnService() {
             }
 
             val builder = Builder()
-                .setSession("AGHTools 客户端过滤")
+                .setSession("AGHTools 手机端过滤")
                 .setMtu(1500)
                 .addAddress("10.111.222.2", 24)
                 .addDnsServer("10.111.222.1")
@@ -314,10 +314,10 @@ class AghVpnService : VpnService() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "客户端过滤",
+            "手机端过滤",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "客户端 DNS 过滤运行状态"
+            description = "手机端 DNS 过滤运行状态"
             setShowBadge(false)
         }
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
@@ -355,7 +355,7 @@ class AghVpnService : VpnService() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_agh)
-            .setContentTitle("AGHTools 客户端过滤")
+            .setContentTitle("AGHTools 手机端过滤")
             .setContentText(text)
             .setContentIntent(contentIntent)
             .setOngoing(true)

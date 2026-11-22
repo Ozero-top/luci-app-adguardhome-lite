@@ -411,7 +411,7 @@ fun MoreScreen(client: AghClient) {
             SectionCard("关于") {
                 InfoRow("应用版本", appVersion.ifEmpty { "-" })
                 Text(
-                    text = "本应用包含路由器插件管理与客户端过滤。客户端过滤只接管 DNS，可在登录页进入客户端过滤后开启或暂停。",
+                    text = "本应用包含路由器插件管理与手机端过滤。手机端过滤只接管 DNS，可在登录页进入手机端过滤后开启或暂停。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

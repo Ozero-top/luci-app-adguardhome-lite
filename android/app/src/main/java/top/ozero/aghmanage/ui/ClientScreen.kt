@@ -113,7 +113,7 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
         } else {
             context.startService(intent)
         }
-        message = "正在开启客户端过滤…"
+        message = "正在开启手机端过滤…"
         messageIsError = false
     }
 
@@ -123,7 +123,7 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
         if (result.resultCode == Activity.RESULT_OK) {
             startClient()
         } else {
-            message = "未授予 VPN 权限，无法开启客户端过滤"
+            message = "未授予 VPN 权限，无法开启手机端过滤"
             messageIsError = true
         }
     }
@@ -145,7 +145,7 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
         context.startService(
             Intent(context, AghVpnService::class.java).setAction(AghVpnService.ACTION_STOP)
         )
-        message = "已停止客户端过滤"
+        message = "已停止手机端过滤"
         messageIsError = false
     }
 
@@ -272,7 +272,7 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
 
         item {
             ScreenTitle(
-                title = "客户端过滤",
+                title = "手机端过滤",
                 subtitle = "仅接管手机 DNS，不代理其它流量"
             )
         }
@@ -294,7 +294,7 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
                             text = when {
                                 paused -> "暂停中，${remaining} 秒后自动恢复"
                                 state.running -> "通知栏或快捷磁贴可暂停 30 秒"
-                                else -> "开启后使用客户端规则拦截广告域名"
+                                else -> "开启后使用手机端规则拦截广告域名"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -344,9 +344,9 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
 
                 Text(
                     text = when (splitMode) {
-                        ClientPrefs.SPLIT_ALLOW -> "只有选中的应用使用客户端过滤，其余应用直连。"
-                        ClientPrefs.SPLIT_DENY -> "选中的应用直连，不使用客户端过滤。"
-                        else -> "所有应用都使用客户端过滤。"
+                        ClientPrefs.SPLIT_ALLOW -> "只有选中的应用使用手机端过滤，其余应用直连。"
+                        ClientPrefs.SPLIT_DENY -> "选中的应用直连，不使用手机端过滤。"
+                        else -> "所有应用都使用手机端过滤。"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -380,7 +380,7 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
             SectionCard("开机自启") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("开机后自动开启客户端过滤", style = MaterialTheme.typography.bodyMedium)
+                        Text("开机后自动开启手机端过滤", style = MaterialTheme.typography.bodyMedium)
                         Text(
                             text = "需已授权 VPN，且关机前处于开启状态。",
                             style = MaterialTheme.typography.bodySmall,
@@ -439,7 +439,7 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
         item {
             SectionCard("拦截日志") {
                 Text(
-                    text = "仅记录客户端过滤拦截的请求，最多保留 300 条。",
+                    text = "仅记录手机端过滤拦截的请求，最多保留 300 条。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -554,7 +554,7 @@ fun ClientScreen(onBack: (() -> Unit)? = null) {
             SectionCard("说明") {
                 listOf(
                     "仅 DNS 流量经过手机 VPN，网页与应用流量仍走原网络。",
-                    "浏览器开启安全 DNS（DoH）或应用内置 DoH 时，查询会绕过客户端过滤。",
+                    "浏览器开启安全 DNS（DoH）或应用内置 DoH 时，查询会绕过手机端过滤。",
                     "系统「私人 DNS」设为自动或指定 DoT 时也可能绕过过滤，建议设为关闭。",
                     "开启后状态栏会出现 VPN 图标，这是 Android 对本地 VPN 的提示。"
                 ).forEach {

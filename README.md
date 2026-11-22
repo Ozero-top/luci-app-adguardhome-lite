@@ -100,9 +100,9 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 配套 Android 客户端提供两种模式：
 
 - **路由器管理**：连接同一局域网内的 LuCI，管理服务、日志、过滤规则、设置、内核与插件更新。
-- **客户端过滤**：不连接路由器，使用手机 VPN 仅接管 DNS，内置 2GB 六类规则，支持应用分流、开机自启、通知栏 / 快捷磁贴暂停 30 秒与拦截日志。
+- **手机端过滤**：不连接路由器，使用手机 VPN 仅接管 DNS，内置 2GB 六类规则，支持应用分流、开机自启、通知栏 / 快捷磁贴暂停 30 秒与拦截日志。
 
-到 [Releases](../../releases) 下载 `AGHTools<版本>.apk`；首次开启客户端过滤需授权 VPN。详见 [android/README.md](android/README.md)。
+到 [Releases](../../releases) 下载 `AGHTools<版本>.apk`；首次开启手机端过滤需授权 VPN。详见 [android/README.md](android/README.md)。
 
 ---
 
@@ -117,7 +117,7 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 | `luci-app-adguardhome-lite_<版本>_all.ipk` | OpenWrt 23.05 / 24.10、ImmortalWrt、iStoreOS 等新版 LuCI |
 | `luci-app-adguardhome-lite_<版本>-legacy_all.ipk` | OpenWrt 22.03 及更早的原生 Lua LuCI |
 | `luci-app-adguardhome-lite_<版本>.run` | 离线自解压包，内含上述两个 ipk，自动选择可用版本 |
-| `AGHTools<版本>.apk` | Android 手机客户端（路由器管理 / 客户端 DNS 过滤） |
+| `AGHTools<版本>.apk` | Android 手机端（路由器管理 / 手机端 DNS 过滤） |
 
 **LuCI 上传（推荐）**
 
@@ -490,9 +490,9 @@ make package/luci-app-adguardhome-lite/compile V=s
 
 ### 1.3.7-9
 
-- **AGHTools 管理器 Android App**：路由器管理与客户端 DNS 过滤两种模式
+- **AGHTools 管理器 Android App**：路由器管理与手机端 DNS 过滤两种模式
 - **路由器管理**：服务启停、查询 / 系统日志、过滤规则与成人内容开关、设置、内核与插件更新
-- **客户端过滤**：仅接管 DNS，2GB 六类规则，应用分流、开机自启、通知栏 / 磁贴暂停、拦截日志分页
+- **手机端过滤**：仅接管 DNS，2GB 六类规则，应用分流、开机自启、通知栏 / 磁贴暂停、拦截日志分页
 - **插件适配**：新增 `/session` 接口供 App 鉴权；修正查询日志「已放行」误标拦截；2GB 档位补齐外语分区（共 6 类）
 
 ### 1.3.7-8
