@@ -97,7 +97,7 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 
 ## Android App（AGHTools 管理器）
 
-配套 Android 客户端提供两种模式：
+配套 Android 手机端提供两种模式：
 
 - **路由器管理**：连接同一局域网内的 LuCI，管理服务、日志、过滤规则、设置、内核与插件更新。
 - **手机端过滤**：不连接路由器，使用手机 VPN 仅接管 DNS，内置 2GB 六类规则，支持应用分流、开机自启、通知栏 / 快捷磁贴暂停 30 秒与拦截日志。
