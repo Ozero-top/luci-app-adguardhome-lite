@@ -29,7 +29,7 @@
 	--agh-warning-soft: #f7edd8;
 	--agh-shadow: 0 10px 26px rgba(61, 80, 49, 0.08);
 	--agh-radius: 14px;
-	--agh-gap: 10px;
+	--agh-gap: 5px;
 	--agh-font: "Space Grotesk", "Noto Sans SC", system-ui, sans-serif;
 	--agh-mono: "JetBrains Mono", ui-monospace, monospace;
 	color-scheme: light;
