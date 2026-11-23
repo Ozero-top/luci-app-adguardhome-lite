@@ -335,14 +335,9 @@ function M.settings_save(ctx)
     uci:set(CONF, "main", "cache_optimistic", cache_optimistic)
     uci:set(CONF, "main", "dns_crypto", dns_crypto)
     uci:set(CONF, "main", "dns_crypto_custom", dns_crypto_custom)
-    uci:delete(CONF, "main", "bypass_ifaces")
-    for i = 1, #ifaces do
-        uci:add_list(CONF, "main", "bypass_ifaces", ifaces[i])
-    end
-    uci:delete(CONF, "main", "bypass_clients")
-    for i = 1, #clients do
-        uci:add_list(CONF, "main", "bypass_clients", clients[i])
-    end
+    -- 24.10 / 25.12 的 Lua 兼容层没有 add_list，统一用 set_list（空表即删除）
+    uci:set_list(CONF, "main", "bypass_ifaces", ifaces)
+    uci:set_list(CONF, "main", "bypass_clients", clients)
     uci:commit(CONF)
 
     -- 运行中优先通过 AdGuard Home API 在线应用缓存设置；失败则由 apply_settings.sh 回退到文件写入
