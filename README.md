@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.10-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.11-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.10-1` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.11-1` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.10-1 -m https://gh-proxy.org
+sh install.sh -v 1.3.11-1 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -392,7 +392,7 @@ curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite
 
 **停止后面板打不开**：正常现象，面板随服务停止，重新点「启动服务」；服务已运行仍打不开时，检查 UCI 端口与 YAML `address` 是否一致，等 5–10 秒。
 
-**能连路由器但打不开网页**：设备没拿到 IPv4 DNS，给 LAN 补下发：
+**能连路由器但打不开网页**：设备没拿到 IPv4 DNS。「接管 53」「PassWall 前置」启用时会自动给 LAN 追加一条 `6,路由器IP`（停止、切换或卸载时只移除插件自己加的那条）；仍异常时可手动补：
 
 ```sh
 uci add_list dhcp.lan.dhcp_option='6,路由器IP'
@@ -487,6 +487,12 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.11-1
+
+- **DHCP DNS 自动下发**：启用「接管 53」或「PassWall 前置」时，自动为 LAN 补一条 DHCP 选项 `6,路由器IP`，解决设备拿到 IP 却无法上网的问题（DNSMasq 移到 1745 后不再自动下发 DNS）
+- **可回退**：停止、切换接管方式或卸载时，只移除插件自己写入的那条，手动配置的 `dhcp_option` 不受影响；已配置过 DNS 下发的环境保持原样
+- **Android App**：功能无变化，沿用 `1.3.10-1` 安装包
 
 ### 1.3.10-1
 

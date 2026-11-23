@@ -135,9 +135,85 @@ set_dnsmasq_port() {
 cancel_dns_mode_apply() {
     log_msg "$1"
     restore_original
+    dhcp_option_restore
     uci -q set "$CONF.main.mode_applied=none"
     uci -q commit "$CONF" 2>/dev/null
     return 1
+}
+
+# 接管 53 / PassWall 前置时 DNSMasq 被移到 1745，不再把自己作为 DNS 下发给 DHCP 客户端，
+# 客户端会「拿到 IP 但上不了网」。这里给 lan 补一条 option 6 指向路由器自身，
+# 只补一条；只删除自己补的那条，用户手动配置的保持不动。
+lan_dns_ip() {
+    _lip="$(get_uci network.lan.ipaddr)"
+    _lip="${_lip%%/*}"
+    if [ -z "$_lip" ] && have_cmd jsonfilter; then
+        _lip="$(ubus call network.interface.lan status 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)"
+    fi
+    if [ -z "$_lip" ]; then
+        _ldev="$(get_uci network.lan.device)"
+        [ -n "$_ldev" ] || _ldev="br-lan"
+        _lip="$(ip -4 addr show dev "$_ldev" 2>/dev/null | awk '/inet /{print $2; exit}' | cut -d/ -f1)"
+    fi
+    echo "$_lip"
+}
+
+dhcp_option_present() {
+    for _o in $(get_uci dhcp.lan.dhcp_option); do
+        [ "$_o" = "$1" ] && return 0
+    done
+    return 1
+}
+
+dhcp_option_add() {
+    uci -q get dhcp.lan >/dev/null 2>&1 || return 0
+    [ "$(get_uci dhcp.lan.ignore)" = "1" ] && return 0
+
+    _ip="$(lan_dns_ip)"
+    [ -n "$_ip" ] || { log_msg "未取到 LAN 地址，跳过 DHCP DNS 下发。"; return 0; }
+
+    _want="6,$_ip"
+    _added="$(get_uci "$CONF.main.added_dhcp_option")"
+
+    # 用户自己配过 6, 开头的选项时保持原样，不接管
+    if [ -z "$_added" ]; then
+        for _o in $(get_uci dhcp.lan.dhcp_option); do
+            case "$_o" in
+                6,*)
+                    log_msg "检测到已有 DHCP DNS 下发（$_o），保持不动。"
+                    return 0
+                    ;;
+            esac
+        done
+    fi
+
+    if dhcp_option_present "$_want"; then
+        if [ -z "$_added" ]; then
+            uci -q set "$CONF.main.added_dhcp_option=$_want"
+            uci -q commit "$CONF" 2>/dev/null
+        fi
+        return 0
+    fi
+
+    # LAN 地址变化时，先撤掉上次补的旧值
+    [ -n "$_added" ] && uci -q del_list "dhcp.lan.dhcp_option=$_added"
+    uci -q add_list "dhcp.lan.dhcp_option=$_want" || return 0
+    uci -q set "$CONF.main.added_dhcp_option=$_want"
+    uci -q commit dhcp 2>/dev/null
+    uci -q commit "$CONF" 2>/dev/null
+    log_msg "已为 LAN 自动下发 DNS（$_want），避免客户端拿到 IP 却无法解析。"
+    restart_dnsmasq
+    sleep 1
+}
+
+dhcp_option_restore() {
+    _added="$(get_uci "$CONF.main.added_dhcp_option")"
+    [ -n "$_added" ] || return 0
+    uci -q del_list "dhcp.lan.dhcp_option=$_added" 2>/dev/null
+    uci -q delete "$CONF.main.added_dhcp_option"
+    uci -q commit dhcp 2>/dev/null
+    uci -q commit "$CONF" 2>/dev/null
+    log_msg "已移除插件自动下发的 DNS（$_added）。"
 }
 
 # 接管 53 端口模式：Clash 的 DNS 劫持会把设备的 53 查询直接拽到 DNSMasq（1745），
@@ -392,6 +468,13 @@ apply_mode() {
         agh_nft_clear
     fi
 
+    # DNSMasq 在 1745 时不会自动下发 DNS，需要给 LAN 的 DHCP 补 option 6；
+    # 不再接管时只撤掉插件自己补的那条。
+    case "$dns_mode" in
+        takeover|passwall) dhcp_option_add ;;
+        *) dhcp_option_restore ;;
+    esac
+
     if mode_is_applied; then
         if ! patch_agh_port; then
             log_msg "无法写入 AdGuard Home DNS 端口，正在恢复 DNSMasq 设置..."
@@ -624,6 +707,9 @@ revert_mode() {
     # 停止服务或切换模式后不再接管 53，移除自建的重定向规则
     agh_nft_clear
 
+    # 只移除插件自己补的 DHCP DNS 下发，用户手动配置的保持不动
+    dhcp_option_restore
+
     if [ "$_applied" = "clashfirst" ]; then
         clashfirst_openclash_restore
     fi
@@ -687,6 +773,8 @@ show_status() {
     echo "dnsmasq_port=$(get_uci dhcp.@dnsmasq[0].port)"
     echo "dnsmasq_noresolv=$(get_uci dhcp.@dnsmasq[0].noresolv)"
     echo "dnsmasq_server=$(get_uci dhcp.@dnsmasq[0].server)"
+    echo "lan_dhcp_option=$(get_uci dhcp.lan.dhcp_option)"
+    echo "added_dhcp_option=$(get_uci "$CONF.main.added_dhcp_option")"
     echo "clash_dns_port=$clash_dns_port"
     echo "openclash_hijack_port=$(openclash_hijack_port)"
     echo "openclash_redirect=$(get_uci openclash.config.enable_redirect_dns)"

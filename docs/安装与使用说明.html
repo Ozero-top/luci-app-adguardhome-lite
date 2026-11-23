@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 管理中心 使用说明 · 1.3.10-1</title>
+<title>AdGuard Home 管理中心 使用说明 · 1.3.11-1</title>
 <meta name="description" content="AdGuard Home 管理中心使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 管理中心 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.10-1</span>
+  <span class="pill"><span class="dot"></span>1.3.11-1</span>
 </header>
 
 <div class="layout">
@@ -211,7 +211,7 @@ footer{
       <h1>AdGuard Home 管理中心 使用说明</h1>
       <p>本插件负责<strong>安装、DNS 接管、过滤、看护与统计</strong>；更细的高级项仍可在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.10-1</span>
+        <span>适用版本 1.3.11-1</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -462,7 +462,7 @@ grep -m1 '^  address:' /etc/AdGuardHome.yaml</code></pre>
 
       <div class="faq">
         <h3>Q6：设备能连路由器但打不开网页？</h3>
-        <p>多为设备没拿到 IPv4 DNS。补一条 DHCP 下发：</p>
+        <p>多为设备没拿到 IPv4 DNS。「接管 53」「PassWall 前置」启用时会自动给 LAN 追加一条 <code>6,路由器IP</code>（停止、切换或卸载时只移除插件自己加的那条）；仍异常时可手动补：</p>
 <pre><code>uci add_list dhcp.lan.dhcp_option='6,路由器IP'
 uci commit dhcp
 /etc/init.d/dnsmasq restart</code></pre>
@@ -534,11 +534,11 @@ python tools/build_apk.py      # 实验性 apk（需在 25.12 实测）
 python tools/build_run.py      # 离线 .run + manifest-&lt;版本&gt;.txt</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.10-1_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.10-1-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.10-1_all.apk</code>（实验性）</li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.10-1.run</code></li>
-        <li><code>dist/manifest-1.3.10-1.txt</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.11-1_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.11-1-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.11-1_all.apk</code>（实验性）</li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.11-1.run</code></li>
+        <li><code>dist/manifest-1.3.11-1.txt</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
@@ -565,6 +565,10 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
         <table>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
+            <tr>
+              <td><span class="tag">1.3.11-1</span></td>
+              <td>「接管 53」「PassWall 前置」启用时自动为 LAN 下发 DHCP DNS（option 6 指向路由器），解决设备拿到 IP 却无法上网；停止、切换或卸载时只移除插件自己写入的那条，手动配置不受影响；Android App 功能不变，沿用 1.3.10-1 安装包</td>
+            </tr>
             <tr>
               <td><span class="tag">1.3.10-1</span></td>
               <td>修复面板在 LuCI 重新登录后误报「登录已过期」：改用父页面实时令牌，失败自动取新令牌重试一次；服务端返回网页时按真实原因提示（24.10 / 25.12 通用）；令牌校验失败改为返回 JSON；Android App 同步升版（versionCode 17，功能不变）</td>
@@ -657,7 +661,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 管理中心 · 使用说明 1.3.10-1 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 管理中心 · 使用说明 1.3.11-1 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {
