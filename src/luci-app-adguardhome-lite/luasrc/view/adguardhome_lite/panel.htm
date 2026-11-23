@@ -36,6 +36,7 @@
 			token: "<%=_token%>",
 			urls: {
 				status:       "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[status]])%>",
+				session:      "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[session]])%>",
 				statsClear:   "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[stats_clear]])%>",
 				coreInstall:  "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[core_install]])%>",
 				coreProgress: "<%=url([[admin]], [[services]], [[adguardhome_lite]], [[core_progress]])%>",
@@ -952,7 +953,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261125b"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261123a"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

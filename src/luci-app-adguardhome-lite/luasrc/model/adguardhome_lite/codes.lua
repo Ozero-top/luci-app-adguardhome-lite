@@ -29,6 +29,7 @@ M.codes = {
     invalid_password = "warn",
     password_hash_invalid = "warn",
     permission_denied = "warn",
+    auth_required = "warn",
     update_busy = "warn",
     core_not_installed = "error",
     core_download_failed = "error",

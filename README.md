@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.7-9_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.10-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.7-9` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.10-1` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.7-9 -m https://gh-proxy.org
+sh install.sh -v 1.3.10-1 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -487,6 +487,12 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.10-1
+
+- **登录提示修复**：面板在 LuCI 重新登录后不再误报「登录已过期」；保存等操作失败时会自动取当前会话令牌重试一次，服务端返回网页时按真实原因提示（24.10 / 25.12 均适用）
+- **服务端校验**：令牌校验失败改为返回 JSON，前端可识别并自动恢复
+- **Android App**：同步升版到 `1.3.10-1`（versionCode 17），功能与 1.3.7-9 一致
 
 ### 1.3.7-9
 

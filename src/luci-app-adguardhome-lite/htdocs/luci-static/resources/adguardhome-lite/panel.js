@@ -8,6 +8,50 @@
 	var CFG = window.AGH || {};
 	var U = CFG.urls || {};
 	var TOKEN = CFG.token || '';
+
+	// 本页在 LuCI 的 iframe 里打开：父页面的 L.env.token 是当前会话的实时令牌，
+	// 比模板里渲染的 token 更可靠（重新登录、LuCI 版本差异时都不会过期）。
+	function parentToken() {
+		try {
+			var p = window.parent;
+			if (!p || p === window) return '';
+			if (p.L) {
+				if (typeof p.L.getToken === 'function') {
+					var live = p.L.getToken();
+					if (live) return String(live);
+				}
+				if (p.L.env && p.L.env.token) return String(p.L.env.token);
+			}
+		} catch (e) { /* 忽略跨域或父页面尚未初始化 */ }
+		return '';
+	}
+
+	var tokenPending = null;
+	function refreshToken() {
+		var live = parentToken();
+		if (live) {
+			TOKEN = live;
+			return Promise.resolve(TOKEN);
+		}
+		if (!U.session) return Promise.resolve(TOKEN);
+		if (tokenPending) return tokenPending;
+		tokenPending = fetchWithTimeout(U.session, {
+			credentials: 'same-origin',
+			cache: 'no-store',
+			headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+		}, 8000).then(function (r) {
+			return r.json();
+		}).then(function (d) {
+			tokenPending = null;
+			if (d && d.ok && d.token) TOKEN = String(d.token);
+			return TOKEN;
+		}, function () {
+			tokenPending = null;
+			return TOKEN;
+		});
+		return tokenPending;
+	}
+
 	var ADULT_FILTER_URL = 'https://cdn.jsdelivr.net/gh/Ozero-top/AdguardHome-Rrules@dist/manual/nsfw.txt';
 	var ADULT_FILTER_NAME = 'HaGeZi NSFW（成人内容）';
 	// 旧版本写入过的上游地址，以及手动添加过的同一条列表；识别后统一迁移到 CDN 地址
@@ -207,20 +251,43 @@
 		showToast(msg, 'bad');
 	}
 
+	// LuCI 在会话失效或令牌不匹配时返回 HTML（登录页 / csrftoken），
+	// 不能一律当成“登录已过期”，否则用户会反复登录仍看到同样的提示。
+	function htmlResponseError(r, text) {
+		var raw = String(text || '');
+		var snippet = raw
+			.replace(/<script[\s\S]*?<\/script>/gi, ' ')
+			.replace(/<style[\s\S]*?<\/style>/gi, ' ')
+			.replace(/<[^>]+>/g, ' ')
+			.replace(/\s+/g, ' ')
+			.trim();
+		if (snippet.length > 140) snippet = snippet.slice(0, 140) + '…';
+
+		var loginRequired = r.status === 401
+			|| (r.headers.get('x-luci-login-required') || '').toLowerCase() === 'yes';
+		if (!loginRequired && /invalid token|csrf|令牌|登录|login|session/i.test(snippet)) {
+			loginRequired = true;
+		}
+		if (loginRequired) {
+			throw Object.assign(new Error('登录已过期'), { login: true, status: r.status });
+		}
+		throw new Error(snippet || ('服务器返回了网页（HTTP ' + r.status + '），请刷新页面后重试。'));
+	}
+
 	async function parseJsonResponse(r) {
 		var ct = r.headers.get('content-type') || '';
-		if (ct.indexOf('text/html') >= 0) {
-			throw Object.assign(new Error('登录已过期'), { login: true });
-		}
 		var text = await r.text();
+		if (ct.indexOf('text/html') >= 0) {
+			htmlResponseError(r, text);
+		}
 		if (!r.ok) {
-			if (text.trim().indexOf('<') === 0) throw Object.assign(new Error('登录已过期'), { login: true });
+			if (text.trim().indexOf('<') === 0) htmlResponseError(r, text);
 			throw new Error(text || ('HTTP ' + r.status));
 		}
 		try {
 			return JSON.parse(text);
 		} catch (e) {
-			if (text.trim().indexOf('<') === 0) throw Object.assign(new Error('登录已过期'), { login: true });
+			if (text.trim().indexOf('<') === 0) htmlResponseError(r, text);
 			throw new Error('接口返回格式错误');
 		}
 	}
@@ -252,7 +319,7 @@
 		return parseJsonResponse(r);
 	}
 
-	async function apiPost(url, data, timeout) {
+	async function postForm(url, data, timeout) {
 		var body = new URLSearchParams(data || {});
 		body.set('token', TOKEN);
 		var r = await fetchWithTimeout(url, {
@@ -268,9 +335,23 @@
 		}, timeout || 30000);
 		var json = await parseJsonResponse(r);
 		if (json && json.ok === false) {
-			throw new Error(json.error || '操作失败');
+			var err = new Error(json.error || '操作失败');
+			if (json.reason === 'auth_required') err.login = true;
+			throw err;
 		}
 		return json;
+	}
+
+	async function apiPost(url, data, timeout) {
+		if (!TOKEN) await refreshToken();
+		try {
+			return await postForm(url, data, timeout);
+		} catch (err) {
+			if (!isLoginError(err)) throw err;
+			// 重新登录后令牌会轮换，取一次当前令牌再重试；仍失败才提示重新登录
+			await refreshToken();
+			return await postForm(url, data, timeout);
+		}
 	}
 
 	async function apiText(url) {

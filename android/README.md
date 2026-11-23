@@ -28,7 +28,7 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
-发布时重命名为 `AGHTools<版本>.apk`（例如 `AGHTools1.3.7-9.apk`）。
+发布时重命名为 `AGHTools<版本>.apk`（例如 `AGHTools1.3.10-1.apk`）。
 
 签名口令通过环境变量提供：
 

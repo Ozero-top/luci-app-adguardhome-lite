@@ -573,9 +573,15 @@ end
 
 local function require_post()
     if not check_token() then
+        -- 用 JSON 返回，前端才能识别为令牌失效并取新令牌重试一次
         http.status(403)
-        http.prepare_content("text/plain; charset=utf-8")
-        http.write("安全校验失败，请刷新页面后重试。")
+        http.prepare_content("application/json")
+        http.write_json({
+            ok = false,
+            error = "登录状态已失效，请刷新页面后重试。",
+            reason = "auth_required",
+            level = codes.level("auth_required")
+        })
         return false
     end
 
