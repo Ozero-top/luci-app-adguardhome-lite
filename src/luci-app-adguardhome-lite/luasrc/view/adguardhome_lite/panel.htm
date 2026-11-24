@@ -30,7 +30,7 @@
 			background: #141517;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126h">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126j">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -93,11 +93,14 @@
 	</div>
 
 	<nav class="agh-tabs" id="agh-tabs">
-		<button type="button" class="agh-tab is-active" data-tab="overview">概览</button>
-		<button type="button" class="agh-tab" data-tab="settings">基础设置</button>
-		<button type="button" class="agh-tab" data-tab="advanced">高级配置</button>
-		<button type="button" class="agh-tab" data-tab="logs">运行日志</button>
-		<button type="button" class="agh-tab" data-tab="guide">使用说明</button>
+		<div class="agh-tabs-scroll">
+			<button type="button" class="agh-tab is-active" data-tab="overview">概览</button>
+			<button type="button" class="agh-tab" data-tab="settings">基础设置</button>
+			<button type="button" class="agh-tab" data-tab="advanced">高级配置</button>
+			<button type="button" class="agh-tab" data-tab="logs">运行日志</button>
+			<button type="button" class="agh-tab" data-tab="guide">使用说明</button>
+		</div>
+		<span id="agh-toast" class="agh-toast" role="status" aria-live="polite"></span>
 	</nav>
 
 	<main class="agh-main">
@@ -529,7 +532,7 @@
 					</select>
 				</div>
 				</div>
-					<p class="agh-hint">预置规则分 512MB / 1GB / 2GB+ 三档，分别 3 / 4 / 6 个列表，档内已去重。切换档位会移除其它档位的预置列表，白名单和自定义订阅不受影响；内置白名单默认不启用，需要时手动开启。切换下载源会自动改源并重新下载，失败时自动换源重试。</p>
+					<p class="agh-hint">预置三档自建过滤规则，按设备内存档位分别 3 / 4 / 6 个列表。切换自动移除其它档位列表，白名单和自定义订阅不受影响；内置白名单默认不启用，手动开启。切换下载源自动改源并重新下载，失败自动换源重试。</p>
 
 				<div id="agh-filter-list" class="agh-rule-list"><div class="agh-empty">读取中...</div></div>
 
@@ -887,7 +890,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261126i"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261126m"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

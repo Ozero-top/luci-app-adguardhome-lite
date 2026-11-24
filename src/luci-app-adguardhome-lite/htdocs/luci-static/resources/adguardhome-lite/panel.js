@@ -279,6 +279,13 @@
 	async function parseJsonResponse(r) {
 		var ct = r.headers.get('content-type') || '';
 		var text = await r.text();
+		// 部分动作没带 JSON Content-Type，但 body 是合法 JSON；先按内容判断，
+		// 否则会把正常响应当成网页错误，把原始 JSON 显示到提示里。
+		if (/^\s*[{[]/.test(text)) {
+			try {
+				return JSON.parse(text);
+			} catch (e) { /* 不是合法 JSON，继续按错误处理 */ }
+		}
 		if (ct.indexOf('text/html') >= 0) {
 			htmlResponseError(r, text);
 		}
@@ -286,12 +293,8 @@
 			if (text.trim().indexOf('<') === 0) htmlResponseError(r, text);
 			throw new Error(text || ('HTTP ' + r.status));
 		}
-		try {
-			return JSON.parse(text);
-		} catch (e) {
-			if (text.trim().indexOf('<') === 0) htmlResponseError(r, text);
-			throw new Error('接口返回格式错误');
-		}
+		if (text.trim().indexOf('<') === 0) htmlResponseError(r, text);
+		throw new Error('接口返回格式错误');
 	}
 
 	// 统一超时：接口卡住时快速失败，避免整个面板一直停在加载状态
@@ -1120,12 +1123,13 @@
 		return filtersAction({ action: 'rules', rules: out.join('\n') });
 	}
 
-	// 订阅来源标签：内置列表走 CDN / GitHub，自定义列表显示域名，方便区分订阅从哪来
+	// 订阅来源标签：内置源给简短说明，其它地址回退显示域名
 	function filterSource(url) {
 		var u = String(url || '');
 		if (u.indexOf('cdn.jsdelivr.net') >= 0) return 'jsDelivr';
+		if (u.indexOf('agh.ozero.top') >= 0) return '作者自建';
 		if (u.indexOf('gh-proxy') >= 0 || u.indexOf('ghproxy') >= 0 || u.indexOf('ghfast') >= 0) return 'GitHub 反代';
-		if (u.indexOf('github.com') >= 0) return 'GitHub';
+		if (u.indexOf('github.com') >= 0 || u.indexOf('githubusercontent.com') >= 0) return 'GitHub 直连';
 		var m = u.match(/^[a-z]+:\/\/([^\/?#]+)/i);
 		return m ? m[1] : '';
 	}
@@ -1307,10 +1311,13 @@
 			try {
 				var d = await apiPost(U.filtersSave, { action: 'preset_source', source: val });
 				state.presetSource = val;
+				var failedCount = Array.isArray(d.failed)
+					? d.failed.length
+					: (d.failed ? Object.keys(d.failed).length : 0);
 				var text = '下载源已切换，迁移 ' + (d.migrated || 0) + ' 个列表';
-				if (d.failed && d.failed.length) text += '，失败 ' + d.failed.length + ' 个';
+				if (failedCount) text += '，失败 ' + failedCount + ' 个';
 				if (msg) msg.textContent = text;
-				showToast('已切换下载源', 'ok');
+				showToast(text, 'ok');
 				await loadFilters(true);
 			} catch (err) {
 				sel.value = prev;

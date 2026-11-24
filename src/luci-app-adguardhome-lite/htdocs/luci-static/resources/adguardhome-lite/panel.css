@@ -153,6 +153,7 @@ code {
 /* 标签页 */
 .agh-tabs {
 	display: flex;
+	align-items: center;
 	gap: 6px;
 	padding: 5px;
 	margin: 0 0 var(--agh-gap);
@@ -160,8 +161,29 @@ code {
 	border: 1px solid var(--agh-border);
 	border-radius: 12px;
 	box-shadow: var(--agh-shadow);
+	overflow: hidden;
+}
+
+.agh-tabs-scroll {
+	display: flex;
+	flex: 1 1 auto;
+	min-width: 0;
+	gap: 6px;
 	overflow-x: auto;
 	scrollbar-width: thin;
+}
+
+/* 操作提示显示在页签栏右侧，不再悬浮遮住页头 */
+#agh-toast {
+	position: static;
+	flex: 0 0 auto;
+	max-width: min(46%, 340px);
+	padding: 7px 12px;
+	border-radius: 8px;
+	box-shadow: none;
+	font-size: 12.5px;
+	line-height: 1.4;
+	animation: none;
 }
 
 .agh-tab {
@@ -1349,9 +1371,11 @@ code {
 	white-space: nowrap;
 }
 
-/* 订阅来源标签：jsDelivr / GitHub / 自定义域名 */
+/* 订阅来源标签：内置源用短标签，自定义源显示实际地址（超长省略） */
 .agh-rule-source {
-	flex: none;
+	flex: 0 1 auto;
+	min-width: 0;
+	max-width: 300px;
 	padding: 1px 7px;
 	border: 1px solid var(--agh-border);
 	border-radius: 6px;
@@ -1359,6 +1383,8 @@ code {
 	color: var(--agh-muted);
 	font-size: 10.5px;
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .agh-rule-tag {
