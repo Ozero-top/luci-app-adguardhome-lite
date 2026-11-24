@@ -143,78 +143,162 @@ cancel_dns_mode_apply() {
 }
 
 # 接管 53 / PassWall 前置时 DNSMasq 被移到 1745，不再把自己作为 DNS 下发给 DHCP 客户端，
-# 客户端会「拿到 IP 但上不了网」。这里给 lan 补一条 option 6 指向路由器自身，
-# 只补一条；只删除自己补的那条，用户手动配置的保持不动。
-lan_dns_ip() {
-    _lip="$(get_uci network.lan.ipaddr)"
-    _lip="${_lip%%/*}"
-    if [ -z "$_lip" ] && have_cmd jsonfilter; then
-        _lip="$(ubus call network.interface.lan status 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)"
+# 客户端会「拿到 IP 但上不了网」。这里给每个启用的 DHCP 服务段补一条 option 6，
+# 指向该网段自身接口的地址；只删除自己补的那条，用户手动配置的保持不动。
+# 记录格式为「段名|6,IP」，旧版本只有「6,IP」时按 lan 处理。
+
+# 列出所有 DHCP 服务段（dnsmasq / odhcpd 段的类型不是 dhcp，不会被选中）
+dhcp_sections() {
+    uci -q show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.]*\)=dhcp$/\1/p'
+}
+
+# 取 DHCP 段对应接口的 IPv4 地址（该网段的网关地址）
+dhcp_section_dns_ip() {
+    _if="$(get_uci "dhcp.$1.interface")"
+    [ -n "$_if" ] || return 0
+
+    _ip="$(get_uci "network.$_if.ipaddr")"
+    _ip="${_ip%%/*}"
+    if [ -z "$_ip" ] && have_cmd jsonfilter; then
+        _ip="$(ubus call "network.interface.$_if" status 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)"
     fi
-    if [ -z "$_lip" ]; then
-        _ldev="$(get_uci network.lan.device)"
-        [ -n "$_ldev" ] || _ldev="br-lan"
-        _lip="$(ip -4 addr show dev "$_ldev" 2>/dev/null | awk '/inet /{print $2; exit}' | cut -d/ -f1)"
+    if [ -z "$_ip" ]; then
+        _dev="$(get_uci "network.$_if.device")"
+        [ -n "$_dev" ] || _dev="br-$_if"
+        _ip="$(ip -4 addr show dev "$_dev" 2>/dev/null | awk '/inet /{print $2; exit}' | cut -d/ -f1)"
     fi
-    echo "$_lip"
+    echo "$_ip"
 }
 
 dhcp_option_present() {
-    for _o in $(get_uci dhcp.lan.dhcp_option); do
-        [ "$_o" = "$1" ] && return 0
+    for _o in $(get_uci "dhcp.$1.dhcp_option"); do
+        [ "$_o" = "$2" ] && return 0
     done
     return 1
 }
 
+# 段内是否已有其它 6, 开头的 DNS 下发（排除指定值）
+dhcp_option_has_dns() {
+    _excl="$2"
+    for _o in $(get_uci "dhcp.$1.dhcp_option"); do
+        case "$_o" in
+            6,*) [ "$_o" = "$_excl" ] || return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# 兼容旧格式：单值「6,IP」视为 lan 段
+added_dhcp_pairs() {
+    for _a in $(get_uci "$CONF.main.added_dhcp_option"); do
+        case "$_a" in
+            *'|'*) echo "$_a" ;;
+            *) echo "lan|$_a" ;;
+        esac
+    done
+}
+
 dhcp_option_add() {
-    uci -q get dhcp.lan >/dev/null 2>&1 || return 0
-    [ "$(get_uci dhcp.lan.ignore)" = "1" ] && return 0
+    _old_raw="$(get_uci "$CONF.main.added_dhcp_option")"
+    _old="$(added_dhcp_pairs)"
+    _new=""
+    _changed="0"
 
-    _ip="$(lan_dns_ip)"
-    [ -n "$_ip" ] || { log_msg "未取到 LAN 地址，跳过 DHCP DNS 下发。"; return 0; }
+    for _sec in $(dhcp_sections); do
+        [ "$(get_uci "dhcp.$_sec.ignore")" = "1" ] && continue
+        _ip="$(dhcp_section_dns_ip "$_sec")"
+        [ -n "$_ip" ] || continue
+        _want="6,$_ip"
+        _key="$_sec|$_want"
 
-    _want="6,$_ip"
-    _added="$(get_uci "$CONF.main.added_dhcp_option")"
-
-    # 用户自己配过 6, 开头的选项时保持原样，不接管
-    if [ -z "$_added" ]; then
-        for _o in $(get_uci dhcp.lan.dhcp_option); do
-            case "$_o" in
-                6,*)
-                    log_msg "检测到已有 DHCP DNS 下发（$_o），保持不动。"
-                    return 0
-                    ;;
+        # 该段之前是否由插件补过
+        _owned=""
+        for _p in $_old; do
+            case "$_p" in
+                "$_sec|"*) _owned="${_p#*|}" ;;
             esac
         done
-    fi
 
-    if dhcp_option_present "$_want"; then
-        if [ -z "$_added" ]; then
-            uci -q set "$CONF.main.added_dhcp_option=$_want"
-            uci -q commit "$CONF" 2>/dev/null
+        if [ -n "$_owned" ]; then
+            if [ "$_owned" = "$_want" ]; then
+                # 用户后来自己配了别的 6, 选项时让位，撤掉插件补的
+                if dhcp_option_has_dns "$_sec" "$_owned"; then
+                    uci -q del_list "dhcp.$_sec.dhcp_option=$_owned" 2>/dev/null
+                    _changed="1"
+                    log_msg "检测到 $_sec 已有手动配置的 DNS 下发，已移除插件补的那条。"
+                    continue
+                fi
+                _new="$_new $_key"
+                continue
+            fi
+            # 该段地址变化：先撤旧值
+            uci -q del_list "dhcp.$_sec.dhcp_option=$_owned" 2>/dev/null
+            _changed="1"
         fi
-        return 0
+
+        if dhcp_option_has_dns "$_sec" ""; then
+            log_msg "检测到 $_sec 已有 DHCP DNS 下发，保持不动。"
+            continue
+        fi
+        if dhcp_option_present "$_sec" "$_want"; then
+            _new="$_new $_key"
+            continue
+        fi
+
+        uci -q add_list "dhcp.$_sec.dhcp_option=$_want" || continue
+        _new="$_new $_key"
+        _changed="1"
+        log_msg "已为 $_sec 自动下发 DNS（$_want）。"
+    done
+
+    # 清理已经不在接管范围内的旧记录（段被删除或改为不接管）
+    for _p in $_old; do
+        case " $_new " in *" $_p "*) continue ;; esac
+        _sec="${_p%%|*}"
+        _val="${_p#*|}"
+        uci -q get "dhcp.$_sec" >/dev/null 2>&1 || continue
+        uci -q del_list "dhcp.$_sec.dhcp_option=$_val" 2>/dev/null
+        _changed="1"
+    done
+
+    # 记录没变化时不重写 UCI，避免每次应用都产生一次闪存写入；
+    # 旧格式（只有 6,IP）会在这次比较中触发一次迁移写入
+    if [ "$(echo $_new)" != "$(echo $_old_raw)" ]; then
+        uci -q delete "$CONF.main.added_dhcp_option"
+        for _p in $_new; do
+            uci -q add_list "$CONF.main.added_dhcp_option=$_p"
+        done
+        uci -q commit "$CONF" 2>/dev/null
     fi
 
-    # LAN 地址变化时，先撤掉上次补的旧值
-    [ -n "$_added" ] && uci -q del_list "dhcp.lan.dhcp_option=$_added"
-    uci -q add_list "dhcp.lan.dhcp_option=$_want" || return 0
-    uci -q set "$CONF.main.added_dhcp_option=$_want"
-    uci -q commit dhcp 2>/dev/null
-    uci -q commit "$CONF" 2>/dev/null
-    log_msg "已为 LAN 自动下发 DNS（$_want），避免客户端拿到 IP 却无法解析。"
-    restart_dnsmasq
-    sleep 1
+    if [ "$_changed" = "1" ]; then
+        uci -q commit dhcp 2>/dev/null
+        log_msg "已更新 DHCP DNS 下发，避免客户端拿到 IP 却无法解析。"
+        restart_dnsmasq
+        sleep 1
+    fi
+    return 0
 }
 
 dhcp_option_restore() {
-    _added="$(get_uci "$CONF.main.added_dhcp_option")"
-    [ -n "$_added" ] || return 0
-    uci -q del_list "dhcp.lan.dhcp_option=$_added" 2>/dev/null
+    _changed="0"
+    for _p in $(get_uci "$CONF.main.added_dhcp_option"); do
+        case "$_p" in
+            *'|'*) _sec="${_p%%|*}"; _val="${_p#*|}" ;;
+            *) _sec="lan"; _val="$_p" ;;
+        esac
+        uci -q get "dhcp.$_sec" >/dev/null 2>&1 || continue
+        uci -q del_list "dhcp.$_sec.dhcp_option=$_val" 2>/dev/null
+        _changed="1"
+    done
     uci -q delete "$CONF.main.added_dhcp_option"
-    uci -q commit dhcp 2>/dev/null
     uci -q commit "$CONF" 2>/dev/null
-    log_msg "已移除插件自动下发的 DNS（$_added）。"
+
+    if [ "$_changed" = "1" ]; then
+        uci -q commit dhcp 2>/dev/null
+        log_msg "已移除插件自动下发的 DHCP DNS。"
+    fi
+    return 0
 }
 
 # KuWrt / iStoreOS 25.12 的 DNSMasq 内置「DNS 劫持」（dns_redirect=1）会以 -105 优先级
@@ -254,6 +338,13 @@ agh_nft_wan_iface() {
     [ -n "$_if" ] || _if="$(uci -q get network.wan.ifname 2>/dev/null)"
     [ -n "$_if" ] || _if="wan"
     echo "$_if"
+}
+
+# 只有 fw4 的 nft 表存在时才校验重定向规则；
+# fw3 或没有 nft 的固件不做这项判断，避免每次应用都被误判为未生效。
+agh_nft_supported() {
+    have_cmd nft || return 1
+    nft list table inet fw4 >/dev/null 2>&1
 }
 
 agh_nft_rule_present() {
@@ -424,11 +515,13 @@ mode_is_applied() {
             ;;
         takeover)
             [ "$(dnsmasq_port)" = "1745" ] || return 1
+            # 规则可能被防火墙重载或固件脚本清掉，缺失时重新应用，避免静默失去过滤
+            agh_nft_supported && { agh_nft_rule_present || return 1; }
             ;;
         passwall)
             [ "$(dnsmasq_port)" = "1745" ] || return 1
             # 收回 53 的规则优先级必须高于 PassWall，规则缺失就重新应用
-            agh_nft_rule_present || return 1
+            agh_nft_supported && { agh_nft_rule_present || return 1; }
             ;;
         openclash)
             openclash_forward_present || return 1

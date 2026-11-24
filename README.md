@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.11-2_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.11-3_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.11-2` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.11-3` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.11-2 -m https://gh-proxy.org
+sh install.sh -v 1.3.11-3 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -487,6 +487,16 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.11-3
+
+- **在线更新更安全**：插件更新与内核安装、设置保存、服务启停、修改密码、YAML 保存互斥；通用模式更新前自动快照插件文件，更新后校验文件完整性、Shell/Lua 语法与启动状态，失败自动回滚，覆盖阶段异常也会恢复
+- **升级弹窗**：新增「更新内容」区域，显示从当前版本到最新版之间所有版本的说明；提供完整更新日志入口，支持 Esc 关闭、暗色适配与失败日志关闭；更新前增加确认提示
+- **检测与网络**：版本检查单节点超时缩短，离线时保留上次结果并 10 分钟后再试；插件更新、插件检查、内核检查统一跟随 GitHub 反代设置
+- **DNS 接管**：「接管 53 端口」增加 nft 重定向规则校验，规则被清掉时自动重建；状态页提示 `dns_redirect` 被重新开启的情况
+- **DHCP DNS 下发**：所有启用的 DHCP 服务段都自动下发 option 6（访客 / IoT 使用各自网关地址），跳过已关闭 DHCP 与用户自定义配置，仅在变化时重启 dnsmasq
+- **其它**：手动安装 ipk / apk 后立即刷新版本显示；通用模式更新前清理旧版本遗留文件
+- **Android App**：功能无变化，沿用 `1.3.10-1` 安装包
 
 ### 1.3.11-2
 

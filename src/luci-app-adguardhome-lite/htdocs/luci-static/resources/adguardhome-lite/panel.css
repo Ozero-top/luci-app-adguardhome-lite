@@ -1552,6 +1552,8 @@ button.agh-update-tip {
 .agh-modal-body {
 	position: relative;
 	width: min(560px, calc(100vw - 32px));
+	max-height: calc(100vh - 24px);
+	overflow: auto;
 	padding: 20px;
 	border-radius: 12px;
 	background: var(--agh-surface, #fffdf7);
@@ -1587,6 +1589,65 @@ button.agh-update-tip {
 	justify-content: flex-end;
 	gap: 10px;
 	margin-top: 16px;
+}
+
+/* 升级弹窗：新版更新内容 */
+.agh-update-notes {
+	margin: 10px 0 4px;
+	padding: 10px 12px;
+	border: 1px solid var(--agh-border);
+	border-radius: 8px;
+	background: var(--agh-surface-2);
+	max-height: min(220px, 38vh);
+	overflow: auto;
+}
+
+.agh-update-notes-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 6px;
+}
+
+.agh-update-notes-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--agh-text);
+}
+
+.agh-update-notes-link {
+	flex: 0 0 auto;
+	font-size: 12px;
+	color: var(--agh-primary);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.agh-update-notes-link:hover {
+	text-decoration: underline;
+}
+
+.agh-update-notes pre {
+	margin: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 1.65;
+}
+
+.agh-update-notes.is-empty pre {
+	color: var(--agh-muted);
+}
+
+.agh-dark .agh-update-notes {
+	background: #26272b;
+	border-color: #3a3b40;
+}
+
+.agh-dark .agh-update-notes-title {
+	color: #e8e6e3;
 }
 
 .agh-dark .agh-modal-body {

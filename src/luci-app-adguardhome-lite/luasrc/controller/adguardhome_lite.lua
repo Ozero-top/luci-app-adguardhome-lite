@@ -407,17 +407,32 @@ local function plugin_update_info()
     local cache = fs.readfile(PLUGIN_UPDATE) or ""
     local latest = clean_tag(cache:match("latest=([^\n]*)"))
     local checked = tonumber(cache:match("time=(%d+)"))
-
-    -- 拿到结果才缓存一天；检查失败时只缓存一小时，尽快重试
-    local ttl = (latest ~= "") and 86400 or 3600
-    if not checked or (os.time() - checked) > ttl then
-        -- 先写占位时间，避免每次轮询都重复启动检查任务
-        fs.writefile(PLUGIN_UPDATE, "latest=" .. latest .. "\ntime=" .. os.time() .. "\n")
-        sys.exec("sh " .. SHARE .. "/check_plugin_update.sh >/dev/null 2>&1 &")
-    end
-
+    local notes = cache:match("notes<<EOF\n(.-)\nEOF") or ""
+    local failed = cache:match("failed=1") ~= nil
     -- 插件 Release 都是正式版，不比内核的正式版 / 预发布版通道，直接比版本号
     local current = plugin_version()
+
+    -- 拿到结果才缓存一天；失败后等 10 分钟再重试，避免离线时随每次状态轮询重复请求
+    local ttl = failed and 600 or ((latest ~= "") and 86400 or 3600)
+    local age = checked and (os.time() - checked) or math.huge
+    -- 旧缓存没有更新说明时补一次；留 60 秒给后台任务，仍取不到则记 nonotes=1 避免反复请求
+    local need_notes = latest ~= "" and notes == "" and not failed
+        and not cache:match("nonotes=1") and age > 60
+    if need_notes or age > ttl then
+        -- 先写占位时间，保留已有说明与失败标记，避免每次轮询都重复启动检查任务
+        local placeholder = "latest=" .. latest .. "\ntime=" .. os.time() .. "\n"
+        if notes ~= "" then
+            placeholder = placeholder .. "notes<<EOF\n" .. notes .. "\nEOF\n"
+        end
+        if failed then
+            placeholder = placeholder .. "failed=1\n"
+        end
+        fs.writefile(PLUGIN_UPDATE, placeholder)
+        -- 传入当前版本，让检查脚本合并所有中间版本的更新说明
+        sys.exec("sh " .. SHARE .. "/check_plugin_update.sh "
+            .. string.format("%q", current) .. " >/dev/null 2>&1 &")
+    end
+
     local newer = version_newer(latest, current)
 
     local url = RELEASE_URL
@@ -429,7 +444,9 @@ local function plugin_update_info()
         current = current,
         latest = latest,
         update = newer,
-        url = url
+        url = url,
+        -- 仅在确实有新版本时返回；内容已由检查脚本限制在 12KB 内，可包含多个版本的说明
+        notes = newer and notes or ""
     }
 end
 

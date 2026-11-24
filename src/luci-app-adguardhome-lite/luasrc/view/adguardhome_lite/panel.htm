@@ -30,7 +30,7 @@
 			background: #141517;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261125p">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126b">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -83,7 +83,10 @@
 	<div class="agh-card" id="agh-plugin-update-progress" hidden>
 		<div class="agh-card-head">
 			<h3>插件更新</h3>
-			<span id="agh-plugin-update-phase" class="agh-hint">准备中...</span>
+			<span class="agh-inline">
+				<span id="agh-plugin-update-phase" class="agh-hint">准备中...</span>
+				<button type="button" class="agh-mini-btn" id="agh-plugin-update-dismiss" hidden>关闭</button>
+			</span>
 		</div>
 		<div class="agh-progress-bar is-indeterminate" id="agh-plugin-update-bar"><i></i></div>
 		<pre class="agh-log" id="agh-plugin-update-log"></pre>
@@ -315,7 +318,7 @@
 								<option value="ghproxy.com">ghproxy.com</option>
 								<option value="ghfast.top">ghfast.top</option>
 							</select>
-							<p class="agh-hint">官方 CDN 失败时通过反代下载 GitHub 内核；反代不可用时回退直连。</p>
+							<p class="agh-hint">官方 CDN 失败时通过反代下载 GitHub 内核；内核/插件版本检查与在线更新也使用该反代，关闭后全部直连。</p>
 						</div>
 
 						<div class="agh-field">
@@ -911,9 +914,16 @@
 
 <div class="agh-modal" id="agh-plugin-update-modal" hidden>
 	<div class="agh-modal-mask" id="agh-plugin-update-mask"></div>
-	<div class="agh-modal-body">
-		<h3>在线更新插件</h3>
+	<div class="agh-modal-body" role="dialog" aria-modal="true" aria-labelledby="agh-plugin-update-title">
+		<h3 id="agh-plugin-update-title">在线更新插件</h3>
 		<p id="agh-plugin-update-summary" class="agh-hint"></p>
+		<div class="agh-update-notes" id="agh-plugin-update-notes" hidden>
+			<div class="agh-update-notes-head">
+				<span class="agh-update-notes-title" id="agh-plugin-update-notes-title">新版更新内容</span>
+				<a class="agh-update-notes-link" id="agh-plugin-update-notes-link" href="#" target="_blank" rel="noopener">查看完整更新日志</a>
+			</div>
+			<pre id="agh-plugin-update-notes-body"></pre>
+		</div>
 		<div class="agh-modal-row">
 			<span>更新渠道</span>
 			<label><input type="radio" name="agh-plugin-channel" value="cn" checked> 国内加速</label>
@@ -953,7 +963,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261123a"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261126d"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

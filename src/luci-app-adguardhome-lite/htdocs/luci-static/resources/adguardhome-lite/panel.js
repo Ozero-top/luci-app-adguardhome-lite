@@ -102,6 +102,7 @@
 		adultMigrated: false,
 		parentalNotified: false,
 		pluginLatest: '',
+		pluginUrl: '',
 		pluginUpdating: false,
 		pluginChecking: false,
 		pluginTimer: null,
@@ -448,6 +449,7 @@
 			return;
 		}
 		tip.disabled = false;
+		if (p && p.url) state.pluginUrl = p.url;
 		if (p && p.update && p.latest) {
 			state.pluginLatest = p.latest;
 			tip.textContent = '发现 v' + p.latest + '，立即更新';
@@ -472,7 +474,8 @@
 		try {
 			await apiPost(U.pluginCheck, {});
 			var found = null;
-			for (var i = 0; i < 16; i++) {
+			// 后台最多串行尝试 3 个节点（每节点 6 秒），这里等 36 秒再判定超时
+			for (var i = 0; i < 24; i++) {
 				await new Promise(function (resolve) { setTimeout(resolve, 1500); });
 				var d = await apiGet(U.status);
 				if (d && d.plugin && d.plugin.latest) {
@@ -634,6 +637,10 @@
 
 		if (d.dns_mode === 'takeover' && d.openclash_hijack && !d.dns_redirect) {
 			rows.push(['配置建议', '<span class="agh-warn">检测到 Clash DNS 劫持，但把查询收回 53 的规则没有生效，查询可能绕过 AdGuard Home。请在「基础设置」重新保存一次「接管 53 端口」，或检查防火墙状态。</span>']);
+		}
+		// DNSMasq 内置劫持被固件或其它插件重新打开时，过滤会静默失效
+		if ((d.dns_mode === 'takeover' || d.dns_mode === 'passwall') && String(d.dnsmasq_redirect || '') === '1') {
+			rows.push(['配置建议', '<span class="agh-warn">DNSMasq 内置的 DNS 劫持（dns_redirect=1）被重新开启了，它会抢在插件规则之前把查询送到 1745，导致过滤失效。请在「基础设置」重新保存一次当前接管方式。</span>']);
 		}
 		if (d.dns_mode === 'passwall') {
 			if (!d.passwall_enabled) {
@@ -1538,10 +1545,49 @@
 	}
 
 	// ===== 插件在线更新 =====
+	// 更新说明：展示最新版内容；强制指定其它版本时隐藏，避免把最新版说明误当成目标版本
+	function syncPluginNotes() {
+		var p = (state.status && state.status.plugin) || {};
+		var latest = p.latest || state.pluginLatest || '';
+		var notes = String(p.notes || '').trim();
+		var forceEl = $('agh-plugin-force');
+		var force = !!(forceEl && forceEl.checked);
+		var input = $('agh-plugin-version-input');
+		var target = force ? ((input && input.value) || '').replace(/\s+/g, '') : latest;
+		var otherVersion = !!(target && latest && target !== latest);
+
+		var link = $('agh-plugin-update-notes-link');
+		if (link) {
+			if (state.pluginUrl) link.href = state.pluginUrl;
+			link.hidden = !state.pluginUrl;
+			link.textContent = (latest && !otherVersion) ? ('查看 v' + latest + ' 完整更新日志') : '查看完整更新日志';
+		}
+
+		var notesBox = $('agh-plugin-update-notes');
+		var notesBody = $('agh-plugin-update-notes-body');
+		var notesTitle = $('agh-plugin-update-notes-title');
+		if (!notesBox || !notesBody) return;
+
+		if (otherVersion) {
+			notesBox.hidden = true;
+			return;
+		}
+		notesBox.hidden = false;
+		notesBox.classList.toggle('is-empty', !notes);
+		var multi = (notes.match(/【v/g) || []).length > 1;
+		if (notesTitle) {
+			notesTitle.textContent = multi
+				? ('升级到 v' + latest + ' 的更新内容')
+				: (latest ? ('v' + latest + ' 更新内容') : '新版更新内容');
+		}
+		notesBody.textContent = notes || '该版本未在 Release 中提供更新说明。';
+	}
+
 	function openPluginUpdateModal() {
 		var p = (state.status && state.status.plugin) || {};
 		if (!p.update || !p.latest) return;
 		state.pluginLatest = p.latest;
+		if (p.url) state.pluginUrl = p.url;
 		var summary = $('agh-plugin-update-summary');
 		if (summary) summary.textContent = '当前 v' + (p.current || '未知') + ' → 最新 v' + p.latest;
 		var force = $('agh-plugin-force');
@@ -1554,6 +1600,7 @@
 		if (input) input.value = p.latest;
 		var start = $('agh-plugin-update-start');
 		if (start) start.textContent = '开始更新';
+		syncPluginNotes();
 		var modal = $('agh-plugin-update-modal');
 		if (modal) modal.hidden = false;
 	}
@@ -1569,6 +1616,7 @@
 		if (on && input && !input.value) input.value = state.pluginLatest;
 		var start = $('agh-plugin-update-start');
 		if (start) start.textContent = on ? '开始强制更新' : '开始更新';
+		syncPluginNotes();
 	}
 
 	function closePluginUpdateModal() {
@@ -1576,9 +1624,20 @@
 		if (modal) modal.hidden = true;
 	}
 
+	function showPluginDismiss(on) {
+		var dismiss = $('agh-plugin-update-dismiss');
+		if (dismiss) dismiss.hidden = !on;
+	}
+
 	function showPluginProgress() {
 		var card = $('agh-plugin-update-progress');
 		if (card) card.hidden = false;
+		showPluginDismiss(false);
+	}
+
+	function hidePluginProgress() {
+		var card = $('agh-plugin-update-progress');
+		if (card) card.hidden = true;
 	}
 
 	function setPluginProgress(log, running, done) {
@@ -1633,6 +1692,7 @@
 					showToast('插件更新完成，页面即将刷新', 'ok');
 					setTimeout(function () { window.location.reload(); }, 2500);
 				} else {
+					showPluginDismiss(true);
 					showToast('插件更新失败，请查看更新日志', 'bad');
 				}
 			} else if (state.pluginUpdating && state.pluginMiss < 4) {
@@ -1642,6 +1702,7 @@
 			} else if (state.pluginUpdating) {
 				state.pluginUpdating = false;
 				if (state.status) updatePluginVersion(state.status);
+				showPluginDismiss(true);
 				showToast('未能启动更新任务，请查看运行日志', 'bad');
 			}
 		}).catch(function (err) {
@@ -1665,7 +1726,11 @@
 			showToast('版本号格式不正确，例如 1.3.5', 'bad');
 			return;
 		}
-		if (force && !(await aghConfirm('强制更新到 v' + target + '？\n\n同版本为重装，低版本为降级；会先备份配置，降级可能遇到配置结构变化。'))) {
+		if (force) {
+			if (!(await aghConfirm('强制更新到 v' + target + '？\n\n同版本为重装，低版本为降级；会先备份配置，降级可能遇到配置结构变化。'))) {
+				return;
+			}
+		} else if (!(await aghConfirm('更新到 v' + target + '？\n\n更新过程中 AdGuard Home 会重启，DNS 可能短暂中断。'))) {
 			return;
 		}
 		var channelEl = document.querySelector('input[name="agh-plugin-channel"]:checked');
@@ -1686,8 +1751,7 @@
 		}).catch(function (err) {
 			state.pluginUpdating = false;
 			if (state.status) updatePluginVersion(state.status);
-			var card = $('agh-plugin-update-progress');
-			if (card) card.hidden = true;
+			hidePluginProgress();
 			handleApiError(err);
 		});
 	}
@@ -1702,9 +1766,10 @@
 				if (state.status) updatePluginVersion(state.status);
 				pollPluginProgress();
 			} else if (d && typeof d.code === 'number' && d.code !== 0) {
-				// 上次更新失败：保留日志，方便排查
+				// 上次更新失败：保留日志，方便排查，并提供关闭入口
 				showPluginProgress();
 				setPluginProgress(d.log || '', false, false);
+				showPluginDismiss(true);
 			}
 		}).catch(function () { /* 忽略 */ });
 	}
@@ -2435,6 +2500,13 @@
 		if ($('agh-plugin-update-mask')) $('agh-plugin-update-mask').onclick = closePluginUpdateModal;
 		if ($('agh-plugin-update-start')) $('agh-plugin-update-start').onclick = startPluginUpdate;
 		if ($('agh-plugin-force')) $('agh-plugin-force').onchange = togglePluginForce;
+		if ($('agh-plugin-version-input')) $('agh-plugin-version-input').oninput = syncPluginNotes;
+		if ($('agh-plugin-update-dismiss')) $('agh-plugin-update-dismiss').onclick = hidePluginProgress;
+		document.addEventListener('keydown', function (e) {
+			if (e.key !== 'Escape') return;
+			var modal = $('agh-plugin-update-modal');
+			if (modal && !modal.hidden) closePluginUpdateModal();
+		});
 
 		bindFilterSwitch('agh-filter-enabled', 'filtering');
 		bindParentalSwitch();

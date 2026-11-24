@@ -58,6 +58,9 @@ function M.status(ctx)
         dns_redirect = (dns_mode == "takeover" or dns_mode == "passwall")
             and (sys.call("nft list chain inet fw4 agh_dns_redirect 2>/dev/null | grep -q 'redirect to :53'") == 0)
             or false,
+        -- DNSMasq 内置的 DNS 劫持开关（KuWrt/iStoreOS 25.12）；
+        -- 接管模式下重新变成 1 会抢在插件规则之前，需要提示用户重新应用
+        dnsmasq_redirect = uci:get("dhcp", "@dnsmasq[0]", "dns_redirect") or "",
         passwall_enabled = passwall_enabled(),
         passwall_dns_port = passwall_dns_port(),
         upstream_current = yaml_list_values(configpath, "upstream_dns"),

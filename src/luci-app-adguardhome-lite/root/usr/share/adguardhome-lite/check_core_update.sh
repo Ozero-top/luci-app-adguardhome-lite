@@ -13,6 +13,15 @@ REPO="AdguardTeam/AdGuardHome"
 API="https://api.github.com/repos/$REPO/releases?per_page=30"
 FEED="https://github.com/$REPO/releases.atom"
 
+# 跟随面板里的 GitHub 反代设置；选择「关闭」或未配置时只走直连
+proxy="$(uci -q get adguardhome_lite.main.github_proxy 2>/dev/null)"
+case "$proxy" in
+    gh-proxy.org|ghproxy.cc|ghproxy.com|ghfast.top) ;;
+    *) proxy="" ;;
+esac
+PROXY_PREFIX=""
+[ -n "$proxy" ] && PROXY_PREFIX="https://$proxy/"
+
 # 避免多个页面同时刷新时重复请求 GitHub，触发限流
 # 异常退出可能残留锁目录，超过 10 分钟视为失效
 if [ -d "$LOCK" ] && [ -n "$(find "$LOCK" -mmin +10 2>/dev/null)" ]; then
@@ -53,7 +62,7 @@ stable=""
 beta=""
 
 data=""
-for prefix in "" "https://gh-proxy.org/" "https://ghfast.top/"; do
+for prefix in $PROXY_PREFIX ""; do
     data=$(fetch "$prefix$API")
     [ -n "$data" ] && break
 done
@@ -69,7 +78,7 @@ fi
 # API 被限流或不可用时回退 Atom
 if [ -z "$stable" ] && [ -z "$beta" ]; then
     tags=""
-    for prefix in "" "https://gh-proxy.org/" "https://ghfast.top/"; do
+    for prefix in $PROXY_PREFIX ""; do
         _out=$(fetch "$prefix$FEED")
         [ -n "$_out" ] || continue
         tags=$(printf '%s' "$_out" | grep -o 'releases/tag/[^"]*' | sed 's#.*tag/##')

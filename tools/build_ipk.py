@@ -255,6 +255,8 @@ chmod 755 /etc/init.d/adguardhome_lite 2>/dev/null
 chmod 755 /usr/share/adguardhome-lite/*.sh 2>/dev/null
 rm -f /usr/share/adguardhome-lite/install_source 2>/dev/null
 rm -f /tmp/luci-indexcache /tmp/luci-indexcache.* 2>/dev/null
+# 手动安装/升级包时清掉运行时版本缓存，面板立即显示新版本
+rm -f /var/run/adguardhome_lite_plugin_version /var/run/adguardhome_lite_plugin_update 2>/dev/null
 
 # 升级/重装时如果配置里仍启用服务，则重建自启链接并重启
 if [ -x /etc/init.d/adguardhome_lite ] && [ "$(uci -q get adguardhome_lite.main.enabled 2>/dev/null)" = "1" ]; then

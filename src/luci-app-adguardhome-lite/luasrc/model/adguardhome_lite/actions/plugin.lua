@@ -2,20 +2,7 @@
 -- 负责插件在线更新：后台执行 plugin_update.sh，前端轮询进度。
 
 local M = {}
-
-local function plugin_running(fs, run)
-    local path = run .. "_plugin_update.running"
-    local mtime = fs.stat(path, "mtime")
-    if not mtime then
-        return false
-    end
-    -- 任务异常退出可能留下标记，超过 30 分钟视为过期
-    if (os.time() - mtime) > 1800 then
-        fs.remove(path)
-        return false
-    end
-    return true
-end
+local tasks = require "luci.model.adguardhome_lite.tasks"
 
 function M.plugin_update(ctx)
     local fs, http, sys = ctx.fs, ctx.http, ctx.sys
@@ -26,8 +13,8 @@ function M.plugin_update(ctx)
         return
     end
 
-    if ctx.update_running() or plugin_running(fs, RUN) then
-        json_error("已有更新任务在运行，请稍后再试。", 409, "plugin_update_busy")
+    if ctx.update_running() or tasks.plugin_running(fs, RUN) or ctx.action_running() then
+        json_error("已有安装或更新任务在运行，请稍后再试。", 409, "plugin_update_busy")
         return
     end
 
@@ -94,7 +81,7 @@ function M.plugin_progress(ctx)
     http.header("Cache-Control", "no-store")
     http.prepare_content("application/json")
     http.write_json({
-        running = plugin_running(fs, RUN),
+        running = tasks.plugin_running(fs, RUN),
         log = log,
         code = ctx.read_number(RUN .. "_plugin_update.code")
     })

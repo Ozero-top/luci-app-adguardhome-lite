@@ -40,8 +40,18 @@ REPO="Ozero-top/luci-app-adguardhome-lite"
 GITHUB="https://github.com/$REPO"
 REL="$GITHUB/releases/download/v$VER"
 JSD="https://cdn.jsdelivr.net/gh/$REPO@dist"
-GH1="https://gh-proxy.org"
-GH2="https://ghfast.top"
+
+# 跟随面板里的 GitHub 反代设置，避免这里写死与设置不一致
+proxy_host=""
+case "$github_proxy" in
+    gh-proxy.org|ghproxy.cc|ghproxy.com|ghfast.top) proxy_host="$github_proxy" ;;
+esac
+PREL=""
+PGIT=""
+if [ -n "$proxy_host" ]; then
+    PREL="https://$proxy_host/$REL"
+    PGIT="https://$proxy_host/$GITHUB"
+fi
 
 TMP=""
 cleanup() {
@@ -102,12 +112,12 @@ TMP="$(mktemp -d /tmp/agh_plugin_update.XXXXXX 2>/dev/null)" || fail "创建临�
 
 case "$CHANNEL" in
     github)
-        ASSET_MIRRORS="$REL $GH1/$REL $GH2/$REL $JSD"
-        SRC_MIRRORS="$GITHUB $GH1/$GITHUB $GH2/$GITHUB"
+        ASSET_MIRRORS="$REL $PREL $JSD"
+        SRC_MIRRORS="$GITHUB $PGIT"
         ;;
     *)
-        ASSET_MIRRORS="$JSD $GH1/$REL $GH2/$REL $REL"
-        SRC_MIRRORS="$GH1/$GITHUB $GH2/$GITHUB $GITHUB"
+        ASSET_MIRRORS="$JSD $PREL $REL"
+        SRC_MIRRORS="$PGIT $GITHUB"
         ;;
 esac
 
@@ -132,10 +142,77 @@ clear_caches() {
     rm -f /tmp/luci-indexcache /tmp/luci-indexcache.* 2>/dev/null
     rm -rf /tmp/luci-modulecache 2>/dev/null
     [ -x /etc/init.d/rpcd ] && /etc/init.d/rpcd reload >/dev/null 2>&1
-    if [ "$(uci -q get adguardhome_lite.main.enabled 2>/dev/null)" = "1" ]; then
+    if [ "$1" != "norestart" ] && [ "$(uci -q get adguardhome_lite.main.enabled 2>/dev/null)" = "1" ]; then
         say "重启 AdGuard Home 服务..."
         /etc/init.d/adguardhome_lite restart >/dev/null 2>&1
     fi
+}
+
+# ===== 通用模式的安全网：更新前快照、更新后校验、失败自动回滚 =====
+WAS_RUNNING=0
+TOUCHED=0
+is_agh_running && WAS_RUNNING=1
+
+ROLLBACK="$TMP/rollback.tar.gz"
+ROLLBACK_LIST="$TMP/rollback.list"
+
+snapshot_files() {
+    : > "$ROLLBACK_LIST"
+    for _p in \
+        etc/init.d/adguardhome_lite \
+        etc/uci-defaults/50_luci-adguardhome-lite \
+        usr/share/adguardhome-lite \
+        usr/lib/lua/luci/controller/adguardhome_lite.lua \
+        usr/lib/lua/luci/model/adguardhome_lite \
+        usr/lib/lua/luci/view/adguardhome_lite \
+        www/luci-static/resources/adguardhome-lite; do
+        [ -e "/$_p" ] && printf '%s\n' "$_p" >> "$ROLLBACK_LIST"
+    done
+    [ -s "$ROLLBACK_LIST" ] || return 0
+    tar -czf "$ROLLBACK" -C / -T "$ROLLBACK_LIST" 2>/dev/null \
+        || say "备份当前插件文件失败，本次更新无法自动回滚"
+}
+
+rollback_files() {
+    [ -s "$ROLLBACK" ] || { say "没有可用的回滚快照"; return 1; }
+    say "正在回滚到更新前的插件文件..."
+    tar -xzf "$ROLLBACK" -C / || return 1
+    return 0
+}
+
+health_check() {
+    for _f in /etc/init.d/adguardhome_lite \
+              /usr/lib/lua/luci/controller/adguardhome_lite.lua \
+              /usr/lib/lua/luci/view/adguardhome_lite/panel.htm \
+              /www/luci-static/resources/adguardhome-lite/panel.js \
+              /usr/share/adguardhome-lite/dns_mode.sh \
+              /usr/share/adguardhome-lite/apply_settings.sh; do
+        [ -s "$_f" ] || { say "更新后文件缺失：$_f"; return 1; }
+    done
+    for _f in /usr/share/adguardhome-lite/*.sh /etc/init.d/adguardhome_lite; do
+        sh -n "$_f" 2>/dev/null || { say "更新后脚本语法错误：$_f"; return 1; }
+    done
+    if have luac; then
+        luac -p /usr/lib/lua/luci/controller/adguardhome_lite.lua 2>/dev/null \
+            || { say "更新后 Lua 语法错误：controller"; return 1; }
+    fi
+    return 0
+}
+
+# 只在更新前服务在运行、且启用状态下验证启动；启动失败才判定新版本有问题
+verify_running() {
+    [ "$(uci -q get adguardhome_lite.main.enabled 2>/dev/null)" = "1" ] || return 0
+    say "重启 AdGuard Home 验证新版本..."
+    /etc/init.d/adguardhome_lite restart >/dev/null 2>&1
+    _vi=0
+    while [ "$_vi" -lt 15 ]; do
+        sleep 1
+        is_agh_running && return 0
+        _vi=$((_vi + 1))
+    done
+    [ "$WAS_RUNNING" = "1" ] && return 1
+    say "服务未运行（更新前也未运行），跳过回滚"
+    return 0
 }
 
 install_package() {
@@ -246,6 +323,15 @@ install_source() {
         cp -p /etc/config/adguardhome_lite "$_keep" || return 1
     fi
 
+    # 这些目录完全由插件维护，整体重铺可以清掉旧版本遗留的模块和静态资源
+    say "清理旧版本残留文件..."
+    TOUCHED=1
+    rm -rf /usr/lib/lua/luci/view/adguardhome_lite \
+           /usr/lib/lua/luci/model/adguardhome_lite \
+           /www/luci-static/resources/adguardhome-lite \
+           /usr/share/adguardhome-lite
+    rm -f /usr/lib/lua/luci/controller/adguardhome_lite.lua
+
     say "覆盖插件文件..."
     cp -a "$_src/root/." / || return 1
     mkdir -p /usr/lib/lua/luci /www/luci-static/resources
@@ -266,6 +352,7 @@ install_source() {
 }
 
 backup_config
+snapshot_files
 
 if [ "$METHOD" = "package" ]; then
     if install_package; then
@@ -278,10 +365,21 @@ if [ "$METHOD" = "package" ]; then
 fi
 
 if install_source; then
-    clear_caches
+    if ! health_check; then
+        rollback_files
+        fail "新版本文件校验未通过，已回滚到更新前的版本"
+    fi
+    clear_caches norestart
+    if ! verify_running; then
+        rollback_files
+        /etc/init.d/adguardhome_lite restart >/dev/null 2>&1
+        fail "新版本无法启动，已回滚到更新前的版本"
+    fi
     say "更新完成：v$VER（通用模式）"
     echo 0 > "$CODE"
     exit 0
 fi
 
+# 覆盖文件阶段失败也要恢复，避免只更新了一半文件
+[ "$TOUCHED" = "1" ] && rollback_files
 fail "所有更新方式均失败，请查看日志或手动下载安装包"
