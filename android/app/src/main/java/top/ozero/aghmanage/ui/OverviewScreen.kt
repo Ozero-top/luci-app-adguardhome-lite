@@ -93,9 +93,14 @@ fun OverviewScreen(client: AghClient, onLogout: () -> Unit) {
 
     fun switchChannel(target: String) {
         val label = channelLabel(target)
+        val legacyHint = if (target == "legacy") {
+            "旧版本可能无法读取已升级的配置，若没有兼容备份会自动取消安装。"
+        } else {
+            ""
+        }
         pending = PendingAction(
             title = "切换到${label}内核",
-            text = "将把更新通道改为${label}并下载安装该通道的最新内核（约 30MB），安装期间 DNS 会短暂中断。确定继续？",
+            text = "将把更新通道改为${label}并下载安装该通道的最新内核（约 30MB），安装期间 DNS 会短暂中断。${legacyHint}确定继续？",
             confirmLabel = "开始切换"
         ) {
             coreLog = ""
@@ -346,7 +351,7 @@ fun OverviewScreen(client: AghClient, onLogout: () -> Unit) {
         val current = status?.channel ?: "stable"
         ChoiceDialog(
             title = "切换内核通道",
-            options = listOf("stable" to "正式版", "beta" to "预发布版"),
+            options = listOf("stable" to "正式版", "beta" to "预发布版", "legacy" to "旧版本"),
             selected = current,
             onSelect = { target ->
                 if (target != current) switchChannel(target)
@@ -356,5 +361,8 @@ fun OverviewScreen(client: AghClient, onLogout: () -> Unit) {
     }
 }
 
-private fun channelLabel(value: String): String =
-    if (value == "beta") "预发布版" else "正式版"
+private fun channelLabel(value: String): String = when (value) {
+    "beta" -> "预发布版"
+    "legacy" -> "旧版本"
+    else -> "正式版"
+}

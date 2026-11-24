@@ -81,7 +81,7 @@ target_channel="$1"
 target_ver="$2"
 target_ver=${target_ver#v}
 case "$target_channel" in
-    stable|beta) channel="$target_channel" ;;
+    stable|beta|legacy) channel="$target_channel" ;;
 esac
 
 [ -n "$binpath" ] || die "内核路径为空，请到“基础设置”中检查配置。" invalid_param
@@ -95,6 +95,10 @@ case "$channel" in
         base_url="https://static.adguard.com/adguardhome/beta"
         channel_name="预发布版"
         ;;
+    legacy)
+        base_url="https://static.adguard.com/adguardhome/release"
+        channel_name="旧版本"
+        ;;
     *)
         base_url="https://static.adguard.com/adguardhome/release"
         channel_name="正式版"
@@ -104,6 +108,7 @@ esac
 # 记录实际安装通道，供页面区分「预发布版」标识；回退正式版时会改写
 installed_channel="stable"
 [ "$channel" = "beta" ] && installed_channel="beta"
+[ "$channel" = "legacy" ] && installed_channel="legacy"
 
 log_msg "开始安装 AdGuard Home 内核（${channel_name}）"
 log_msg "设备架构：$arch，目标路径：$binpath"
@@ -138,6 +143,22 @@ elif [ -n "$proxy_host" ]; then
     stable_list="https://${proxy_host}/${github_url} $release_url $github_url"
 else
     stable_list="$release_url $github_url"
+fi
+
+# 旧版本按页面确认的正式版标签直连下载；不能用 release 地址兜底，否则会装成最新正式版
+legacy_tag=""
+if [ "$channel" = "legacy" ]; then
+    legacy_tag="$target_ver"
+    if [ -z "$legacy_tag" ]; then
+        die "未能确定旧版本号，请回到概览页等待版本检查完成后重试。" core_download_failed
+    fi
+    legacy_github="https://github.com/AdguardTeam/AdGuardHome/releases/download/v${legacy_tag}/AdGuardHome_linux_${arch}.tar.gz"
+    if [ -n "$proxy_host" ]; then
+        url_list="https://${proxy_host}/${legacy_github} $legacy_github"
+    else
+        url_list="$legacy_github"
+    fi
+    log_msg "使用旧版本：$legacy_tag"
 fi
 
 # 预发布版优先使用页面已确认的版本；没有时再取 GitHub 预发布标签（atom 可走反代），官方 beta 通道作兜底
@@ -177,8 +198,10 @@ if [ "$channel" = "beta" ]; then
         log_msg "未能获取预发布版标签，使用官方 beta 下载通道。"
     fi
 else
-    url_list="$stable_list"
-    [ -n "$proxy_host" ] && log_msg "已启用 GitHub 反代：$proxy_host（优先使用）"
+    if [ "$channel" != "legacy" ]; then
+        url_list="$stable_list"
+        [ -n "$proxy_host" ] && log_msg "已启用 GitHub 反代：$proxy_host（优先使用）"
+    fi
 fi
 
 ARCHIVE="/tmp/adguardhome_lite_update_$$.tar.gz"
@@ -278,11 +301,40 @@ newsize=$(wc -c < "$newbin" 2>/dev/null | tr -d ' ')
 [ -n "$newsize" ] || die "无法读取新内核大小。" core_integrity_failed
 [ "$newsize" -ge 1048576 ] || die "内核可执行文件过小（${newsize} 字节），可能已损坏。" core_integrity_failed
 
+# 每次更换内核前都备份配置，且必须在 --check-config 之前：
+# 新版内核校验时会把旧 schema 原地迁移，备份晚了就只剩迁移后的配置
+cfg_bak=""
+if [ -s "$configpath" ]; then
+    cfg_bak="${configpath}.bak-$(date +%Y%m%d%H%M%S)"
+    if cp -p "$configpath" "$cfg_bak" 2>/dev/null; then
+        log_msg "更新前已备份配置：$cfg_bak"
+    else
+        cfg_bak=""
+        log_msg "提示：配置备份失败，继续升级（原文件未被修改）。"
+    fi
+fi
+
 # 用新内核校验现有配置；避免升级后服务无法启动
+# 旧版本内核可能读不了已升级的配置 schema，此时从已有备份里找一份兼容的
+cfg_from_backup=""
 if [ -s "$configpath" ]; then
     if ! "$newbin" --check-config -c "$configpath" >/tmp/adguardhome_lite_core_check.log 2>&1; then
         log_msg "$(cat /tmp/adguardhome_lite_core_check.log 2>/dev/null)"
-        die "新内核无法解析现有配置文件，已取消更新。请先备份并检查配置。" config_check_failed
+        if [ "$channel" = "legacy" ]; then
+            for _bak in $(ls -1t "${configpath}".bak-* 2>/dev/null); do
+                if "$newbin" --check-config -c "$_bak" >/dev/null 2>&1; then
+                    cfg_from_backup="$_bak"
+                    break
+                fi
+            done
+            if [ -n "$cfg_from_backup" ]; then
+                log_msg "当前配置与旧版本内核不兼容，将改用兼容备份：$cfg_from_backup"
+            else
+                die "旧版本内核无法解析当前配置（配置可能已升级到新 schema）。请恢复升级前的配置备份后重试，本次未改动内核。" config_check_failed
+            fi
+        else
+            die "新内核无法解析现有配置文件，已取消更新。请先备份并检查配置。" config_check_failed
+        fi
     fi
 fi
 
@@ -308,18 +360,6 @@ is_agh_running && was_running=1
 was_enabled=$(uci -q get "$CONF.main.enabled" 2>/dev/null)
 [ -n "$was_enabled" ] || was_enabled="0"
 
-# 预发布版属于大版本先行发布，升级前先备份配置，便于回滚
-cfg_bak=""
-if [ "$channel" = "beta" ] && [ -s "$configpath" ]; then
-    cfg_bak="${configpath}.bak-$(date +%Y%m%d%H%M%S)"
-    if cp -p "$configpath" "$cfg_bak" 2>/dev/null; then
-        log_msg "预发布版升级前已备份配置：$cfg_bak"
-    else
-        cfg_bak=""
-        log_msg "提示：配置备份失败，继续升级（原文件未被修改）。"
-    fi
-fi
-
 log_msg "正在停止服务并替换内核..."
 /etc/init.d/adguardhome_lite stop >/dev/null 2>&1
 
@@ -329,6 +369,15 @@ while [ $i -lt 10 ]; do
     sleep 1
     i=$(( i + 1 ))
 done
+
+# 服务已停止，再写入兼容配置，避免退出时又把新 schema 配置写回去
+if [ -n "$cfg_from_backup" ]; then
+    if cp -f "$cfg_from_backup" "$configpath" 2>/dev/null; then
+        log_msg "已恢复兼容配置：$cfg_from_backup"
+    else
+        die "写入兼容配置失败，已取消更新，内核未改动。" config_restore_failed
+    fi
+fi
 
 # 空间足够时保留一份旧内核，启动失败可自动回滚
 backup=""
@@ -388,6 +437,6 @@ uci -q commit "$CONF" 2>/dev/null
 
 log_msg "AdGuard Home 内核安装/更新成功：$newver"
 if [ -n "$cfg_bak" ]; then
-    log_msg "升级前的配置备份：$cfg_bak（回退配置：cp -f $cfg_bak $configpath）"
+    log_msg "切换前的配置备份：$cfg_bak（回退配置：cp -f $cfg_bak $configpath）"
 fi
 exit 0

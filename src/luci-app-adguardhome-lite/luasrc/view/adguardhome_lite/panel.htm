@@ -305,8 +305,9 @@
 							<select id="agh-set-channel">
 								<option value="stable">正式版（推荐）</option>
 								<option value="beta">预发布版（谨慎使用）</option>
+								<option value="legacy">旧版本（兼容旧配置，如 v0.107.x）</option>
 							</select>
-							<p class="agh-hint agh-mt-8">预发布版取自 GitHub 预发布标签（可走上方反代），失败时依次回退官方预发布通道与正式版；升级前会自动备份 /etc/AdGuardHome.yaml。</p>
+							<p class="agh-hint agh-mt-8">正式版取最新正式发布；预发布版取 GitHub 预发布标签；旧版本取上一条正式版本线（如 v1.0.0 之前为 v0.107.x）。预发布版与旧版本下载可走上方反代，切换前会自动备份 /etc/AdGuardHome.yaml。</p>
 						</div>
 
 						<div class="agh-field">

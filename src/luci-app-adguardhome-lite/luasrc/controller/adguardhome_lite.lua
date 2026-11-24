@@ -316,32 +316,68 @@ local function core_version(binpath)
     return ver
 end
 
+-- 从标签列表里取语义版本最大的一个；旧缓存没有列表时退回单值
+local function latest_tag(list, fallback)
+    local best = fallback or ""
+    for tag in tostring(list or ""):gmatch("%S+") do
+        local v = clean_tag(tag)
+        if v ~= "" and (best == "" or version_newer(v, best)) then
+            best = v
+        end
+    end
+    return best
+end
+
+-- 旧版本通道：取最新正式版之外的上一条正式版本线（如 1.0.0 之前是 0.107.x）
+local function legacy_tag(list, latest_stable)
+    local current_series = tostring(latest_stable or ""):match("^(%d+%.%d+)")
+    if not current_series then
+        return ""
+    end
+    local best = ""
+    for tag in tostring(list or ""):gmatch("%S+") do
+        local v = clean_tag(tag)
+        if v ~= "" and v:match("^(%d+%.%d+)") ~= current_series
+            and (best == "" or version_newer(v, best)) then
+            best = v
+        end
+    end
+    return best
+end
+
 -- 内核更新检查：按「内核更新通道」取对应最新版本，结果缓存 24 小时
 local function core_update_info(binpath, channel)
     local cache = fs.readfile(CORE_UPDATE) or ""
-    local stable = clean_tag(cache:match("stable=([^\n]*)"))
-    local beta_tag = clean_tag(cache:match("beta=([^\n]*)"))
+    local stable_tags = cache:match("stable_tags=([^\n]*)") or ""
+    local beta_tags = cache:match("beta_tags=([^\n]*)") or ""
+    local stable = latest_tag(stable_tags, clean_tag(cache:match("stable=([^\n]*)")))
+    local beta_tag = latest_tag(beta_tags, clean_tag(cache:match("beta=([^\n]*)")))
+    local legacy = legacy_tag(stable_tags, stable)
     local checked = tonumber(cache:match("time=(%d+)"))
 
     -- 拿到结果才缓存一天；检查失败时只缓存一小时，尽快重试
     local ttl = (stable ~= "" and beta_tag ~= "") and 86400 or 3600
     if not checked or (os.time() - checked) > ttl then
-        -- 先写占位时间，避免每次轮询都重复启动检查任务
-        fs.writefile(CORE_UPDATE, "stable=" .. stable .. "\nbeta=" .. beta_tag .. "\ntime=" .. os.time() .. "\n")
+        -- 先写占位时间，避免每次轮询都重复启动检查任务；已有标签列表保留
+        fs.writefile(CORE_UPDATE, string.format(
+            "stable=%s\nbeta=%s\nstable_tags=%s\nbeta_tags=%s\ntime=%d\n",
+            stable, beta_tag, stable_tags, beta_tags, os.time()))
+        sys.exec("sh " .. SHARE .. "/check_core_update.sh >/dev/null 2>&1 &")
+    elseif channel == "legacy" and legacy == "" and stable_tags == "" then
+        -- 旧版缓存没有标签列表，算不出上一条版本线，主动补查一次
         sys.exec("sh " .. SHARE .. "/check_core_update.sh >/dev/null 2>&1 &")
     end
 
-    -- 正式版通道只看正式发布；预发布通道在预发布与正式版中取更新的一个
-    local candidates = { stable }
-    if channel == "beta" and beta_tag ~= "" then
-        candidates = { beta_tag, stable }
-    end
+    -- 三个通道各自独立：正式版只取正式标签，预发布版只取预发布标签，
+    -- 旧版本只取上一条正式版本线。不能把 beta 和 stable 混在一起比大小，
+    -- 否则 1.0.0 会盖掉 1.0.0-b.2，导致选了预发布版却安装正式版。
     local latest = ""
-    for i = 1, #candidates do
-        local v = candidates[i]
-        if v ~= "" and (latest == "" or version_newer(v, latest)) then
-            latest = v
-        end
+    if channel == "beta" then
+        latest = beta_tag ~= "" and beta_tag or stable
+    elseif channel == "legacy" then
+        latest = legacy
+    else
+        latest = stable
     end
 
     local current = core_version(binpath)
@@ -349,7 +385,7 @@ local function core_update_info(binpath, channel)
         current = current,
         latest = latest,
         -- 通道由 Releases API 的 prerelease 标记决定，不能只看版本号里的 -b
-        beta = (beta_tag ~= "" and latest == beta_tag),
+        beta = (channel == "beta" and beta_tag ~= "" and latest == beta_tag),
         update = (latest ~= "" and current ~= "" and version_newer(latest, current)) or false
     }
 end

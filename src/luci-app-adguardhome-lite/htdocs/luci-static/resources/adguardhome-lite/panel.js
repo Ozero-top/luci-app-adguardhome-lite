@@ -401,7 +401,9 @@
 	}
 
 	function channelLabel(channel) {
-		return channel === 'beta' ? '预发布版' : '正式版';
+		if (channel === 'beta') return '预发布版';
+		if (channel === 'legacy') return '旧版本';
+		return '正式版';
 	}
 
 	// AdGuard Home 预发布版本号形如 v1.0.0-b.2
@@ -413,7 +415,7 @@
 	function isCoreBeta(d) {
 		var ch = d && d.core_channel;
 		if (ch === 'beta') return true;
-		if (ch === 'stable') return false;
+		if (ch === 'stable' || ch === 'legacy') return false;
 		return isBetaVersion(d && d.version);
 	}
 
@@ -736,30 +738,50 @@
 		var installBtn = $('agh-install-btn');
 		var enableBtn = $('agh-enable-btn');
 		var panelLink = $('agh-panel-link');
+		var noLegacyTarget = d.channel === 'legacy' && !(d.core_update && d.core_update.latest);
+		var legacyRisk = d.channel === 'legacy' && d.legacy_config_risk;
 
 		if (installBtn) {
-			installBtn.disabled = busy;
+			installBtn.disabled = busy || noLegacyTarget;
 			installBtn.textContent = d.core ? '重新安装/更新内核' : '安装内核';
 		}
 		var coreHint = $('agh-core-hint');
 		if (coreHint) {
 			var cu = d.core_update;
+			var hintText = '';
+			var hintWarn = false;
 			if (d.core) {
-				var hintText;
 				if (cu && cu.update && cu.latest) {
 					hintText = '已安装 ' + (d.version || '未知') + '，发现新版本 v' + cu.latest +
 						(cu.beta ? '（预发布版）' : '（正式版）') + '，点击「安装/更新内核」升级';
-					coreHint.className = 'agh-hint agh-warn';
+					hintWarn = true;
 				} else {
-					hintText = '已安装，当前版本：' + (d.version || '未知');
-					if (isCoreBeta(d)) hintText += '（预发布版，升级大版本前会自动备份配置）';
-					coreHint.className = 'agh-hint';
+					var installedChannel = d.core_channel || (isCoreBeta(d) ? 'beta' : 'stable');
+					if (d.channel && d.channel !== installedChannel) {
+						// 通道已切换但目标版本不高于当前版本时不会有更新提示，这里明确给出切换入口
+						hintText = '已安装 ' + (d.version || '未知') + '（' + channelLabel(installedChannel) +
+							'），当前为' + channelLabel(d.channel) + '通道' +
+							(cu && cu.latest ? '（目标 v' + cu.latest + '）' : '') +
+							'，点击「重新安装/更新内核」切换';
+						hintWarn = true;
+					} else {
+						hintText = '已安装，当前版本：' + (d.version || '未知');
+						if (isCoreBeta(d)) hintText += '（预发布版，升级大版本前会自动备份配置）';
+					}
 				}
-				coreHint.textContent = hintText;
 			} else {
-				coreHint.className = 'agh-hint';
-				coreHint.textContent = d.update_running ? '正在安装...' : '尚未安装内核';
+				hintText = d.update_running ? '正在安装...' : '尚未安装内核';
 			}
+			if (noLegacyTarget && !d.update_running) {
+				hintText = '旧版本通道暂无可用目标版本（版本检查未完成或只有一条正式版本线），请稍后刷新';
+				hintWarn = true;
+			}
+			if (legacyRisk && d.config_schema) {
+				hintText += '；当前配置为 schema ' + d.config_schema + '，且没有更旧的备份，旧版本内核会拒绝安装';
+				hintWarn = true;
+			}
+			coreHint.className = hintWarn ? 'agh-hint agh-warn' : 'agh-hint';
+			coreHint.textContent = hintText;
 		}
 
 		if (enableBtn) {
@@ -1531,7 +1553,15 @@
 
 	async function installCore() {
 		if (state.pluginUpdating) return;
-		if (!(await aghConfirm('将从 AdGuard 官方源或 GitHub 反代下载最新内核，可能需要几分钟。确定继续？'))) return;
+		var st = state.status || {};
+		var cu = st.core_update || {};
+		var target = cu.latest
+			? ('v' + cu.latest + (cu.beta ? '（预发布版）' : '（正式版）'))
+			: '当前通道的最新内核';
+		var risk = (st.channel === 'legacy' && st.legacy_config_risk)
+			? '当前配置可能不被旧版本内核支持，且没有更旧的配置备份，安装会被取消。'
+			: '';
+		if (!(await aghConfirm('将安装 ' + target + '，需要从下载源获取，可能需要几分钟。' + risk + '确定继续？'))) return;
 		showProgress('正在启动安装任务...');
 		state.busy = true;
 		updateSteps(state.status);

@@ -60,6 +60,14 @@ parse_api() {
 
 stable=""
 beta=""
+stable_tags=""
+beta_tags=""
+
+# 所有标签都保留下来，由控制器按语义版本取最大值，
+# 避免依赖 GitHub 返回顺序（旧 beta 的基版本可能比新正式版更低，也可能被重新编辑排序）。
+to_tags() {
+    tr '\n' ' ' | sed 's/[[:space:]]*$//'
+}
 
 data=""
 for prefix in $PROXY_PREFIX ""; do
@@ -70,8 +78,10 @@ done
 if [ -n "$data" ]; then
     list=$(printf '%s\n' "$data" | parse_api)
     if [ -n "$list" ]; then
-        stable=$(printf '%s\n' "$list" | awk '$2 == 0 { print $1; exit }')
-        beta=$(printf '%s\n' "$list" | awk '$2 == 1 { print $1; exit }')
+        stable_tags=$(printf '%s\n' "$list" | awk '$2 == 0 { print $1 }' | to_tags)
+        beta_tags=$(printf '%s\n' "$list" | awk '$2 == 1 { print $1 }' | to_tags)
+        stable=$(printf '%s\n' "$stable_tags" | awk '{ print $1 }')
+        beta=$(printf '%s\n' "$beta_tags" | awk '{ print $1 }')
     fi
 fi
 
@@ -81,12 +91,15 @@ if [ -z "$stable" ] && [ -z "$beta" ]; then
     for prefix in $PROXY_PREFIX ""; do
         _out=$(fetch "$prefix$FEED")
         [ -n "$_out" ] || continue
-        tags=$(printf '%s' "$_out" | grep -o 'releases/tag/[^"]*' | sed 's#.*tag/##')
+        # 只取合法标签字符，避免把正文里被转义的 changelog 链接（&quot;...）当成版本号
+        tags=$(printf '%s' "$_out" | grep -o 'releases/tag/[A-Za-z0-9._-]*' | sed 's#.*tag/##')
         [ -n "$tags" ] && break
     done
     if [ -n "$tags" ]; then
-        stable=$(printf '%s\n' "$tags" | grep -vE -- '-b\.?[0-9]' | head -n 1)
-        beta=$(printf '%s\n' "$tags" | grep -m 1 -E -- '-b\.?[0-9]')
+        stable_tags=$(printf '%s\n' "$tags" | grep -vE -- '-b\.?[0-9]' | to_tags)
+        beta_tags=$(printf '%s\n' "$tags" | grep -E -- '-b\.?[0-9]' | to_tags)
+        stable=$(printf '%s\n' "$stable_tags" | awk '{ print $1 }')
+        beta=$(printf '%s\n' "$beta_tags" | awk '{ print $1 }')
     fi
 fi
 
@@ -99,5 +112,7 @@ beta=${beta#v}
 {
     printf 'stable=%s\n' "$stable"
     printf 'beta=%s\n' "$beta"
+    printf 'stable_tags=%s\n' "$stable_tags"
+    printf 'beta_tags=%s\n' "$beta_tags"
     printf 'time=%s\n' "$(date +%s)"
 } > "$CACHE"

@@ -21,11 +21,17 @@ function M.core_install(ctx)
 
     -- 把页面已确认的通道与版本传给安装脚本，保证提示的版本就是实际安装的版本
     local channel = cfg("channel", "stable")
+    if channel ~= "beta" and channel ~= "legacy" then
+        channel = "stable"
+    end
     local info = core_update_info(cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome"), channel)
+    if channel == "legacy" and info.latest == "" then
+        json_error("旧版本通道暂无可用目标版本，请等待版本检查完成后重试。", 409, "invalid_param")
+        return
+    end
     local cmd = "sh " .. SHARE .. "/update_core.sh"
     if info.latest ~= "" then
-        local target_channel = info.beta and "beta" or "stable"
-        cmd = cmd .. " " .. string.format("%q", target_channel) .. " " .. string.format("%q", info.latest)
+        cmd = cmd .. " " .. string.format("%q", channel) .. " " .. string.format("%q", info.latest)
     end
 
     fs.writefile(RUN .. "_update.log", "正在启动内核安装任务...\n")

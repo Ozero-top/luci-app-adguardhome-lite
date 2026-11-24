@@ -41,6 +41,9 @@ check("revision newer than base", util.version_newer("1.3.7-2", "1.3.7"), true)
 check("base older than revision", util.version_newer("1.3.7", "1.3.7-2"), false)
 check("revision newer than older revision", util.version_newer("1.3.7-2", "1.3.7-1"), true)
 check("revision newer than older base", util.version_newer("1.3.7-2", "1.3.6-1"), true)
+check("release newer than own beta", util.version_newer("1.0.0", "1.0.0-b.2"), true)
+check("next minor beta newer than release", util.version_newer("1.1.0-b.1", "1.0.0"), true)
+check("old beta lower than new release", util.version_newer("0.108.0-b.91", "1.0.0"), false)
 check("clean tag", util.clean_tag(" v1.2.3 "), "1.2.3")
 
 -- 词表

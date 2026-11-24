@@ -45,7 +45,7 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 ### 安装与内核
 
 - **三步上手**：安装内核 → 一键启用 → 打开 AGH 面板，每步给出状态与失败原因。
-- **官方内核**：自动识别架构下载官方版本，可选预发布版；升级前备份配置，预发布通道失败自动回退正式版。
+- **官方内核**：自动识别架构下载官方版本，可选正式版 / 预发布版 / 旧版本；每次更换内核前备份配置，预发布通道失败自动回退正式版，旧版本可回退到上一条正式版本线。
 - **下载兜底**：进度实时可见，支持多个 GitHub 反代，失败自动回退官方 CDN 与直连；fake-IP 环境自动解析真实 IP。
 
 ### DNS 接入
@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.11-3_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.12-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.11-3` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.12-1` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.11-3 -m https://gh-proxy.org
+sh install.sh -v 1.3.12-1 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -377,6 +377,7 @@ curl -fsSL https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite
 
 - **下载失败**：检查网络与系统时间；国内网络在「基础设置 → 插件配置」启用 GitHub 反代；fake-IP 环境自动解析真实 IP；空间不足时把内核位置改到内置存储或清理闪存。
 - **预发布版**：依次尝试 GitHub 预发布（含反代）→ 官方预发布通道 → 正式版，日志记录每个地址的结果。
+- **旧版本**：取上一条正式版本线（如 v1.0.0 之前为 v0.107.x）的最高版本，按标签直连下载；旧内核读不了新 schema 配置时自动改用兼容的配置备份，没有兼容备份则取消安装、不改动内核。
 - **重启后消失**：内核装在 `/tmp` 内存位置，重装或在「基础设置 → 插件配置」改到内置存储。
 
 ### Q4：启用后不能上网 / 面板打不开 / 网页打不开？
@@ -487,6 +488,15 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.12-1
+
+- **三通道内核**：正式版 / 预发布版 / 旧版本；正式版只取最新正式发布，预发布版只取 GitHub 预发布，旧版本取上一条正式版本线（如 v1.0.0 之前为 v0.107.x），三条通道互不覆盖
+- **修复通道切换**：解决选预发布版却安装正式版、切换通道后版本缓存不刷新的问题；预发布版不再被更高基版本的正式版覆盖
+- **旧版本兼容**：切旧版本时自动恢复兼容的配置备份，没有兼容备份则取消安装；每次更换内核前先备份配置（早于 `--check-config`，避免 schema 被原地迁移后备份失效）
+- **预检与保护**：概览提前提示旧版本配置风险；没有可用旧版本目标时禁用安装按钮
+- **版本检查**：GitHub API 限流走 Atom 时，修复正文链接被误当版本号的问题；标签按语义版本取最大值
+- **Android App**：通道切换增加「旧版本」，概览与设置显示对应通道（versionCode 18）
 
 ### 1.3.11-3
 

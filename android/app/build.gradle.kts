@@ -14,8 +14,8 @@ android {
         applicationId = "top.ozero.aghmanage"
         minSdk = 24
         targetSdk = 35
-        versionCode = 17
-        versionName = "1.3.10-1"
+        versionCode = 18
+        versionName = "1.3.12-1"
     }
 
     signingConfigs {

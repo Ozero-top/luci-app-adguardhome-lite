@@ -28,7 +28,7 @@
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
-发布时重命名为 `AGHTools<版本>.apk`（例如 `AGHTools1.3.10-1.apk`）。
+发布时重命名为 `AGHTools<版本>.apk`（例如 `AGHTools1.3.12-1.apk`）。
 
 签名口令通过环境变量提供：
 
@@ -60,7 +60,7 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 
 ## 页面
 
-- **概览**：运行状态、统计、服务启停 / 重启、清空统计、DNS 自检、内核通道切换（正式版 / 预发布版）。
+- **概览**：运行状态、统计、服务启停 / 重启、清空统计、DNS 自检、内核通道切换（正式版 / 预发布版 / 旧版本）。
 - **日志**：系统日志（可按级别筛选）与查询日志（拦截状态、域名搜索、分页）。
 - **规则**：过滤开关（安全搜索 / 家长控制 / 成人内容，成人内容与家长控制互斥）、预置档位与下载源、订阅增删启停、自定义规则。
 - **设置**：接管方式、端口、内核位置、缓存、上游 DNS、排除列表、保留周期、YAML 编辑。

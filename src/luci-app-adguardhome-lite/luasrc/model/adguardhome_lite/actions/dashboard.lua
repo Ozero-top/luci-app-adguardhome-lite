@@ -8,6 +8,39 @@ local parental_service = require "luci.model.adguardhome_lite.parental"
 -- 家长控制试拨结果的复用时长：家长控制开启期间每 5 分钟最多试拨一次
 local PARENTAL_PROBE_TTL = 300
 
+-- 旧版本内核可能读不了已升级的配置 schema；没有更低 schema 的备份时提前提示
+local function legacy_config_risk(fs, configpath, channel)
+    if channel ~= "legacy" then
+        return false, nil
+    end
+    local function schema_of(path)
+        local data = fs.readfile(path) or ""
+        return tonumber(data:match("\nschema_version:%s*(%d+)") or data:match("^schema_version:%s*(%d+)"))
+    end
+    local current = schema_of(configpath)
+    if not current then
+        return false, nil
+    end
+    -- 用 fs.dir 扫描备份：shell 里带引号的通配符不会展开，不能靠 ls
+    local dir, base = configpath:match("^(.*)/([^/]+)$")
+    if not dir then
+        return true, current
+    end
+    local prefix = base .. ".bak-"
+    local ok, iter = pcall(fs.dir, dir)
+    if ok and iter then
+        for entry in iter do
+            if entry:sub(1, #prefix) == prefix then
+                local v = schema_of(dir .. "/" .. entry)
+                if v and v < current then
+                    return false, current
+                end
+            end
+        end
+    end
+    return true, current
+end
+
 function M.status(ctx)
     local fs, http, sys, uci, util, codes, agh, selftest, split_words, join_words, valid_iface_name, valid_client_spec, version_newer, clean_tag, CONF, SHARE, RUN, STATS_CACHE, VERSION_CACHE, CORE_UPDATE, PLUGIN_UPDATE, INSTALL_VERSION, RELEASE_URL, collect_stats, read_cache, cfg, CACHE_YAML_KEYS, yaml_cache_scalar, yaml_list_values, yaml_safe_search_enabled, yaml_section_scalar, yaml_set_section_scalar, cache_option, IGNORED_IFACE_PATTERNS, iface_ignored, net_devices, is_enabled, core_version, core_update_info, plugin_version, plugin_update_info, service_running, openclash_hijack_port, openclash_running, openclash_upstream_agh, passwall_enabled, passwall_dns_port, read_number, update_running, action_running, start_action, check_token, require_post, default_reason, json_error, state_value, agh_client, agh_request, agh_api, interval_days = ctx.fs, ctx.http, ctx.sys, ctx.uci, ctx.util, ctx.codes, ctx.agh, ctx.selftest, ctx.split_words, ctx.join_words, ctx.valid_iface_name, ctx.valid_client_spec, ctx.version_newer, ctx.clean_tag, ctx.CONF, ctx.SHARE, ctx.RUN, ctx.STATS_CACHE, ctx.VERSION_CACHE, ctx.CORE_UPDATE, ctx.PLUGIN_UPDATE, ctx.INSTALL_VERSION, ctx.RELEASE_URL, ctx.collect_stats, ctx.read_cache, ctx.cfg, ctx.CACHE_YAML_KEYS, ctx.yaml_cache_scalar, ctx.yaml_list_values, ctx.yaml_safe_search_enabled, ctx.yaml_section_scalar, ctx.yaml_set_section_scalar, ctx.cache_option, ctx.IGNORED_IFACE_PATTERNS, ctx.iface_ignored, ctx.net_devices, ctx.is_enabled, ctx.core_version, ctx.core_update_info, ctx.plugin_version, ctx.plugin_update_info, ctx.service_running, ctx.openclash_hijack_port, ctx.openclash_running, ctx.openclash_upstream_agh, ctx.passwall_enabled, ctx.passwall_dns_port, ctx.read_number, ctx.update_running, ctx.action_running, ctx.start_action, ctx.check_token, ctx.require_post, ctx.default_reason, ctx.json_error, ctx.state_value, ctx.agh_client, ctx.agh_request, ctx.agh_api, ctx.interval_days
     local binpath = cfg("binpath", "/usr/bin/AdGuardHome/AdGuardHome")
@@ -28,6 +61,8 @@ function M.status(ctx)
     local password = cfg("adminpass", "admin123")
     local hijack_port = openclash_hijack_port()
 
+    local channel = cfg("channel", "stable")
+    local legacy_risk, config_schema = legacy_config_risk(fs, configpath, channel)
     local data = {
         core = fs.access(binpath, "x") and true or false,
         version = core_version(binpath),
@@ -41,8 +76,10 @@ function M.status(ctx)
         workdir = workdir,
         admin_user = cfg("adminuser", "admin"),
         admin_pass = password,
-        channel = cfg("channel", "stable"),
-        core_update = core_update_info(binpath, cfg("channel", "stable")),
+        channel = channel,
+        config_schema = config_schema,
+        legacy_config_risk = legacy_risk,
+        core_update = core_update_info(binpath, channel),
         core_channel = cfg("core_channel", ""),
         github_proxy = cfg("github_proxy", "gh-proxy.org"),
         mode_applied = cfg("mode_applied", "none"),

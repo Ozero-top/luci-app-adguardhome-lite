@@ -14,6 +14,11 @@ APPLY = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "apply_settings.s
 DNS_MODE = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "dns_mode.sh").read_text(encoding="utf-8")
 KEEP = (SRC / "root" / "lib" / "upgrade" / "keep.d" / "luci-app-adguardhome-lite").read_text(encoding="utf-8")
 RULES = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "rules.lua").read_text(encoding="utf-8")
+CHECK = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "check_core_update.sh").read_text(encoding="utf-8")
+CONTROLLER = (SRC / "luasrc" / "controller" / "adguardhome_lite.lua").read_text(encoding="utf-8")
+SETTINGS = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "settings.lua").read_text(encoding="utf-8")
+DASHBOARD = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "dashboard.lua").read_text(encoding="utf-8")
+CORE = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "core.lua").read_text(encoding="utf-8")
 
 
 class ReliabilityTest(unittest.TestCase):
@@ -72,6 +77,29 @@ class ReliabilityTest(unittest.TestCase):
         self.assertIn("add_preset", RULES)
         self.assertIn("github_proxy", RULES)
         self.assertIn("preset_path", RULES)
+
+    def test_core_channels_are_selected_independently(self):
+        # 正式版与预发布版各自保留标签列表，避免 1.0.0 把 1.0.0-b.2 盖掉
+        self.assertIn("stable_tags=", CHECK)
+        self.assertIn("beta_tags=", CHECK)
+        self.assertIn("latest_tag(", CONTROLLER)
+        self.assertIn('latest = beta_tag ~= "" and beta_tag or stable', CONTROLLER)
+        # Atom 正文里有被转义的 changelog 链接，标签只能取合法字符
+        self.assertIn("releases/tag/[A-Za-z0-9._-]*", CHECK)
+        # 旧版本通道取上一条正式版本线，安装脚本按标签直连且不回退最新正式版
+        self.assertIn("legacy_tag(", CONTROLLER)
+        self.assertIn("stable|beta|legacy", UPDATE)
+        self.assertIn("legacy_github", UPDATE)
+        self.assertIn('url_list="$stable_list"', UPDATE)
+        self.assertIn("legacy = true", SETTINGS)
+        # 旧版本内核读不了新 schema 配置时，改用兼容备份；没有备份则安全取消
+        self.assertIn("cfg_from_backup", UPDATE)
+        self.assertIn("旧版本内核无法解析当前配置", UPDATE)
+        # 备份必须先于 --check-config：新版校验会原地迁移 schema，晚了就备份不到旧配置
+        self.assertLess(UPDATE.index("更新前已备份配置"), UPDATE.index('"$newbin" --check-config'))
+        # 概览提前提示配置风险；没有旧版本目标时拒绝启动安装
+        self.assertIn("legacy_config_risk", DASHBOARD)
+        self.assertIn("旧版本通道暂无可用目标版本", CORE)
 
 
 if __name__ == "__main__":

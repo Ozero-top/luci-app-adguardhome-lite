@@ -220,10 +220,10 @@ fun SettingsScreen(client: AghClient) {
                             f.workDir
                         ) { v -> form = f.copy(workDir = v) }
                     }
-                    ChoiceRow("更新通道", if (f.channel == "beta") "预发布版" else "正式版") {
+                    ChoiceRow("更新通道", channelLabel(f.channel)) {
                         choices = ChoiceSpec(
                             "更新通道",
-                            listOf("stable" to "正式版", "beta" to "预发布版"),
+                            listOf("stable" to "正式版", "beta" to "预发布版", "legacy" to "旧版本"),
                             f.channel
                         ) { v -> form = f.copy(channel = v) }
                     }
@@ -476,6 +476,12 @@ private fun NumberField(label: String, value: String, onValueChange: (String) ->
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+private fun channelLabel(value: String): String = when (value) {
+    "beta" -> "预发布版"
+    "legacy" -> "旧版本"
+    else -> "正式版"
 }
 
 private fun proxyLabel(value: String): String = when (value) {

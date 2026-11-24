@@ -218,7 +218,7 @@ function M.settings_save(ctx)
         ["/etc/AdGuardHome"] = true,
         ["/tmp/AdGuardHome"] = true
     }
-    local allowed_channels = { stable = true, beta = true }
+    local allowed_channels = { stable = true, beta = true, legacy = true }
     local allowed_proxies = {
         none = true, ["gh-proxy.org"] = true, ["ghproxy.cc"] = true,
         ["ghproxy.com"] = true, ["ghfast.top"] = true
@@ -324,6 +324,7 @@ function M.settings_save(ctx)
         return
     end
 
+    local prev_channel = uci:get(CONF, "main", "channel") or ""
     uci:set(CONF, "main", "enabled", enabled)
     uci:set(CONF, "main", "dns_mode", mode)
     uci:set(CONF, "main", "webport", tostring(port))
@@ -344,6 +345,13 @@ function M.settings_save(ctx)
     uci:set_list(CONF, "main", "bypass_ifaces", ifaces)
     uci:set_list(CONF, "main", "bypass_clients", clients)
     uci:commit(CONF)
+
+    -- 切换通道后旧缓存里的版本属于另一条通道，会造成「选了预览版却装正式版」，
+    -- 立即失效并后台重查，让概览页尽快显示新通道的目标版本。
+    if prev_channel ~= channel then
+        fs.remove(CORE_UPDATE)
+        sys.exec("sh " .. SHARE .. "/check_core_update.sh >/dev/null 2>&1 &")
+    end
 
     -- 运行中优先通过 AdGuard Home API 在线应用缓存设置；失败则由 apply_settings.sh 回退到文件写入
     uci:delete(CONF, "main", "cache_api_applied")
