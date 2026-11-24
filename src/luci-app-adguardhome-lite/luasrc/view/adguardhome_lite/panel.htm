@@ -30,7 +30,7 @@
 			background: #141517;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126j">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126k">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -266,7 +266,7 @@
 							<label for="agh-set-dns-mode">DNS 接管方式</label>
 							<select id="agh-set-dns-mode">
 								<option value="takeover">接管 53 端口（默认，DNSMasq 移到 1745）</option>
-								<option value="passwall">PassWall 前置（AGH 53 → PassWall DNS 分流，保留劫持）</option>
+								<option value="passwall">PassWall / PassWall2 前置（AGH 53 → PassWall DNS 分流，保留劫持）</option>
 								<option value="upstream">DNSMasq 上游（AdGuard Home 监听 5333）</option>
 								<option value="clashfirst">Clash 前置（Clash 7874 → AGH 5335 → 真实 DNS）</option>
 								<option value="none">仅面板模式（不接管 DNS）</option>
@@ -744,7 +744,7 @@
 				</div>
 				<ul class="agh-tips">
 					<li><b>大多数家庭：</b>选「接管 53 端口」（默认，推荐）。装了 Clash、开着 DNS 劫持也能用，过滤和逐设备统计最完整。</li>
-					<li><b>正在用 PassWall：</b>选「PassWall 前置」，不需要关闭 PassWall 的 DNS 劫持。PassWall 重启后如果换了 DNS 端口，回插件重新保存一次设置即可。</li>
+					<li><b>正在用 PassWall / PassWall2：</b>选「PassWall 前置」，不需要关闭它们的 DNS 劫持。重启后如果换了 DNS 端口，插件会在 10 秒内自动跟随（会短暂重启一次 AdGuard Home），无需手动保存。</li>
 					<li><b>不想让 AdGuard Home 占 53：</b>可选「Clash 前置」（需要 Clash 正在运行，面板来源都会显示 127.0.0.1，属于正常现象）或「DNSMasq 上游」（DNSMasq 继续当入口；Clash 开着 DNS 劫持时不要用）。</li>
 					<li><b>只想先看看面板：</b>选「仅面板模式」，完全不改系统 DNS。</li>
 				</ul>
@@ -890,7 +890,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261126m"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261126r"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

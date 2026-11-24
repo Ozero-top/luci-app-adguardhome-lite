@@ -49,6 +49,45 @@ check_parental() {
     fi
 }
 
+# PassWall 的 DNS 端口由 get_new_port 动态分配，重启、切换 DNS 方案或增删 ACL 后可能变化。
+# 当前上游仍由插件管理时自动跟随，用户自定义的上游不动；端口没变时什么都不做。
+# 注意：AdGuard Home 的 SIGHUP 不会应用上游 DNS 的变更（实测仍查旧端口并报 connection refused），
+# 必须结束进程让 procd 用新配置重新拉起，DNS 中断约 10 秒。
+PSW_SYNC_INTERVAL=10
+PSW_SYNC_LAST=0
+
+sync_passwall_upstream() {
+    [ "$dns_mode" = "passwall" ] || return 0
+    [ "$upstream_source" = "custom" ] && return 0
+    passwall_enabled || return 0
+
+    _exp="$(passwall_upstream_dns)"
+    case "$_exp" in
+        ''|*:) return 0 ;;
+    esac
+    _cur="$(yaml_get_list "$configpath" "upstream_dns")"
+    _auto="$(uci -q get "$CONF.main.auto_upstream" 2>/dev/null)"
+    [ -n "$_cur" ] || return 0
+    # 上游已偏离插件记录的值，说明是用户手填的，不再接管
+    [ "$_cur" = "$_auto" ] || return 0
+    [ "$_cur" != "$_exp" ] || return 0
+
+    yaml_set_list "$configpath" "upstream_dns" "$_exp" || return 0
+    uci -q set "$CONF.main.auto_upstream=$_exp"
+    uci -q commit "$CONF" 2>/dev/null
+
+    # SIGHUP 只重载过滤规则等配置，上游 DNS 不会生效，必须重启进程；
+    # 这里结束 AdGuard Home，由 procd 的 respawn 用新配置拉起。
+    _pid="$(pidof AdGuardHome)"
+    if [ -n "$_pid" ]; then
+        # 给本轮重启留出时间，避免启动稍慢时触发下面的 30 秒回退
+        DEAD=0
+        kill "$_pid" 2>/dev/null
+    fi
+
+    log_event warn passwall_upstream_follow "检测到 PassWall DNS 端口变化，AdGuard Home 上游已自动更新为 $_exp。"
+}
+
 while true; do
     sleep 5
     load_conf
@@ -61,6 +100,11 @@ while true; do
 
     if is_agh_running; then
         check_parental
+        _now="$(date +%s)"
+        if [ $(( _now - PSW_SYNC_LAST )) -ge "$PSW_SYNC_INTERVAL" ]; then
+            PSW_SYNC_LAST="$_now"
+            sync_passwall_upstream
+        fi
         DEAD=0
         continue
     fi

@@ -530,21 +530,38 @@ local function openclash_upstream_agh(port)
 end
 
 local function passwall_enabled()
+    if (uci:get("passwall2", "@global[0]", "enabled") or "") == "1" then
+        return true
+    end
     return (uci:get("passwall", "@global[0]", "enabled") or "") == "1"
 end
 
--- PassWall 的 DNS 端口由 get_new_port 动态分配，真实端口只写在运行时变量文件里
+-- 端口由 get_new_port 动态分配：PassWall 1.x 从 11400 起，变量名 ACL_default_dns_port；
+-- PassWall 2.x 从 2001 起，默认 ACL 的变量名为 ACL_acl_default_dns_port。
+-- 两者都装时以 PassWall2 为准，避免读到 1.x 的残留运行时文件。
 local function passwall_dns_port()
-    for _, f in ipairs({ "/tmp/etc/passwall/var", "/tmp/etc/passwall_tmp/var" }) do
+    local files, keys, fallback
+    if (uci:get("passwall2", "@global[0]", "enabled") or "") == "1" then
+        files = { "/tmp/etc/passwall2/var", "/tmp/etc/passwall2_tmp/var" }
+        keys = { "ACL_acl_default_dns_port", "ACL_default_dns_port" }
+        fallback = "2001"
+    else
+        files = { "/tmp/etc/passwall/var", "/tmp/etc/passwall_tmp/var" }
+        keys = { "ACL_default_dns_port" }
+        fallback = "11400"
+    end
+    for _, f in ipairs(files) do
         local content = fs.readfile(f)
         if content then
-            local port = content:match("ACL_default_dns_port=[\"']?(%d+)")
-            if port and port ~= "" then
-                return port
+            for _, key in ipairs(keys) do
+                local port = content:match(key .. "=[\"']?(%d+)")
+                if port then
+                    return port
+                end
             end
         end
     end
-    return "11400"
+    return fallback
 end
 
 local function read_number(path)

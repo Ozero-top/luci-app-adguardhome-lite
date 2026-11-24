@@ -57,6 +57,13 @@ function M.status(ctx)
     elseif dns_mode == "clashfirst" then
         dnsport = 5335
     end
+    -- 只用于界面显示：区分当前启用的是 PassWall 1.x 还是 2.x
+    local passwall_flavor = ""
+    if (uci:get("passwall2", "@global[0]", "enabled") or "") == "1" then
+        passwall_flavor = "2"
+    elseif (uci:get("passwall", "@global[0]", "enabled") or "") == "1" then
+        passwall_flavor = "1"
+    end
     local webport = tonumber(cfg("webport", "13800")) or 13800
     local password = cfg("adminpass", "admin123")
     local hijack_port = openclash_hijack_port()
@@ -100,6 +107,7 @@ function M.status(ctx)
         dnsmasq_redirect = uci:get("dhcp", "@dnsmasq[0]", "dns_redirect") or "",
         passwall_enabled = passwall_enabled(),
         passwall_dns_port = passwall_dns_port(),
+        passwall_flavor = passwall_flavor,
         upstream_current = yaml_list_values(configpath, "upstream_dns"),
         upstream_source = cfg("upstream_source", "auto"),
         agh_bypassed = cfg("agh_bypassed", "0"),

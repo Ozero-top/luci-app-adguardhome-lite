@@ -910,7 +910,11 @@ show_status() {
     echo "agh_bypassed=$(get_uci "$CONF.main.agh_bypassed")"
     echo "openclash_forward=$(openclash_forward_present && echo yes || echo no)"
     echo "passwall_enabled=$(passwall_enabled && echo yes || echo no)"
-    echo "passwall_dns_redirect=$(get_uci passwall.@global[0].dns_redirect)"
+    if [ "$(uci -q get passwall2.@global[0].enabled 2>/dev/null)" = "1" ]; then
+        echo "passwall_dns_redirect=$(get_uci passwall2.@global[0].dns_redirect)"
+    else
+        echo "passwall_dns_redirect=$(get_uci passwall.@global[0].dns_redirect)"
+    fi
     echo "passwall_dns_port=$(passwall_dns_port)"
 }
 

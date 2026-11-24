@@ -103,7 +103,8 @@ function M.settings_get(ctx)
         bypass_clients = join_words(uci:get(CONF, "main", "bypass_clients")),
         devices = net_devices(),
         openclash_installed = uci:get("openclash", "config") ~= nil,
-        passwall_installed = uci:get("passwall", "@global[0]", "enabled") ~= nil,
+        passwall_installed = uci:get("passwall2", "@global[0]", "enabled") ~= nil
+            or uci:get("passwall", "@global[0]", "enabled") ~= nil,
         passwall_enabled = passwall_enabled(),
         passwall_dns_port = passwall_dns_port(),
         admin_user = cfg("adminuser", "admin"),

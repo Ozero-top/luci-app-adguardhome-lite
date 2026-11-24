@@ -425,6 +425,13 @@ code {
 	word-break: break-all;
 }
 
+/* DNS 接管等短值单行显示，避免把整行卡片撑高 */
+.agh-status-item.agh-status-nowrap .agh-v {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .agh-ok { color: var(--agh-success); }
 .agh-bad { color: var(--agh-danger); }
 .agh-warn { color: var(--agh-warning); }

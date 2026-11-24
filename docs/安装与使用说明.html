@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 管理中心 使用说明 · 1.3.12-3</title>
+<title>AdGuard Home 管理中心 使用说明 · 1.3.12-4</title>
 <meta name="description" content="AdGuard Home 管理中心使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 管理中心 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.12-3</span>
+  <span class="pill"><span class="dot"></span>1.3.12-4</span>
 </header>
 
 <div class="layout">
@@ -211,7 +211,7 @@ footer{
       <h1>AdGuard Home 管理中心 使用说明</h1>
       <p>本插件负责<strong>安装、DNS 接管、过滤、看护与统计</strong>；更细的高级项仍可在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.12-3</span>
+        <span>适用版本 1.3.12-4</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -364,7 +364,7 @@ nft list chain inet fw4 agh_dns_redirect</code></pre>
           <thead><tr><th>设置项</th><th>说明</th></tr></thead>
           <tbody>
             <tr><td>启用 AdGuard Home</td><td>开启后启动服务；关闭后停止并恢复 DNSMasq 原始设置</td></tr>
-            <tr><td>DNS 接管方式</td><td>推荐「接管 53 端口」；装了 PassWall 用「PassWall 前置」，详见第 5 节</td></tr>
+            <tr><td>DNS 接管方式</td><td>推荐「接管 53 端口」；装了 PassWall / PassWall2 用「PassWall 前置」，详见第 5 节</td></tr>
             <tr><td>管理面板端口</td><td>默认 <code>13800</code>，不能占用 53 / 1745 / 5333 / 5335</td></tr>
             <tr><td>内核安装位置</td><td>内置存储重启保留；内存临时重启后需重装</td></tr>
             <tr><td>数据工作目录</td><td>保存统计和过滤缓存；内存临时会减少闪存写入，重启后统计清空</td></tr>
@@ -406,22 +406,23 @@ nft list chain inet fw4 agh_dns_redirect</code></pre>
           <thead><tr><th>方式</th><th>AdGuard Home</th><th>DNSMasq</th><th>适合</th></tr></thead>
           <tbody>
             <tr><td>接管 53 端口（默认）</td><td>53</td><td>1745</td><td>想逐设备统计，装了 Clash 也能用</td></tr>
-            <tr><td>PassWall 前置</td><td>53</td><td>1745</td><td>用 PassWall 做分流，不想关它的 DNS 劫持</td></tr>
+            <tr><td>PassWall / PassWall2 前置</td><td>53</td><td>1745</td><td>用 PassWall 或 PassWall2 做分流，不想关它的 DNS 劫持</td></tr>
             <tr><td>DNSMasq 上游</td><td>5333</td><td>53</td><td>不想让 AdGuard Home 占 53，且没有程序抢 53</td></tr>
             <tr><td>Clash 前置</td><td>5335</td><td>53</td><td>不想占 53，不需要逐设备统计</td></tr>
             <tr><td>仅面板</td><td>不接管</td><td>53</td><td>只想打开面板查看</td></tr>
           </tbody>
         </table>
       </div>
-      <p><strong>怎么选</strong>：需要逐设备统计、所有域名先过滤，选「接管 53 端口」；装了 PassWall、又不想关闭它的 DNS 劫持，选「PassWall 前置」；不想让 AdGuard Home 占 53，选「Clash 前置」；只想看面板，选「仅面板」。</p>
+      <p><strong>怎么选</strong>：需要逐设备统计、所有域名先过滤，选「接管 53 端口」；装了 PassWall / PassWall2、又不想关闭它的 DNS 劫持，选「PassWall 前置」；不想让 AdGuard Home 占 53，选「Clash 前置」；只想看面板，选「仅面板」。</p>
       <div class="note"><p>旧「Clash 串联」已下线，旧配置会自动迁移为「接管 53 端口」。前置模式会自动把 Clash 自定义上游指向 <code>127.0.0.1:5335</code>，停止或切换时恢复原值。</p></div>
       <p><strong>与 Clash 共存</strong>：选「接管 53」时，插件会创建 <code>agh_dns_redirect</code> 链，把局域网设备的 53 查询收回路由器，Clash 劫持指向 <code>:53</code>、<code>:1745</code> 或 <code>:7874</code> 都不会绕过过滤。</p>
-      <p><strong>与 PassWall 共存</strong>：选「PassWall 前置」时不需要关闭 PassWall 的 DNS 劫持。收回链改用 <code>priority -102</code>（PassWall 为 <code>-101</code>），先于它接住设备的 53 查询；AdGuard Home 上游自动指向 PassWall 自己的 DNS（端口从 PassWall 运行时变量 <code>/tmp/etc/passwall/var</code> 读取，默认从 <code>11400</code> 起分配）。PassWall 未启用时上游回退为 <code>127.0.0.1:1745</code>，不会断网。该模式不支持「排除接口 / 客户端」，排除的设备会直接走 PassWall。</p>
+      <p><strong>与 PassWall / PassWall2 共存</strong>：选「PassWall 前置」时不需要关闭它们的 DNS 劫持。收回链改用 <code>priority -102</code>（PassWall 为 <code>-101</code>），先于它接住设备的 53 查询；AdGuard Home 上游自动指向 PassWall 自己的 DNS（地址用路由器局域网 IP，端口从运行时变量读取：PassWall 1.x 读 <code>/tmp/etc/passwall/var</code> 的 <code>ACL_default_dns_port</code>，默认从 <code>11400</code> 起分配；PassWall2 读 <code>/tmp/etc/passwall2/var</code> 的 <code>ACL_acl_default_dns_port</code>，默认从 <code>2001</code> 起分配；两者都启用时以 PassWall2 为准）。之所以不用 <code>127.0.0.1</code>：PassWall 自带的 dnsmasq 开了 <code>local-service</code>，只回答局域网来源的查询，用回环地址会被拒绝，表现为只有缓存能解析、新域名全部失败。PassWall 未启用时上游回退为 <code>127.0.0.1:1745</code>，不会断网。该模式不支持「排除接口 / 客户端」，排除的设备会直接走 PassWall。</p>
       <p>检查：</p>
 <pre><code>nft list chain inet fw4 agh_dns_redirect</code></pre>
       <p>看到 <code>redirect to :53</code> 即为正常；没有这条链时，重新保存一次「接管 53 端口」。</p>
       <p><strong>切换与停止</strong>：切换方式会先恢复接管前的 DNSMasq 原值，再按新方式配置；停止或卸载时恢复端口、<code>noresolv</code>、<code>resolvfile</code> 和 <code>server</code>，不会写入公共 DNS。</p>
-      <p><strong>启动顺序</strong>：DNSMasq（19）→ AdGuard Home（95）→ Clash / PassWall（99），插件已注册 <code>START=95</code>，无需手动调整。「PassWall 前置」下 PassWall 启动后才会开始分流，上游按默认端口 <code>11400</code> 预写，不阻塞上网。</p>
+      <p><strong>启动顺序</strong>：DNSMasq（19）→ AdGuard Home（95）→ Clash / PassWall（99），插件已注册 <code>START=95</code>，无需手动调整。「PassWall 前置」下 PassWall 启动后才会开始分流，上游按默认端口（1.x <code>11400</code> / 2.x <code>2001</code>）预写，不阻塞上网。</p>
+      <p><strong>端口跟随</strong>：PassWall / PassWall2 的 DNS 端口是动态分配的（1.x 从 <code>11400</code> 起、2.x 从 <code>2001</code> 起找空闲端口），看护进程每 10 秒检查一次；端口变化且上游仍由插件管理时，自动改写上游并重启 AdGuard Home（约 10 秒；SIGHUP 不会应用上游变更），不重启 PassWall；自定义上游不会被改动。</p>
       <p><strong>排除接口 / 客户端</strong>：仅「接管 53」生效。命中的查询直接交给 DNSMasq（1745），不进入 AdGuard Home，也不计入统计；指向外部 DNS 的查询直接放行。</p>
       <p><strong>自定义域名转发</strong>：DNSMasq 里的 <code>server=/corp.example/10.0.0.1</code> 会保留。「接管 53」下查询仍先经过 AdGuard Home，过滤和统计正常；「DNSMasq 上游」下这类域名直接发给指定服务器，不经过 AdGuard Home。需要过滤时，改用 AdGuard Home 上游的 <code>[/corp.example/]10.0.0.1</code> 写法。</p>
     </section>
@@ -535,11 +536,11 @@ python tools/build_apk.py      # 实验性 apk（需在 25.12 实测）
 python tools/build_run.py      # 离线 .run + manifest-&lt;版本&gt;.txt</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.12-3_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.12-3-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.12-3_all.apk</code>（实验性）</li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.12-3.run</code></li>
-        <li><code>dist/manifest-1.3.12-3.txt</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.12-4_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.12-4-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.12-4_all.apk</code>（实验性）</li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.12-4.run</code></li>
+        <li><code>dist/manifest-1.3.12-4.txt</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
@@ -566,6 +567,10 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
         <table>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
+            <tr>
+              <td><span class="tag">1.3.12-4</span></td>
+              <td>新增 PassWall2 支持并自动读取其 DNS 端口；切换 PassWall / PassWall2 或端口变化后，看护每 10 秒检查并自动重启 AdGuard Home 应用新上游，不再需要手动重启（修复 SIGHUP 不生效导致的解析失败）；运行状态「DNS 接管」改为单行显示；Android App 沿用 1.3.12-1。使用 PassWall2 或经常切换插件的用户建议升级，其它场景按需升级</td>
+            </tr>
             <tr>
               <td><span class="tag">1.3.12-3</span></td>
               <td>界面清理与说明优化，功能不变，按需升级：过滤规则 5 个开关回到单行并精简说明，订阅列表合并为一行并显示来源（jsDelivr / GitHub / 域名）；使用说明新增开关说明；修复 HTML 过滤正则告警；Android App 沿用 1.3.12-1</td>
@@ -682,7 +687,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 管理中心 · 使用说明 1.3.12-3 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 管理中心 · 使用说明 1.3.12-4 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {

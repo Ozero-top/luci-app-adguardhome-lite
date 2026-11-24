@@ -99,8 +99,8 @@ if [ -s "$configpath" ]; then
                 _target_up="$(passwall_upstream_dns)"
                 if ! passwall_enabled; then
                     log_msg "PassWall 未启用，AdGuard Home 上游回退到本机 DNSMasq（1745）。"
-                elif [ ! -f /tmp/etc/passwall/var ] && [ ! -f /tmp/etc/passwall_tmp/var ]; then
-                    log_msg "PassWall 尚未启动，暂按默认端口 11400 设置上游；若 PassWall 实际端口不同，请在其启动后重新保存一次设置。"
+                elif [ -z "$(passwall_runtime_var)" ]; then
+                    log_msg "PassWall 尚未启动，暂按默认端口 $(passwall_dns_port) 设置上游；实际端口不同时插件会自动跟随。"
                 fi
                 ;;
             *) _target_up="127.0.0.1:$(dnsmasq_port)" ;;
@@ -120,11 +120,20 @@ if [ -s "$configpath" ]; then
                 _is_auto=1
                 ;;
         esac
+        # PassWall 模式的上游是本机局域网 IP:PassWall DNS 端口，同样视为插件写入
+        if [ "$dns_mode" = "passwall" ] && [ -n "$_self_ip" ]; then
+            case "$_cur_up" in
+                "$_self_ip":*) _is_auto=1 ;;
+            esac
+        fi
 
         if [ "$_is_auto" = "1" ] && [ "$_cur_up" != "$_target_up" ]; then
             yaml_set_list "$configpath" "upstream_dns" "$_target_up"
             uci -q set "$CONF.main.auto_upstream=$_target_up"
             log_msg "已根据 DNS 接管方式调整上游 DNS：$_target_up"
+        elif [ "$_is_auto" = "1" ] && [ "$_auto_up" != "$_target_up" ]; then
+            # 上游已是目标值（如手动改过地址）时，同步记录，避免下次判断拿到旧值
+            uci -q set "$CONF.main.auto_upstream=$_target_up"
         fi
 
         # DoH/DoT 上游需要 bootstrap 解析解析器域名。

@@ -379,9 +379,9 @@
 		return 'http://' + host + ':' + (port || 13800) + '/';
 	}
 
-	function modeLabel(mode) {
+	function modeLabel(mode, flavor) {
 		if (mode === 'takeover') return '接管 53 端口';
-		if (mode === 'passwall') return 'PassWall 前置（AGH → PassWall DNS）';
+		if (mode === 'passwall') return (flavor === '2' ? 'PassWall2' : 'PassWall') + ' 前置';
 		if (mode === 'openclash') return 'Clash 串联（已下线）';
 		if (mode === 'clashfirst') return 'Clash 前置（Clash → AGH → 真实 DNS）';
 		if (mode === 'none') return '仅面板（不接管 DNS）';
@@ -628,7 +628,7 @@
 		var rows = [
 			['服务状态', d.running ? '<span class="agh-ok">运行中</span>' : '<span class="agh-bad">已停止</span>'],
 			['内核版本', renderCoreVersion(d)],
-			['DNS 接管', esc(modeLabel(d.dns_mode)) + ((d.mode_applied && d.mode_applied !== d.dns_mode) ? ' <span class="agh-warn">（待应用）</span>' : '')],
+			['DNS 接管', esc(modeLabel(d.dns_mode, d.passwall_flavor)) + ((d.mode_applied && d.mode_applied !== d.dns_mode) ? ' <span class="agh-warn">（待应用）</span>' : '')],
 			['当前链路', '<span class="agh-path">' + esc(modeChain(d)) + '</span>'],
 			['更新通道', esc(channelLabel(d.channel))]
 		];
@@ -650,16 +650,18 @@
 		}
 		if (d.dns_mode === 'passwall') {
 			if (!d.passwall_enabled) {
-				rows.push(['配置建议', '<span class="agh-warn">未检测到启用中的 PassWall，查询会经 AdGuard Home 转给本机 DNSMasq（1745），不走 PassWall 分流。</span>']);
+				rows.push(['配置建议', '<span class="agh-warn">未检测到启用中的 PassWall / PassWall2，查询会经 AdGuard Home 转给本机 DNSMasq（1745），不走 PassWall 分流。</span>']);
 			} else if (!d.dns_redirect) {
 				rows.push(['配置建议', '<span class="agh-warn">把查询收回 53 的规则没有生效，查询可能被 PassWall 的劫持抢走。请在「基础设置」重新保存一次「PassWall 前置」。</span>']);
 			} else {
+				// PassWall 自带的 dnsmasq 只接受局域网来源，上游可能是 127.0.0.1 或局域网 IP，
+				// 这里只比较端口，避免误报。
 				var pswPort = String(d.passwall_dns_port || '');
-				var tgt = pswPort ? '127.0.0.1:' + pswPort : '';
 				var ups = String(d.upstream_current || '');
-				if (tgt && d.upstream_source !== 'custom' && ups.indexOf(tgt) < 0) {
-					rows.push(['配置建议', '<span class="agh-warn">AdGuard Home 上游未指向当前 PassWall DNS（' + esc(tgt) +
-						'），可能是 PassWall 重启后更换了端口。请重新保存一次「PassWall 前置」。</span>']);
+				var upsPort = (ups.match(/:(\d+)\s*$/) || [])[1] || '';
+				if (pswPort && d.upstream_source !== 'custom' && upsPort !== pswPort) {
+					rows.push(['配置建议', '<span class="agh-warn">AdGuard Home 上游未指向当前 PassWall DNS 端口（' + esc(pswPort) +
+						'），插件会在 10 秒内自动跟随（会短暂重启一次 AdGuard Home）。</span>']);
 				}
 			}
 		}
@@ -700,6 +702,7 @@
 			var cls = 'agh-status-item';
 			if (wide[label]) cls += ' agh-status-wide';
 			if (label === '配置建议') cls += ' agh-status-full';
+			if (label === 'DNS 接管') cls += ' agh-status-nowrap';
 			html += '<div class="' + cls + '"><span class="agh-k">' + esc(label) + '</span><span class="agh-v">' + rows[i][1] + '</span></div>';
 		}
 		var grid = $('agh-status-grid');
@@ -2020,8 +2023,8 @@
 		if (passwallOption) {
 			passwallOption.disabled = !state.passwall;
 			passwallOption.textContent = state.passwall
-				? 'PassWall 前置（AGH 53 → PassWall DNS 分流，保留劫持）'
-				: 'PassWall 前置（未安装 PassWall，不可用）';
+				? 'PassWall / PassWall2 前置（AGH 53 → PassWall DNS 分流，保留劫持）'
+				: 'PassWall / PassWall2 前置（未安装 PassWall，不可用）';
 		}
 
 		var modeNote = $('agh-dns-mode-note');
@@ -2032,9 +2035,9 @@
 			} else if (!state.openclash && mode === 'clashfirst') {
 				text = 'Clash 未安装，「Clash 前置」模式不会生效，请改用「接管 53 端口」。';
 			} else if (mode === 'passwall' && !state.passwallEnabled) {
-				text = 'PassWall 当前未启用：AdGuard Home 会把查询转给本机 DNSMasq（1745）。启用 PassWall 后重新保存一次设置即可走分流。';
+				text = 'PassWall / PassWall2 当前未启用：AdGuard Home 会把查询转给本机 DNSMasq（1745）。启用后会在 10 秒内自动切回 PassWall 分流。';
 			} else if (mode === 'passwall') {
-				text = 'PassWall DNS 端口：' + (state.passwallDnsPort || '11400') + '，保存后自动写入 AdGuard Home 上游。';
+				text = 'PassWall DNS 端口：' + (state.passwallDnsPort || '11400') + '，保存后自动写入 AdGuard Home 上游，端口变化会自动跟随。';
 			}
 			modeNote.textContent = text;
 			modeNote.style.display = text ? '' : 'none';

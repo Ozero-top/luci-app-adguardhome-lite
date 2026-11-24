@@ -50,9 +50,9 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 
 ### DNS 接入
 
-- **五种方式**：接管 53、PassWall 前置、DNSMasq 上游、Clash 前置、仅面板；「Clash 串联」已下线，旧配置自动迁移。
+- **五种方式**：接管 53、PassWall / PassWall2 前置、DNSMasq 上游、Clash 前置、仅面板；「Clash 串联」已下线，旧配置自动迁移。
 - **Clash 共存**：推荐「接管 53 + Clash 劫持/转发」，自建 `agh_dns_redirect` 链先收回设备 53 查询，Clash 劫持指向哪个端口都绕不过过滤。
-- **PassWall 共存**：无需关闭其 DNS 劫持，插件接管规则优先级更高，上游自动指向 PassWall 动态 DNS 端口，过滤与分流同时保留。
+- **PassWall 共存**：PassWall 1.x / PassWall2 均支持，无需关闭其 DNS 劫持，插件接管规则优先级更高，上游自动指向 PassWall 动态 DNS 端口并跟随端口变化，过滤与分流同时保留。
 - **上游可控**：默认按模式自动写入，也可自定义 DoH/DoT/DoQ 与 `[/域名/]IP` 条件转发；只改插件自己写入的值，手改的代理、PTR、上游保持原样。
 - **按接口 / 客户端放行**：「接管 53」下可排除指定接口或 IP/CIDR，这些查询由 DNSMasq 直接应答，不进 AdGuard Home。
 
@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.12-3_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.12-4_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.12-3` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.12-4` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.12-3 -m https://gh-proxy.org
+sh install.sh -v 1.3.12-4 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -230,7 +230,7 @@ sh install.sh -v 1.3.12-3 -m https://gh-proxy.org
 | 方式 | 完整链路 | 适用场景 |
 |---|---|---|
 | **接管 53 端口**（默认） | 客户端 → 53 AdGuard Home → 1745 DNSMasq → 7874 Clash DNS / 上游 DNS | 想逐设备统计；装了 Clash、开着 DNS 劫持/转发也能用（插件自动收回 53） |
-| PassWall 前置 | 客户端 → 53 AdGuard Home → 11400 起 PassWall DNS → 分流 | 装了 PassWall、不想关它的 DNS 劫持，又想保留过滤与逐设备统计 |
+| PassWall / PassWall2 前置 | 客户端 → 53 AdGuard Home → PassWall DNS（1.x 11400 起 / 2.x 2001 起）→ 分流 | 装了 PassWall 或 PassWall2、不想关它的 DNS 劫持，又想保留过滤与逐设备统计 |
 | DNSMasq 上游 | 客户端 → 53 DNSMasq → 5333 AdGuard Home → 自动上游 | 不想让 AdGuard Home 占 53，且没有程序抢 53 |
 | Clash 前置 | 客户端 → Clash 劫持 → 7874 Clash DNS → 5335 AdGuard Home → 真实 DNS | 不想让 AdGuard Home 占 53、不需要逐设备统计 |
 | 仅面板模式 | 不接管 DNS，仅提供管理面板 | 先体验面板或手动接管 |
@@ -275,21 +275,22 @@ nft list chain inet fw4 dstnat | grep 'Clash DNS Hijack'
 - Clash 劫持写 `:1745` 或 `:7874` 都没关系，自定义链已先接住；
 - 没有该链且劫持直指 `:7874`：查询绕过 AdGuard Home，重新保存一次「接管 53 端口」。
 
-### PassWall 前置
+### PassWall / PassWall2 前置
 
-PassWall 默认开着 DNS 劫持，会把局域网 53 查询收到自己的 DNS（端口从 `11400` 起动态分配）。选「PassWall 前置」无需关闭它：
+PassWall（含 PassWall2）默认开着 DNS 劫持，会把局域网 53 查询收到自己的 DNS。选「PassWall 前置」无需关闭它：
 
 ```text
 客户端 → 53 AdGuard Home（过滤、记录真实设备 IP）
-      → 127.0.0.1:<PassWall DNS 端口>（国内外分流）→ 真实 DNS
+      → <路由器局域网 IP>:<PassWall DNS 端口>（国内外分流）→ 真实 DNS
 ```
 
 - 插件自建 `agh_dns_redirect` 链用 `priority -102`（比 PassWall 的 `-101` 更靠前），53 查询先进入 AdGuard Home；
-- 系统 DNSMasq 仍移到 `1745`，AdGuard Home 上游写成 `127.0.0.1:<端口>`，端口从 `/tmp/etc/passwall/var` 读取；
+- 系统 DNSMasq 仍移到 `1745`，AdGuard Home 上游写成「路由器局域网 IP:端口」：PassWall 1.x 读 `/tmp/etc/passwall/var` 的 `ACL_default_dns_port`（从 `11400` 起分配），PassWall2 读 `/tmp/etc/passwall2/var` 的 `ACL_acl_default_dns_port`（从 `2001` 起分配）；两者都启用时以 PassWall2 为准；
+- 上游必须用局域网 IP 而不是 `127.0.0.1`：PassWall 自带的 dnsmasq 开了 `local-service`，只回答局域网来源的查询，用 `127.0.0.1` 会被拒绝，表现为只有缓存能解析、新域名全部失败；
 - PassWall 未启用时上游回退 `127.0.0.1:1745`，不会断网；
 - 该模式不支持「排除接口 / 客户端」，排除的设备直接落到 PassWall 劫持，有分流但不经过 AdGuard Home。
 
-PassWall 重启换了 DNS 端口时，概览会提示「上游未指向当前 PassWall DNS」，重新保存一次即可。
+PassWall 重启或切换 PassWall / PassWall2 导致 DNS 端口变化时，看护进程每 10 秒检查一次，会自动把上游改到新端口并重启 AdGuard Home（约 10 秒；SIGHUP 不会应用上游变更），不重启 PassWall，也不影响自定义上游；概览会在跟随前给出提示。
 
 ### 排除接口与客户端（仅「接管 53」）
 
@@ -345,7 +346,7 @@ DNSMasq 里已有的 `server=/corp.example/10.0.0.1` 会被保留，不同接管
 |---|---|---|
 | Clash 前置 | 无 | 上游是真实 DNS，不依赖 Clash |
 | 接管 53 端口 | 可与 Clash 劫持同用 | 自定义链先收回 53，再经 DNSMasq（1745）交给 Clash（7874） |
-| PassWall 前置 | PassWall 启动后分流 | 收回链先占 53，上游指向 PassWall DNS；未启动时按默认 `11400` 写入，不阻塞上网 |
+| PassWall / PassWall2 前置 | PassWall 启动后分流 | 收回链先占 53，上游指向 PassWall DNS；未启动时按默认端口（1.x `11400` / 2.x `2001`）写入，不阻塞上网 |
 | DNSMasq 上游 / 仅面板 | 无 | 不涉及 53 劫持 |
 
 Clash 重启期间 DNS 可能中断 1~2 秒，属正常现象。
@@ -488,6 +489,15 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.12-4
+
+- **支持 PassWall2**：自动读取 PassWall2 的 DNS 端口（1.x 从 11400 起、2.x 从 2001 起），与 PassWall 共存时以 PassWall2 为准
+- **端口跟随更可靠**：切换 PassWall / PassWall2 或端口变化后，看护每 10 秒检查并自动重启 AdGuard Home 应用新上游，不再需要手动重启
+- **修复**：AdGuard Home 的 SIGHUP 不会应用上游 DNS 变更，之前切换插件后会一直解析失败
+- **界面**：运行状态的「DNS 接管」单行显示，不再撑高卡片
+- **Android App**：本次无改动，继续沿用 1.3.12-1 安装包
+- **升级提示**：用 PassWall2 或经常切换 PassWall 的用户建议升级，其它场景按需升级
 
 ### 1.3.12-3
 

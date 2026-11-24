@@ -100,35 +100,59 @@ load_conf() {
     esac
 }
 
-# PassWall 是否启用（停止 PassWall 会残留 inet passwall 表，不能看表判断）
+# PassWall / PassWall2 是否启用（停止后 UCI 会置 0，残留 nft 表不能作为判断依据）
 passwall_enabled() {
+    [ "$(uci -q get passwall2.@global[0].enabled 2>/dev/null)" = "1" ] && return 0
     [ "$(uci -q get passwall.@global[0].enabled 2>/dev/null)" = "1" ]
 }
 
-# PassWall 的 DNS 端口是动态分配的（get_new_port 11400），
-# 真实端口只在运行时写入 /tmp/etc/passwall*/var 的 ACL_default_dns_port。
-# 运行时变量不存在（PassWall 尚未启动）时按默认起始端口 11400 推断。
-passwall_dns_port() {
-    for _pwv in /tmp/etc/passwall/var /tmp/etc/passwall_tmp/var; do
-        [ -f "$_pwv" ] || continue
-        _pwp=$(awk -F= '/ACL_default_dns_port=/{print $2; exit}' "$_pwv" 2>/dev/null | tr -d "\"'[:space:]")
-        case "$_pwp" in
-            ''|*[!0-9]*) _pwp="" ;;
-        esac
-        if [ -n "$_pwp" ]; then
-            echo "$_pwp"
-            return 0
-        fi
-    done
+# 输出当前生效的 PassWall 运行时变量文件；尚未启动时无输出。
+# 两者都装时以 PassWall2 为准，避免读到 PassWall 1.x 的残留文件。
+passwall_runtime_var() {
+    if [ "$(uci -q get passwall2.@global[0].enabled 2>/dev/null)" = "1" ]; then
+        for _pwv in /tmp/etc/passwall2/var /tmp/etc/passwall2_tmp/var; do
+            [ -f "$_pwv" ] && { echo "$_pwv"; return 0; }
+        done
+    else
+        for _pwv in /tmp/etc/passwall/var /tmp/etc/passwall_tmp/var; do
+            [ -f "$_pwv" ] && { echo "$_pwv"; return 0; }
+        done
+    fi
+    return 1
+}
 
-    echo "11400"
+# PassWall 的 DNS 端口由 get_new_port 动态分配：
+#   PassWall 1.x 从 11400 起，变量名 ACL_default_dns_port；
+#   PassWall 2.x 从 2001 起，默认 ACL 的变量名为 ACL_acl_default_dns_port。
+# 运行时变量不存在（尚未启动）时按各自起始端口推断。
+passwall_dns_port() {
+    _pwv="$(passwall_runtime_var)"
+    if [ -n "$_pwv" ]; then
+        for _pwk in ACL_acl_default_dns_port ACL_default_dns_port; do
+            _pwp=$(awk -F= -v k="$_pwk" '$1==k{print $2; exit}' "$_pwv" 2>/dev/null | tr -d "\"'[:space:]")
+            case "$_pwp" in
+                ''|*[!0-9]*) _pwp="" ;;
+                *) echo "$_pwp"; return 0 ;;
+            esac
+        done
+    fi
+
+    if [ "$(uci -q get passwall2.@global[0].enabled 2>/dev/null)" = "1" ]; then
+        echo "2001"
+    else
+        echo "11400"
+    fi
 }
 
 # PassWall 模式下 AdGuard Home 的上游：交给 PassWall 自己的 DNS 做分流与去污染。
 # PassWall 未启用时回退到本机 DNSMasq（1745），避免上游指向不存在的端口导致断网。
+# 注意：PassWall 自带的 dnsmasq 开了 local-service，只回答局域网来源的查询，
+# 用 127.0.0.1 会被拒绝（表现为只有缓存能解析、新域名全部失败），所以这里用局域网 IP。
 passwall_upstream_dns() {
     if passwall_enabled; then
-        echo "127.0.0.1:$(passwall_dns_port)"
+        _pw_ip="$(uci -q get network.lan.ipaddr 2>/dev/null)"
+        [ -n "$_pw_ip" ] || _pw_ip="127.0.0.1"
+        echo "$_pw_ip:$(passwall_dns_port)"
     else
         echo "127.0.0.1:1745"
     fi
