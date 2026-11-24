@@ -30,7 +30,7 @@
 			background: #141517;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126b">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126d">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -97,7 +97,7 @@
 		<button type="button" class="agh-tab" data-tab="settings">基础设置</button>
 		<button type="button" class="agh-tab" data-tab="advanced">高级配置</button>
 		<button type="button" class="agh-tab" data-tab="logs">运行日志</button>
-		<button type="button" class="agh-tab" data-tab="guide">使用引导</button>
+		<button type="button" class="agh-tab" data-tab="guide">使用说明</button>
 	</nav>
 
 	<main class="agh-main">
@@ -127,7 +127,7 @@
 						<div class="agh-metric-label">成人内容（家长控制）</div>
 					</div>
 				</div>
-				<p id="agh-stats-hint" class="agh-hint">数据直接取自 AdGuard Home 统计接口，无需打开 AGH 面板；服务未运行时无法读取。</p>
+				<p id="agh-stats-alert" class="agh-hint agh-hint-warn agh-stats-alert" hidden></p>
 			</div>
 
 			<div class="agh-card">
@@ -142,17 +142,6 @@
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>DNS 自检</h3>
-					<button type="button" id="agh-selftest-btn" class="agh-ghost-btn agh-small-btn">开始检测</button>
-				</div>
-				<p class="agh-hint">只读检查内核、进程、管理端口与本机 DNS 查询链路，不会修改任何配置。</p>
-				<ul class="agh-tips" id="agh-selftest-list">
-					<li class="agh-hint">尚未检测。</li>
-				</ul>
-			</div>
-
-			<div class="agh-card">
-				<div class="agh-card-head">
 					<h3>服务控制</h3>
 				</div>
 				<div class="agh-actions">
@@ -160,7 +149,6 @@
 					<button type="button" id="agh-stop-btn" class="agh-btn agh-btn-danger">停止并关闭自启</button>
 					<button type="button" id="agh-restart-btn" class="agh-btn agh-btn-secondary">重启服务</button>
 				</div>
-				<p class="agh-hint agh-mt-8">“停止并关闭自启”会结束 AdGuard Home 进程并恢复 DNSMasq 原始设置，面板也会同时关闭；需要面板时请重新启动服务。</p>
 			</div>
 
 			<div class="agh-card">
@@ -172,8 +160,7 @@
 					<div class="agh-step agh-step-init">
 						<div class="agh-step-no">1</div>
 						<div class="agh-step-body">
-							<div class="agh-step-title">安装 AdGuard Home 内核</div>
-							<p>自动识别设备架构，从官方源或 GitHub 反代下载最新内核。内核约 10-40MB，请确保路由器空间充足。</p>
+							<div class="agh-step-title-row"><div class="agh-step-title">安装 AdGuard Home 内核</div><span class="agh-hint agh-head-note">自动识别设备架构，从官方源或 GitHub 反代下载最新内核。内核约 10-40MB，请确保路由器空间充足。</span></div>
 							<div class="agh-inline">
 								<button type="button" id="agh-install-btn" class="agh-btn agh-btn-primary">安装/更新内核</button>
 								<span id="agh-core-hint" class="agh-hint"></span>
@@ -183,8 +170,7 @@
 					<div class="agh-step agh-step-init">
 						<div class="agh-step-no">2</div>
 						<div class="agh-step-body">
-							<div class="agh-step-title">一键启用并接管 DNS</div>
-							<p>首次启用从内置模板生成配置，默认账号 admin、密码 admin123，并采用“接管 53 端口”方式接管 DNS。</p>
+							<div class="agh-step-title-row"><div class="agh-step-title">一键启用并接管 DNS</div><span class="agh-hint agh-head-note">首次启用从内置模板生成配置，默认账号 admin、密码 admin123，并采用“接管 53 端口”方式接管 DNS。</span></div>
 							<div class="agh-inline">
 								<button type="button" id="agh-enable-btn" class="agh-btn agh-btn-primary">一键启用</button>
 								<span id="agh-enable-hint" class="agh-hint"></span>
@@ -194,8 +180,7 @@
 					<div class="agh-step">
 						<div class="agh-step-no">3</div>
 						<div class="agh-step-body">
-							<div class="agh-step-title">打开 AdGuard Home 面板</div>
-							<p>首次登录可使用状态卡片中的默认密码。登录后可添加过滤规则、查看拦截统计。</p>
+							<div class="agh-step-title-row"><div class="agh-step-title">打开 AdGuard Home 面板</div><span class="agh-hint agh-head-note">首次登录可使用状态卡片中的默认密码。登录后可添加过滤规则、查看拦截统计。</span></div>
 							<div class="agh-inline">
 								<a href="#" id="agh-panel-link" class="agh-btn agh-btn-secondary" target="_blank" rel="noopener">打开 AGH 面板</a>
 								<span id="agh-console-hint" class="agh-hint"></span>
@@ -212,6 +197,16 @@
 					<div class="agh-progress-bar is-indeterminate" id="agh-progress-bar"><i></i></div>
 					<pre id="agh-progress-log" class="agh-log"></pre>
 				</div>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<div class="agh-card-head-left"><h3>DNS 自检</h3><span class="agh-hint agh-head-note">只读检查内核、进程、管理端口与本机 DNS 查询链路，不会修改任何配置。</span></div>
+					<button type="button" id="agh-selftest-btn" class="agh-ghost-btn agh-small-btn">开始检测</button>
+				</div>
+				<ul class="agh-tips" id="agh-selftest-list">
+					<li class="agh-hint">尚未检测。</li>
+				</ul>
 			</div>
 
 			<div class="agh-card" id="agh-legacy-card" style="display:none">
@@ -249,14 +244,12 @@
 
 			<div class="agh-card is-active" data-subpanel="svc">
 				<div class="agh-card-head">
-					<h3>服务与 DNS</h3>
+					<div class="agh-card-head-left"><h3>服务与 DNS</h3><span class="agh-hint agh-head-note">默认配置：接管 53 端口，管理面板端口 13800，默认账号 admin / 密码 admin123。保存后自动应用，约 5-10 秒恢复。</span></div>
 				</div>
-				<p class="agh-hint">默认配置：接管 53 端口，管理面板端口 13800，默认账号 admin / 密码 admin123。保存后会自动应用，约 5-10 秒恢复。</p>
 				<form id="agh-settings-form" class="agh-form" autocomplete="off">
 					<div class="agh-field agh-field-switch">
 						<div>
-							<label for="agh-set-enabled">启用 AdGuard Home</label>
-							<p class="agh-hint">开启后启动服务；关闭后停止服务并恢复 DNSMasq 原始设置。</p>
+							<div class="agh-label-row"><label for="agh-set-enabled">启用 AdGuard Home</label><span class="agh-hint">开启后启动服务；关闭后停止服务并恢复 DNSMasq 原始设置。</span></div>
 						</div>
 						<span class="agh-switch-state" data-for="agh-set-enabled">已关闭</span>
 						<label class="agh-switch">
@@ -265,13 +258,7 @@
 						</label>
 					</div>
 
-					<ul class="agh-hint-list">
-						<li><b>想统计每台设备、让所有域名都先过滤</b>：选「接管 53 端口」。装了 Clash、开着 DNS 劫持也能用，设备的 53 查询会被收回，不会再被 Clash 抢走。</li>
-						<li><b>装了 PassWall、又不想关它的 DNS 劫持</b>：选「PassWall 前置」。AdGuard Home 占 53 先过滤，再交给 PassWall 自己的 DNS 分流。</li>
-						<li><b>不想让 AdGuard Home 占 53，或不在乎逐设备统计</b>：选「Clash 前置」，面板里的来源会显示为 127.0.0.1。</li>
-					</ul>
-
-				<div class="agh-form-grid agh-form-grid-3">
+				<div class="agh-form-grid agh-form-grid-3 agh-form-grid-tight">
 						<div class="agh-field">
 							<label for="agh-set-dns-mode">DNS 接管方式</label>
 							<select id="agh-set-dns-mode">
@@ -287,7 +274,6 @@
 						<div class="agh-field">
 							<label for="agh-set-webport">管理面板端口</label>
 							<input type="number" id="agh-set-webport" min="1" max="65535" placeholder="13800">
-							<p class="agh-hint">默认 13800；不能使用 53、1745、5333、5335。</p>
 						</div>
 
 						<div class="agh-field">
@@ -296,9 +282,7 @@
 								<option value="/usr/bin/AdGuardHome/AdGuardHome">内置存储（推荐，重启保留）</option>
 								<option value="/tmp/AdGuardHome/AdGuardHome">内存临时（重启后需重新安装）</option>
 							</select>
-							<p class="agh-hint">内置存储重启后保留；内存临时会随重启清空，需重新安装内核。</p>
 						</div>
-
 
 						<div class="agh-field">
 							<label for="agh-set-channel">内核更新通道</label>
@@ -307,7 +291,6 @@
 								<option value="beta">预发布版（谨慎使用）</option>
 								<option value="legacy">旧版本（兼容旧配置，如 v0.107.x）</option>
 							</select>
-							<p class="agh-hint agh-mt-8">正式版取最新正式发布；预发布版取 GitHub 预发布标签；旧版本取上一条正式版本线（如 v1.0.0 之前为 v0.107.x）。预发布版与旧版本下载可走上方反代，切换前会自动备份 /etc/AdGuardHome.yaml。</p>
 						</div>
 
 						<div class="agh-field">
@@ -319,7 +302,6 @@
 								<option value="ghproxy.com">ghproxy.com</option>
 								<option value="ghfast.top">ghfast.top</option>
 							</select>
-							<p class="agh-hint">官方 CDN 失败时通过反代下载 GitHub 内核；内核/插件版本检查与在线更新也使用该反代，关闭后全部直连。</p>
 						</div>
 
 						<div class="agh-field">
@@ -328,11 +310,10 @@
 								<option value="/etc/AdGuardHome">内置存储（推荐，数据保留）</option>
 								<option value="/tmp/AdGuardHome">内存临时（减少闪存写入）</option>
 							</select>
-							<p class="agh-hint">保存统计与过滤缓存；内存临时可减少闪存写入，重启后统计清空。</p>
 						</div>
 					</div>
 
-					<div class="agh-form-grid" id="agh-bypass-group">
+					<div class="agh-form-grid agh-form-grid-tight" id="agh-bypass-group">
 						<div class="agh-field">
 							<label>不参与接管的接口</label>
 							<div class="agh-select" id="agh-bypass-iface-dd">
@@ -342,12 +323,10 @@
 								</button>
 								<div class="agh-select-menu" id="agh-bypass-iface-menu" hidden></div>
 							</div>
-							<p class="agh-hint">选中后，从该接口进入的 DNS 查询直接交给系统 DNSMasq（1745），不经过 AdGuard Home；不选表示全部接管。</p>
 						</div>
 						<div class="agh-field">
 							<label for="agh-set-bypass-clients">不参与接管的客户端 IP / CIDR</label>
 							<input type="text" id="agh-set-bypass-clients" placeholder="192.168.1.50 192.168.2.0/24 fd00::5">
-							<p class="agh-hint">多个用空格分隔，支持 IPv4、IPv6 与 CIDR。命中的设备查询路由器 DNS 时由 DNSMasq 直接应答，不计入 AdGuard Home 统计；指向外部 DNS 的查询不受影响。</p>
 						</div>
 					</div>
 					<p class="agh-hint" id="agh-bypass-note" style="display:none">「不参与接管」只在「接管 53 端口」模式下生效：该模式由插件自建 nft 规则接管查询，其它模式不经过这些规则。</p>
@@ -361,10 +340,12 @@
 
 			<div class="agh-card" data-subpanel="upstream">
 				<div class="agh-card-head">
-					<h3>上游 DNS</h3>
+					<div class="agh-card-head-left">
+						<h3>上游 DNS</h3>
+						<span class="agh-hint agh-head-note">自动按当前接管方式写入；选择「自定义」后固定使用下面的列表，切换接管方式也不会改。</span>
+					</div>
 					<span id="agh-upstream-msg" class="agh-hint"></span>
 				</div>
-				<p class="agh-hint">自动模式按当前接管方式写入；自定义模式固定使用下面的列表，切换接管方式也不会改。启用自定义后，加密上游预设不会覆盖它。</p>
 				<p id="agh-upstream-lan-note" class="agh-hint agh-hint-warn" hidden></p>
 				<form id="agh-upstream-form" class="agh-form" autocomplete="off">
 					<div class="agh-form-grid">
@@ -384,22 +365,24 @@
 					</div>
 					<div class="agh-form-actions">
 						<button type="submit" id="agh-save-upstream-btn" class="agh-btn agh-btn-primary">保存并应用</button>
-						<span class="agh-hint">会重启 AdGuard Home，约 5-10 秒生效。</span>
+						<span class="agh-hint">保存后重启 AGH，约 5-10 秒生效。</span>
 					</div>
 				</form>
 			</div>
 
 			<div class="agh-card" data-subpanel="upstream">
 				<div class="agh-card-head">
-					<h3>DNS 缓存</h3>
+					<div class="agh-card-head-left">
+						<h3>DNS 缓存</h3>
+						<span class="agh-hint agh-head-note">缓存可减少上游查询，重启服务后清空。</span>
+					</div>
 					<span id="agh-cache-msg" class="agh-hint"></span>
 				</div>
-				<p class="agh-hint">默认开启。缓存可减少上游查询；关闭后 AdGuard Home 不再缓存 DNS 响应。缓存为内存缓存，重启服务后清空。</p>
 				<form id="agh-cache-form" class="agh-form" autocomplete="off">
 					<div class="agh-field agh-field-switch">
 						<div>
 							<label for="agh-set-cache-enabled">启用 DNS 缓存</label>
-							<p class="agh-hint">默认开启；老版本升级会保留当前 AdGuard Home 配置中的状态。</p>
+							<p class="agh-hint">老版本升级会保留当前设置。</p>
 						</div>
 						<span class="agh-switch-state" data-for="agh-set-cache-enabled">已关闭</span>
 						<label class="agh-switch">
@@ -409,7 +392,10 @@
 					</div>
 					<div class="agh-form-grid agh-form-grid-3" id="agh-cache-fields">
 						<div class="agh-field">
-							<label for="agh-set-cache-size">缓存大小</label>
+							<div class="agh-label-row">
+								<label for="agh-set-cache-size">缓存大小</label>
+								<span class="agh-hint">默认 16MB；低配 8/16MB，大内存 64/128MB。</span>
+							</div>
 							<select id="agh-set-cache-size">
 								<option value="8">8 MB</option>
 								<option value="16" selected>16 MB（推荐）</option>
@@ -417,23 +403,20 @@
 								<option value="64">64 MB</option>
 								<option value="128">128 MB</option>
 							</select>
-							<p class="agh-hint">默认 16MB；低配路由器建议 8/16MB，x86 或大内存可选 64/128MB。</p>
 						</div>
 						<div class="agh-field">
-							<label for="agh-set-cache-ttl-min">最小 TTL（秒）</label>
+							<label for="agh-set-cache-ttl-min">最小 TTL（秒，0=不覆盖）</label>
 							<input type="number" id="agh-set-cache-ttl-min" min="0" max="604800" step="1" value="0">
-							<p class="agh-hint">0 = 不覆盖；默认 0 秒。</p>
 						</div>
 						<div class="agh-field">
-							<label for="agh-set-cache-ttl-max">最大 TTL（秒）</label>
+							<label for="agh-set-cache-ttl-max">最大 TTL（秒，0=不限制）</label>
 							<input type="number" id="agh-set-cache-ttl-max" min="0" max="604800" step="1" value="0">
-							<p class="agh-hint">0 = 不限制；默认 0。</p>
 						</div>
 					</div>
 					<div class="agh-field agh-field-switch">
 						<div>
 							<label for="agh-set-cache-optimistic">乐观缓存</label>
-							<p class="agh-hint">默认关闭。开启后缓存过期也会先返回旧记录再后台刷新；Clash fake-IP 环境不建议开启。</p>
+							<p class="agh-hint">过期先返回旧记录再后台刷新；Clash fake-IP 不建议开启。</p>
 						</div>
 						<label class="agh-switch">
 							<input type="checkbox" id="agh-set-cache-optimistic">
@@ -442,17 +425,17 @@
 					</div>
 					<div class="agh-form-actions">
 						<button type="submit" id="agh-save-cache-btn" class="agh-btn agh-btn-primary">保存并应用</button>
-						<span class="agh-hint">与上方设置共用一次应用，约 5-10 秒生效。</span>
+						<span class="agh-hint">保存后重启 AGH，约 5-10 秒生效。</span>
 					</div>
 				</form>
 			</div>
 
 			<div class="agh-card" data-subpanel="upstream">
 				<div class="agh-card-head">
-					<h3>加密上游</h3>
+					<div class="agh-card-head-left"><h3>加密上游</h3><span class="agh-hint agh-head-note">仅在「Clash 前置」模式生效；其它模式的上游是本机 DNSMasq，加密不会生效。</span></div>
 					<span id="agh-crypto-msg" class="agh-hint"></span>
 				</div>
-				<p class="agh-hint">对 AdGuard Home 到真实上游这一段启用 DoH/DoT。仅在「Clash 前置」模式生效；「接管 53」等模式的上游是本机 DNSMasq，加密不会生效。默认关闭。</p>
+				
 				<form id="agh-crypto-form" class="agh-form" autocomplete="off">
 					<div class="agh-form-grid" id="agh-crypto-fields">
 						<div class="agh-field">
@@ -464,7 +447,7 @@
 								<option value="cloudflare">Cloudflare DoH（需代理）</option>
 								<option value="custom">自定义上游</option>
 							</select>
-							<p class="agh-hint">国内推荐阿里或 DNSPod；Cloudflare 在部分网络不可达。</p>
+							<p class="agh-hint">国内推荐阿里或 DNSPod；Cloudflare 部分网络不可达。</p>
 						</div>
 						<div class="agh-field agh-crypto-side">
 							<p class="agh-hint agh-hint-warn" id="agh-crypto-mode-note" style="display:none"></p>
@@ -477,18 +460,21 @@
 					</div>
 					<div class="agh-form-actions">
 						<button type="submit" id="agh-save-crypto-btn" class="agh-btn agh-btn-primary">保存并应用</button>
-						<span class="agh-hint">会重启 AdGuard Home，约 5-10 秒生效。</span>
-						<span class="agh-hint"><b>bootstrap DNS（自动补全）</b>　仅在 bootstrap 为空时补写 223.5.5.5、119.29.29.29，已有值不覆盖。</span>
+						<span class="agh-hint">保存后重启 AGH，约 5-10 秒生效。</span>
 					</div>
+					<details class="agh-details">
+						<summary>bootstrap DNS 说明</summary>
+						<p class="agh-hint">仅在 bootstrap 为空时自动补写 223.5.5.5、119.29.29.29，已有值不覆盖。</p>
+					</details>
 				</form>
 			</div>
 
 			<div class="agh-card" data-subpanel="filters">
 				<div class="agh-card-head">
-					<h3>过滤规则</h3>
+					<div class="agh-card-head-left"><h3>过滤规则</h3><span class="agh-hint agh-head-note">直接管理过滤开关、订阅列表和自定义规则，修改后立即生效，不需要重启。</span></div>
 					<span id="agh-filters-msg" class="agh-hint"></span>
 				</div>
-				<p class="agh-hint">直接管理过滤开关、订阅列表和自定义规则，修改后立即生效，不需要重启。</p>
+				
 
 				<div class="agh-form-grid agh-form-grid-5">
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
@@ -533,7 +519,7 @@
 					</div>
 				</div>
 
-				<h4 class="agh-subhead">订阅 / 规则列表</h4>
+				<div class="agh-subhead-row"><h4 class="agh-subhead">订阅 / 规则列表</h4>
 				<div class="agh-memory-trim">
 					<span class="agh-hint">按设备内存切换规则档位：</span>
 					<div class="agh-seg" id="agh-memory-trim">
@@ -549,7 +535,8 @@
 						<option value="custom">自建备用</option>
 					</select>
 				</div>
-				<p class="agh-hint">预置规则分三档：512MB 订阅 3 个列表，1GB 订阅 4 个，2GB 及以上订阅 5 个，各列表之间已去重。切换档位会移除其它档位的预置列表，白名单和自定义订阅不受影响。内置白名单默认添加但不启用，需要放行时手动开启。下载源可选 jsDelivr（默认）、GitHub 直连或自建备用，切换后已有列表会自动改到新源并立即重新下载；某个源失败时会自动换其它源重试。</p>
+				</div>
+					<p class="agh-hint">预置规则分 512MB / 1GB / 2GB+ 三档，分别 3 / 4 / 6 个列表，档内已去重。切换档位会移除其它档位的预置列表，白名单和自定义订阅不受影响；内置白名单默认不启用，需要时手动开启。切换下载源会自动改源并重新下载，失败时自动换源重试。</p>
 
 				<div id="agh-filter-list" class="agh-rule-list"><div class="agh-empty">读取中...</div></div>
 
@@ -606,7 +593,6 @@
 				<div class="agh-card-head">
 					<h3>修改面板密码</h3>
 				</div>
-				<p class="agh-hint">浏览器本地计算 bcrypt 哈希，保存后自动重启 AdGuard Home。忘记当前密码也可直接用这里重置。</p>
 				<form id="agh-password-form" class="agh-form" autocomplete="off">
 					<div class="agh-form-grid">
 						<div class="agh-field">
@@ -627,10 +613,10 @@
 
 			<div class="agh-card" data-subpanel="svc">
 				<div class="agh-card-head">
-					<h3>统计与日志保留</h3>
+					<div class="agh-card-head-left"><h3>统计与日志保留</h3><span class="agh-hint agh-head-note">控制 AdGuard Home 的统计和查询日志保留时长；保存后会重启服务。</span></div>
 					<span id="agh-retention-msg" class="agh-hint"></span>
 				</div>
-				<p class="agh-hint">控制 AdGuard Home 的统计和查询日志保留时长；保存后会重启服务。</p>
+				
 				<form id="agh-retention-form" class="agh-form" autocomplete="off">
 					<div class="agh-form-grid">
 						<div class="agh-field">
@@ -656,7 +642,7 @@
 					</div>
 					<div class="agh-form-actions">
 						<button type="submit" id="agh-save-retention-btn" class="agh-btn agh-btn-primary">保存并应用</button>
-						<span class="agh-hint">会重启 AdGuard Home，约 5-10 秒生效。</span>
+						<span class="agh-hint">保存后重启 AGH，约 5-10 秒生效。</span>
 					</div>
 				</form>
 			</div>
@@ -692,7 +678,7 @@
 
 			<div class="agh-card is-active" data-logpanel="sys">
 				<div class="agh-card-head">
-					<h3>运行日志</h3>
+					<div class="agh-card-head-left"><h3>运行日志</h3><span class="agh-hint agh-head-note">按类型分区显示：持久化状态、服务操作、订阅更新、系统日志、内核安装/更新；系统日志最新在最前，默认每 5 秒自动刷新。</span></div>
 					<div class="agh-inline">
 						<select id="agh-log-level" class="agh-select">
 							<option value="">全部级别</option>
@@ -707,13 +693,13 @@
 						<button type="button" id="agh-log-download" class="agh-btn agh-btn-secondary agh-small-btn">下载日志</button>
 					</div>
 				</div>
-				<p class="agh-hint">按类型分区显示：持久化状态、服务操作、订阅更新、系统日志、内核安装/更新；系统日志最新在最前，默认每 5 秒自动刷新。</p>
+				
 				<div id="agh-log-box" class="agh-log-sections"><div class="agh-empty">正在读取日志...</div></div>
 			</div>
 
 			<div class="agh-card" data-logpanel="query">
 				<div class="agh-card-head">
-					<h3>查询日志</h3>
+					<div class="agh-card-head-left"><h3>查询日志</h3><span id="agh-querylog-hint" class="agh-hint agh-head-note">来自 AdGuard Home 查询日志；每页 20 条，支持筛选、搜索与翻页。</span></div>
 					<div class="agh-inline">
 						<div class="agh-seg" id="agh-querylog-filter">
 							<button type="button" class="is-active" data-qstatus="">全部</button>
@@ -729,7 +715,7 @@
 						<button type="button" id="agh-querylog-refresh" class="agh-ghost-btn agh-small-btn">刷新</button>
 					</div>
 				</div>
-				<p class="agh-hint" id="agh-querylog-hint">来自 AdGuard Home 查询日志；每页 20 条，支持筛选、搜索与翻页。</p>
+				
 				<table class="agh-query-table">
 					<colgroup>
 						<col class="agh-col-time"><col class="agh-col-client"><col class="agh-col-domain"><col class="agh-col-rule"><col class="agh-col-elapsed"><col class="agh-col-status">
@@ -750,156 +736,90 @@
 		<section class="agh-tab-panel" id="agh-tab-guide">
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>一、初始化配置</h3>
+					<h3>一、三步开始使用</h3>
 				</div>
 				<ol class="agh-guide-list">
-					<li><b>安装内核：</b>在“概览 → 初始化配置”点击“安装/更新内核”，自动识别架构并下载官方最新正式版。</li>
-					<li><b>一键启用：</b>首次启用从内置模板生成配置，默认密码 admin123，默认用“接管 53 端口”。<b>装了 Clash 也可以保持“接管 53 端口”</b>；只有收回规则在你的固件上确实不生效、查询被 Clash 抢走时，才需要改成“Clash 前置”。</li>
-					<li><b>打开 AGH 面板：</b>用概览页显示的地址、账号和默认密码登录 AdGuard Home。</li>
+					<li><b>安装内核：</b>打开「概览 → 初始化配置」，点「安装/更新内核」。默认安装正式版；下载慢或失败时，到「基础设置 → 插件配置」选择 GitHub 反代（推荐 <code>gh-proxy.org</code>）。</li>
+					<li><b>一键启用：</b>回到概览点「一键启用」。插件会生成配置，默认账号 <code>admin</code>、密码 <code>admin123</code>，并默认使用「接管 53 端口」。</li>
+					<li><b>登录面板：</b>点「打开 AGH 面板」，用上面的账号密码登录。第一次登录后请立即修改默认密码。</li>
 				</ol>
-				<p class="agh-hint">国内网络如果下载失败，可在“基础设置 → 插件配置”选择 GitHub 反代（推荐 gh-proxy.org）；反代不可用时自动回退直连。内置规则订阅走 jsDelivr CDN，通常无需反代。</p>
+				<p class="agh-hint"><b>注意：</b>启用会修改路由器的 DNS 设置。公司、宿舍等不允许自行修改 DNS 的网络，请先确认再启用；只想看面板、不改 DNS 时，在「基础设置」选择「仅面板模式」。</p>
 			</div>
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>二、五种 DNS 接管方式，到底选哪个？</h3>
-				</div>
-				<p class="agh-hint">记住一句话：<b>想看到每台设备、让所有域名都先过滤 → 「接管 53 端口」</b>（装了 Clash、开着 DNS 劫持也照样能用）；<b>装了 PassWall → 「PassWall 前置」</b>（不用关 PassWall 的 DNS 劫持）；<b>不想让 AdGuard Home 占 53 端口 → 「Clash 前置」</b>。剩下两种只在特殊情况用。</p>
-				<div class="agh-table-wrap">
-					<table class="agh-table">
-						<thead>
-							<tr><th>你的情况</th><th>该选哪个</th><th>为什么</th></tr>
-						</thead>
-						<tbody>
-							<tr>
-								<td>装了 Clash（DNS 劫持/转发开着），还想看到每台设备</td>
-								<td><b>接管 53 端口</b></td>
-								<td>插件会在 Clash 的劫持之前把设备的 53 查询收回 53，先交给 AdGuard Home 过滤，再经 DNSMasq（1745）→ Clash（7874）分流。</td>
-							</tr>
-							<tr>
-								<td>装了 PassWall（DNS 劫持开着），还想看到每台设备</td>
-								<td><b>PassWall 前置</b></td>
-								<td>插件在 PassWall 的劫持之前把设备的 53 查询收回 53，先交给 AdGuard Home 过滤，剩下的再转给 PassWall 自己的 DNS（从 11400 起的动态端口）做国内外分流。</td>
-							</tr>
-							<tr>
-								<td>没装 Clash</td>
-								<td><b>接管 53 端口</b>（默认）</td>
-								<td>最直接：把 53 交给 AdGuard Home，所有设备默认都走它，过滤和统计都最完整。</td>
-							</tr>
-							<tr>
-								<td>不想让 AdGuard Home 占 53，也不在乎逐设备统计</td>
-								<td><b>Clash 前置</b></td>
-								<td>Clash 先劫持，再把查询交给 AdGuard Home（5335）过滤；面板里来源全是 127.0.0.1，属于正常现象。</td>
-							</tr>
-							<tr>
-								<td>没有程序抢 53，但想让 DNSMasq 继续当入口</td>
-								<td><b>DNSMasq 上游</b></td>
-								<td>DNSMasq 留在 53，收到查询后转给 AdGuard Home（5333）过滤。</td>
-							</tr>
-							<tr>
-								<td>只想看看面板，或 DNS 已经由别的程序管了</td>
-								<td><b>仅面板模式</b></td>
-								<td>完全不动系统的 DNS，只开 13800 管理面板。</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
-				<p class="agh-hint">原来的「Clash 串联」已下线：DNSMasq 会优先用 Clash 写入的上游，查询被 Clash 抢先应答，AdGuard Home 实际收不到，旧配置会自动迁移到「接管 53 端口」。</p>
-				<p class="agh-hint">切换方式时，与当前方式无关的设置会自动置灰：排除接口/客户端只在「接管 53 端口」可用；没装 Clash 时「Clash 前置」不可选；选「DNSMasq 上游」且开着 Clash 会提示上游可能被覆盖。置灰只是禁止修改，已保存的值不会丢。</p>
-			</div>
-
-			<div class="agh-card">
-				<div class="agh-card-head">
-					<h3>三、每种方式的大白话说明</h3>
+					<h3>二、DNS 接管方式怎么选</h3>
 				</div>
 				<ul class="agh-tips">
-					<li><b>接管 53 端口（默认）：</b>相当于把「问路的前台」直接换成 AdGuard Home。设备一上来就问它，它先把广告域名拦掉，剩下的再转交给系统原来的 DNSMasq（被挪到 1745 端口）。<br>
-					<b>什么时候用：</b>想看到每台设备、让所有域名都先过滤；装了 Clash 也推荐这个。<br>
-					<b>要注意：</b>插件会自建一条 nft 规则，把设备的 53 查询在 Clash 劫持之前收回 53；如果这条规则没生效（面板会提示），查询仍可能被 Clash 抢走。<br>
-					<b>不想被接管：</b>访客 WiFi、IoT 网段、旁路由或某台自建 DNS 的设备，可在“基础设置 → 插件配置 → 不参与接管的接口 / 客户端”里排除；这些查询直接交给系统 DNSMasq（1745）应答，不进入 AdGuard Home，也不计入统计。</li>
-					<li><b>DNSMasq 上游：</b>前台还是 DNSMasq，但它不再自己查，而是把所有查询转给 AdGuard Home（5333）过滤。<br>
-					<b>什么时候用：</b>你不想让 AdGuard Home 占用 53 端口，同时又没有程序抢 53。<br>
-					<b>要注意：</b>Clash 开着 DNS 劫持时不要用。</li>
-					<li><b>Clash 前置：</b>设备先被 Clash 的劫持规则拉进 Clash 的 DNS（7874），Clash 再把域名丢给 AdGuard Home（5335）过滤，AdGuard Home 最后去问运营商/公共 DNS。<br>
-					<b>什么时候用：</b>不想让 AdGuard Home 占 53 端口，或者只关心过滤、不在乎每台设备各自的统计。<br>
-					<b>要注意：</b>Clash 内核必须运行；插件会自动把 Clash 的上游改成 127.0.0.1:5335，Clash 重启或「一键设置」后如果失效，回来重新保存一次即可。这个模式下面板里看到的来源都是 Clash（127.0.0.1），看不到每台设备的名字，属于正常现象。</li>
-					<li><b>PassWall 前置：</b>设备查询先被插件收回 53 交给 AdGuard Home 过滤，剩下的再交给 PassWall 自己的 DNS 做国内外分流；PassWall 的 DNS 劫持保持开启即可，不需要关闭。<br>
-					<b>什么时候用：</b>已经在用 PassWall 做分流，又想保留 AdGuard Home 的过滤与逐设备统计。<br>
-					<b>要注意：</b>插件按 PassWall 运行时端口自动设置上游（默认从 11400 起分配），PassWall 重启后如果换了端口，回来重新保存一次设置即可；该模式不支持“不参与接管”的接口/客户端排除，排除的设备会直接走 PassWall。</li>
-					<li><b>仅面板模式：</b>什么 DNS 都不改，只把 13800 面板开起来。<br>
-					<b>什么时候用：</b>只想先看看界面，或者你已经有别的 DNS 方案（比如另一台软路由）。</li>
+					<li><b>大多数家庭：</b>选「接管 53 端口」（默认，推荐）。装了 Clash、开着 DNS 劫持也能用，过滤和逐设备统计最完整。</li>
+					<li><b>正在用 PassWall：</b>选「PassWall 前置」，不需要关闭 PassWall 的 DNS 劫持。PassWall 重启后如果换了 DNS 端口，回插件重新保存一次设置即可。</li>
+					<li><b>不想让 AdGuard Home 占 53：</b>可选「Clash 前置」（需要 Clash 正在运行，面板来源都会显示 127.0.0.1，属于正常现象）或「DNSMasq 上游」（DNSMasq 继续当入口；Clash 开着 DNS 劫持时不要用）。</li>
+					<li><b>只想先看看面板：</b>选「仅面板模式」，完全不改系统 DNS。</li>
 				</ul>
-				<p class="agh-hint">切换方式时，插件会先把 DNSMasq 恢复成你原来的设置，再按新方式配置，所以来回切换不会越配越乱。停止服务或卸载插件也会自动恢复。</p>
-			</div>
-
-			<div class="agh-card">
-				<div class="agh-card-head">
-					<h3>四、插件里可以直接做的事</h3>
-				</div>
+				<p class="agh-hint agh-mt-8"><b>注意：</b>启用后常见的几种情况。</p>
 				<ul class="agh-tips">
-					<li><b>基础设置 → 插件配置：</b>启用/停止服务、DNS 接管方式、管理面板端口、内核安装位置与更新通道、GitHub 反代、数据工作目录、不参与接管的接口 / 客户端；下方同时提供面板密码修改和统计与日志保留（按天设置，保存后重启生效）。</li>
-					<li><b>基础设置 → DNS 解析：</b>上游 DNS 可选“自动（按接管方式）”或“自定义”；自定义支持 IP、<code>tls://</code>、<code>https://</code>、<code>quic://</code> 以及 <code>[/域名/]IP</code> 条件转发。DNS 缓存可设 8～128MB、最小/最大 TTL 和乐观缓存；加密上游（DoH/DoT/DoQ）只在“Clash 前置”模式生效。</li>
-					<li><b>基础设置 → 过滤规则：</b>总开关控制全部订阅与自定义规则是否生效；成人内容拦截（HaGeZi NSFW）、家长控制、安全搜索、浏览安全可一键启停；订阅支持添加、启停、删除，列表类型选“白名单（放行）”即作为白名单使用；预置规则按设备内存分 512MB / 1GB / 2GB+ 三档（分别 3 / 4 / 6 个分类列表，档内已去重），切换档位会自动移除其它档位的列表并清理已下线分类，白名单和自定义订阅不受影响；内置白名单默认添加但不启用，需要放行时手动开启；自定义规则支持 <code>@@</code> 白名单语法。以上修改立即生效，不需要重启；切换下载源会立即重新下载已有列表。</li>
-					<li><b>拦截 DoH 服务器：</b>自定义规则输入框右侧的开关，一键写入 9 条常见加密 DNS（<code>dns.google</code>、<code>cloudflare-dns.com</code>、<code>dns.quad9.net</code>、<code>doh.pub</code> 等）的拦截规则，防止浏览器和应用用加密 DNS 绕过 AdGuard Home；关闭时按域名移除，裸域名与 <code>||domain^</code> 两种写法都会清理干净。</li>
-					<li><b>概览 → DNS 自检：</b>点“开始检测”只读检查内核文件、进程、13800 面板端口和本机 53 查询链路，不修改任何配置；失败项会直接给出原因，保存设置或切换接管方式后可先用它确认。</li>
-					<li><b>运行日志：</b>按类型分区显示，从上到下依次是「持久化状态（上次应用 / 内核更新 / DNS 回退结果）」「服务操作日志」「订阅更新日志（保留最近 100 次）」「系统日志」「内核安装/更新日志」；系统日志最新的排在最前，默认每 5 秒自动刷新，可关闭，也支持手动刷新与下载；级别可选“全部 / 仅错误 / 仅警告”，每条记录带原因码（如 <code>dns_hijack_conflict</code>、<code>core_integrity_failed</code>）。旁边的“查询日志”子页支持「全部 / 已拦截 / 已放行」筛选、按域名或设备搜索、每页 20 条翻页，每条显示命中的规则与所属订阅。</li>
-					<li><b>概览 → 版本与在线更新：</b>标题下显示当前版本，点版本号可立即检查更新；发现新版本可在页内更新（国内加速 / GitHub 直连，通用模式 / 安装包），也支持强制重装与指定版本降级，更新前自动备份 UCI 配置。</li>
-					<li><b>高级配置：</b>直接编辑 <code>/etc/AdGuardHome.yaml</code>，保存前自动执行 <code>--check-config</code>，校验失败不覆盖原文件，并保留 <code>.bak</code> 备份。</li>
-					<li><b>概览：</b>过滤统计（DNS 查询、已拦截、恶意/钓鱼、成人内容）直接取自 AdGuard Home 统计接口，可用“清空统计”重置；服务停止时数值显示“-”。右上角可切换暗色 / 浅色主题；检测到旧插件或旧内核时会显示清理卡片，清理前先备份。</li>
-				</ul>
-				<p class="agh-hint">「接管 53 端口」下自定义上游会绕过本机 DNSMasq（1745），<code>xxx.lan</code> 等本地主机名将无法解析；需要保留本地解析时，请在自定义列表末尾加上 <code>127.0.0.1:1745</code>。</p>
-			</div>
-
-			<div class="agh-card">
-				<div class="agh-card-head">
-					<h3>五、仍需在 AdGuard Home 面板设置的</h3>
-				</div>
-				<ul class="agh-tips">
-					<li><b>客户端设置：</b>“设置 → 客户端设置”，给设备命名、按设备单独指定上游或过滤规则。</li>
-					<li><b>家长控制：</b>「基础设置 → 过滤规则」已有开关，也可在“设置 → 常规设置 → 附加过滤器”调整；命中计入概览里的“成人内容（家长控制）”。</li>
-					<li><b>阻止服务：</b>“设置 → 常规设置”，可整块屏蔽抖音、游戏平台等服务。</li>
-					<li><b>DNSSEC、fallback、上游模式：</b>“设置 → DNS 设置”；插件只在首次生成配置时写入默认值，之后以面板为准。</li>
-					<li><b>详细统计：</b>“仪表盘”提供时间维度图表与更细的分类统计；插件里的「查询日志」只做筛选、搜索与翻页，查询的完整响应详情仍在 AdGuard Home 面板查看。</li>
-				</ul>
-				<p class="agh-hint">插件里的开关与 AdGuard Home 面板修改的是同一份配置，两边都能改，以最后一次保存为准。</p>
-			</div>
-
-			<div class="agh-card">
-				<div class="agh-card-head">
-					<h3>六、常见问题</h3>
-				</div>
-				<ul class="agh-tips">
-					<li><b>出问题怎么定位：</b>先在概览点“开始检测”，DNS 自检会逐项检查内核、进程、面板端口和本机 53 查询链路；再到“运行日志”把级别切到“仅错误”，错误行都带原因码，反馈时附上这几行即可。</li>
-					<li><b>面板打不开：</b>确认服务处于“运行中”；停止服务时面板也会关闭。</li>
-					<li><b>启用后不能上网：</b>点击“停止并关闭自启”，插件会恢复 DNSMasq 原始设置。</li>
-					<li><b>13800 打不开：</b>等待 5-10 秒；确认 UCI 端口和配置一致；旧安装需手动改成 13800。</li>
-					<li><b>忘记密码：</b>“基础设置 → 插件配置”。</li>
-					<li><b>升级固件后：</b>配置会保留，内核需重新安装。</li>
-					<li><b>「恶意/钓鱼」「成人内容」一直是 0：</b>「恶意/钓鱼」依赖「浏览安全」；「成人内容」只统计 AdGuard Home 原生家长控制，插件自带的「成人内容拦截」命中会计入「已拦截」。安全浏览依赖境外在线服务，开启后如果解析明显变慢，请把它关掉。</li>
-					<li><b>广告拦不住：</b>先确认 DNS 接管方式对不对（推荐「接管 53 端口」，并确认面板没有提示劫持绕过）；能过滤的是广告域名，抖音、微信、爱奇艺这类“同一个 App 自己域名里的广告”DNS 拦不了，需要客户端级方案；如果设备用 DoH/DoT 加密 DNS 绕过了路由器，打开「拦截 DoH 服务器」开关。</li>
+					<li><b>接管失效：</b>插件会从 Clash 等程序手里抢回 53 端口；如果概览提示接管失效或查询被 Clash 抢走，重新保存一次设置即可。</li>
+					<li><b>来回切换：</b>切换接管方式时，插件会先把 DNSMasq 恢复成你原来的设置，不会越切越乱。</li>
+					<li><b>排除接口 / 客户端：</b>只在「接管 53 端口」下可用。被排除的设备查询路由器 DNS 时由 DNSMasq 直接应答，不计入 AdGuard Home 统计；设备自己指定外部 DNS 的查询不受影响。多个客户端用空格分隔，支持单个 IP、网段（CIDR）和 IPv6。</li>
 				</ul>
 			</div>
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>七、开机启动顺序（不用手动干预）</h3>
+					<h3>三、平时常用的功能</h3>
 				</div>
 				<ul class="agh-tips">
-					<li><b>顺序：</b>DNSMasq（START=19）→ AdGuard Home（START=95）→ Clash（START=99）。</li>
-					<li><b>为什么这样排：</b>先让 DNSMasq 起来（接管 53 时它在 1745 提供本地解析），再让 AdGuard Home 占好 53/5335，最后才启动 Clash 去劫持 53 并把上游交给 AdGuard Home。这样开机过程中每个环节的端口都已就绪，不会出现「Clash 先起来、AdGuard Home 还没监听」导致解析失败。</li>
-					<li><b>你不需要做什么：</b>安装或启用插件时，`/etc/init.d/adguardhome_lite` 已注册为 START=95、STOP=01，开机自动按上述顺序执行。</li>
+					<li><b>概览：</b>看 DNS 查询、拦截数量和服务状态；「DNS 自检」可检查内核、进程、面板端口和本机 DNS 是否正常。</li>
+					<li><b>过滤规则：</b>开关安全搜索、家长控制、成人内容拦截，管理订阅和自定义规则，修改后立即生效。</li>
+					<li><b>运行日志：</b>出问题先看这里；可筛选错误、查看内核更新日志和查询日志。</li>
+					<li><b>版本更新：</b>点顶部的版本号检查更新，发现新版可在页面内升级；升级前会自动备份配置。</li>
+				</ul>
+				<p class="agh-hint"><b>建议：</b>开启「拦截 DoH 服务器」，防止浏览器或 App 使用加密 DNS 绕过过滤；设备自己开了「私人 DNS / DoH」时，过滤不会生效。</p>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>四、必须注意的事项</h3>
+				</div>
+				<ul class="agh-tips">
+					<li><b>改默认密码：</b>默认账号 <code>admin</code>、密码 <code>admin123</code>，首次登录后请修改。</li>
+					<li><b>面板端口：</b>默认 <code>13800</code>；53、1745、5333、5335 已被 DNS 相关服务占用，不能填。不要把面板端口映射到公网。</li>
+					<li><b>内核更新通道：</b>正式版装最新正式发布；预发布版装 GitHub 上的预览版（可能不稳定）；旧版本装上一代正式版（老配置兼容用，例如正式版已到 v1.x 时装 v0.107.x）。每次更换内核前会自动备份配置。</li>
+					<li><b>GitHub 反代：</b>下载内核、检查插件与内核更新、在线升级都会用到；关闭后全部直连。国内下载慢时推荐 <code>gh-proxy.org</code>。</li>
+					<li><b>数据工作目录：</b>默认「内置存储」，重启后统计保留；改到「内存临时」可减少闪存写入，但重启后统计清空。</li>
+					<li><b>本地域名：</b>「接管 53 端口」下使用自定义上游会绕过本机 DNSMasq，<code>xxx.lan</code> 等本地域名将无法解析；需要保留时，在自定义上游末尾加上 <code>127.0.0.1:1745</code>。</li>
+					<li><b>内核位置：</b>内核装在「内存临时」时重启后会消失，需要重新安装；长期使用建议选「内置存储」。</li>
+					<li><b>固件升级后：</b>配置会保留，但内核需要重新安装；DNS 接管设置可能被重置，重新保存一次即可。</li>
+					<li><b>停止与卸载：</b>停止服务或卸载插件会自动恢复 DNSMasq 原始设置；启用后如果无法上网，先在概览点「停止并关闭自启」。</li>
+					<li><b>避免冲突：</b>「接管 53 端口」会调整 DNSMasq，请确认没有其它 DNS 服务同时占用 53 端口。</li>
+					<li><b>能拦什么：</b>DNS 过滤只能拦广告域名；抖音、微信等 App 内同域名广告需要客户端级方案。恶意/钓鱼统计依赖「浏览安全」（境外服务，开启后解析变慢可关闭）；成人内容统计只计算 AdGuard Home 原生家长控制。</li>
 				</ul>
 			</div>
 
 			<div class="agh-card">
 				<div class="agh-card-head">
-					<h3>八、安全提示</h3>
+					<h3>五、出问题怎么办</h3>
 				</div>
 				<ul class="agh-tips">
-					<li>AdGuard Home 面板默认对局域网开放，请勿把 13800 映射到公网。</li>
-					<li>默认密码 admin123，建议首次登录后修改。</li>
-					<li>接管 53 端口会调整 DNSMasq，请确认没有其他 DNS 服务冲突。</li>
+					<li><b>启用后不能上网：</b>概览 →「停止并关闭自启」，会恢复 DNSMasq 原始设置；仍异常可重启路由器。</li>
+					<li><b>面板打不开：</b>先确认服务是「运行中」；停止服务时 13800 面板也会关闭。刚启动可等 5～10 秒再试，并确认端口没有被其它程序占用。</li>
+					<li><b>广告拦不住：</b>确认用的是「接管 53 端口」；检查设备是否开了 DoH / 私人 DNS；必要时开启「拦截 DoH 服务器」。</li>
+					<li><b>忘记密码：</b>「基础设置 → 插件配置」可直接重设，不需要旧密码。</li>
+					<li><b>反馈问题：</b>先点概览的「开始检测」，再到「运行日志」筛选「仅错误」，附上带原因码的错误行。</li>
 				</ul>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>六、这些设置仍在 AdGuard Home 面板</h3>
+				</div>
+				<ul class="agh-tips">
+					<li><b>客户端设置：</b>给设备命名、按设备单独指定上游或过滤规则。</li>
+					<li><b>家长控制与阻止服务：</b>可屏蔽抖音、游戏平台等整类服务。</li>
+					<li><b>DNSSEC、fallback、上游模式：</b>在「设置 → DNS 设置」调整。</li>
+					<li><b>详细统计：</b>时间图表和更细分类在 AGH 面板的「仪表盘」；插件里只显示主要数字。</li>
+				</ul>
+				<p class="agh-hint">插件和 AGH 面板修改的是同一份配置，两边都能改，以最后一次保存为准。</p>
 			</div>
 		</section>
 		</main>

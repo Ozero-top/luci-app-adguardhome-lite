@@ -842,9 +842,21 @@
 		return Number(value).toLocaleString('zh-CN');
 	}
 
+	// 统计异常提示：正常时隐藏，不占卡片高度
+	function setStatsAlert(text) {
+		var el = $('agh-stats-alert');
+		if (!el) return;
+		if (text) {
+			el.textContent = text;
+			el.hidden = false;
+		} else {
+			el.textContent = '';
+			el.hidden = true;
+		}
+	}
+
 	// 统计随 /status 一起返回，这里只负责渲染，避免额外请求
 	function renderStats(d, status) {
-		var hint = $('agh-stats-hint');
 		var keys = {
 			queries: 'agh-stat-queries',
 			blocked: 'agh-stat-blocked',
@@ -856,11 +868,9 @@
 				var el = $(keys[k]);
 				if (el) el.textContent = '-';
 			});
-			if (hint) {
-				hint.textContent = (status && !status.running)
-					? '服务未运行，暂无可统计。'
-					: ((d && d.error) ? d.error : '统计读取失败。');
-			}
+			setStatsAlert(status && status.running === false
+				? '服务未运行，暂无统计数据。'
+				: ((d && d.error) || '统计读取失败。'));
 			return;
 		}
 		Object.keys(keys).forEach(function (k) {
@@ -876,19 +886,8 @@
 		if (updated) {
 			updated.textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
 		}
-		if (hint) {
-			var tips = [];
-			if (d.protection === false) tips.push('防护已关闭');
-			if (d.safebrowsing === false) tips.push('未开启安全浏览，「恶意/钓鱼」会一直是 0（它依赖境外在线服务，开启后若解析变慢请关闭）');
-			if (d.adult_filter) {
-				tips.push('成人规则已启用，命中数计入「已拦截」');
-			} else if (d.parental === false) {
-				tips.push('未开启成人内容拦截，「成人内容」会一直是 0');
-			}
-			hint.textContent = tips.length
-				? tips.join('；') + '，可到 AdGuard Home 面板开启。'
-				: '数据来自 AdGuard Home 统计接口，每 10 秒随状态自动刷新。';
-		}
+		// 只有影响统计的异常才提示：防护关闭时数字不会继续增长
+		setStatsAlert(d.protection === false ? '防护已关闭，统计数据不会更新；开启防护后恢复。' : '');
 	}
 
 	async function refreshStatus(silent) {
@@ -914,7 +913,7 @@
 			await apiPost(U.statsClear, {});
 			showToast('统计数据已清空', 'ok');
 		} catch (err) {
-			handleApiError(err, $('agh-stats-hint'));
+			handleApiError(err);
 		} finally {
 			if (btn) btn.disabled = false;
 			refreshStatus(true);
@@ -1879,7 +1878,11 @@
 		if (custom) {
 			custom.disabled = !on;
 			var field = custom.closest ? custom.closest('.agh-field') : null;
-			if (field) field.classList.toggle('is-locked', !on);
+			if (field) {
+				// 自动模式下这一栏没有作用，直接隐藏，避免空白大输入框占位
+				field.hidden = !on;
+				field.classList.toggle('is-locked', !on);
+			}
 		}
 
 		// 接管 53 模式下 AGH 的上游就是本机 DNSMasq(1745)，
@@ -1937,11 +1940,9 @@
 		var text = '';
 		if (value !== 'custom') {
 			if (!on) {
-				text = '当前 DNS 接管方式不是「Clash 前置」，加密上游不可修改；切换到「Clash 前置」后才能开启。';
+				text = '需切换到「Clash 前置」后才能使用。';
 			} else if (value !== 'off' && state.cryptoBlocked) {
 				text = '检测到自定义上游 DNS，加密预设不会生效；请在「DNS 解析 → 上游 DNS」把来源改回「自动」。';
-			} else if (value !== 'off') {
-				text = '当前为「Clash 前置」模式，保存后加密上游生效。';
 			}
 		}
 		note.textContent = text;

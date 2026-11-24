@@ -330,6 +330,20 @@ code {
 	margin-bottom: 12px;
 }
 
+/* 卡片标题旁的一句话说明：与标题同组，消息仍靠右 */
+.agh-card-head-left {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	flex-wrap: wrap;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.agh-card-head-left h3 {
+	margin: 0;
+}
+
 .agh-card-head h3 {
 	margin: 0;
 	font-size: 16px;
@@ -476,6 +490,19 @@ code {
 	color: #324a2c;
 }
 
+/* 步骤标题与其说明同一行，窄屏自动换行 */
+.agh-step-title-row {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 8px;
+}
+
+.agh-step-title-row .agh-step-title {
+	margin-bottom: 0;
+}
+
 .agh-step-body p {
 	margin: 0 0 10px;
 	color: var(--agh-muted);
@@ -486,6 +513,26 @@ code {
 	align-items: center;
 	gap: 8px;
 	flex-wrap: wrap;
+}
+
+/* 统计异常提示：正常时不占位，只在服务未运行/防护关闭/读取失败时出现 */
+.agh-stats-alert {
+	margin: 8px 0 0;
+}
+
+/* 折叠的补充说明：默认收起，需要时展开 */
+.agh-details {
+	margin-top: 10px;
+}
+
+.agh-details summary {
+	cursor: pointer;
+	color: var(--agh-muted);
+	font-size: 11.5px;
+}
+
+.agh-details p {
+	margin: 6px 0 0;
 }
 
 .agh-hint {
@@ -658,6 +705,11 @@ code {
 	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 	gap: 14px 16px;
 	align-items: start;
+}
+
+/* 去掉字段说明后的紧凑表单：保留列间距，只压缩行间距 */
+.agh-form-grid.agh-form-grid-tight {
+	row-gap: 10px;
 }
 
 /* 基础设置固定三列，排成整齐的两行 */
@@ -857,6 +909,19 @@ code {
 	font-weight: 700;
 	margin-bottom: 6px;
 	color: #324a2c;
+}
+
+/* 字段标签与简短说明同一行 */
+.agh-label-row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-bottom: 6px;
+}
+
+.agh-field .agh-label-row label {
+	margin-bottom: 0;
 }
 
 .agh-field > .agh-hint { margin: 6px 0 0; }
@@ -1175,6 +1240,23 @@ code {
 	margin: 16px 0 8px;
 	font-size: 13px;
 	color: var(--agh-text);
+}
+
+/* 小标题与档位/下载源工具条同一行，窄屏自动换行 */
+.agh-subhead-row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin: 16px 0 8px;
+}
+
+.agh-subhead-row .agh-subhead {
+	margin: 0;
+}
+
+.agh-subhead-row .agh-memory-trim {
+	margin-top: 0;
 }
 
 .agh-rule-list {

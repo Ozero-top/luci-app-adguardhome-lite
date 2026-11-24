@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.12-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.12-2_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.12-1` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.12-2` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.12-1 -m https://gh-proxy.org
+sh install.sh -v 1.3.12-2 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -217,7 +217,7 @@ sh install.sh -v 1.3.12-1 -m https://gh-proxy.org
 
 - 面板：`0.0.0.0:13800`，账号 `admin` / `admin123`（首次登录建议修改）
 - DNS：默认「接管 53 端口」，DNSMasq 移到 `1745`，上游 `127.0.0.1:1745`
-- 过滤规则：按内存自动选档（512MB 3 个 / 1GB 4 个 / 2GB+ 5 个分类列表，档内已去重），白名单默认添加但不启用
+- 过滤规则：按内存自动选档（512MB 3 个 / 1GB 4 个 / 2GB+ 6 个分类列表，档内已去重），白名单默认添加但不启用
 - 日志与统计：保留 30 天，查询日志只存内存不写闪存
 - DNS 缓存：开启，16MB，最小 TTL 0，乐观缓存关闭；可在「基础设置 → DNS 解析」修改
 - 加密上游：默认关闭，仅「Clash 前置」可开启（阿里 / DNSPod / Cloudflare DoH 或自定义）
@@ -483,11 +483,19 @@ make package/luci-app-adguardhome-lite/compile V=s
 
 - [安装与使用说明](docs/安装与使用说明.md)：安装验证清单、DNS 接管详解、Clash 排查、卸载回滚与常见问题。
 - [预置规则仓库](https://github.com/Ozero-top/AdguardHome-Rrules)：每 7 天自动抓取、去重、重分类的三档订阅，产物发布于 `dist` 分支。
-- 插件内「使用引导」标签包含三步说明与常见问题入口。
+- 插件内「使用说明」标签包含三步上手、接管方式选择、注意事项与常见问题。
 
 ---
 
 ## 更新日志
+
+### 1.3.12-2
+
+- **界面更紧凑**：各卡片的说明文字移到标题同行；概览「DNS 自检」调整到「初始化配置」之后
+- **说明更清楚**：使用说明补充面板端口限制、内核通道与反代、数据工作目录、排除接口 / 客户端的实际效果
+- **文案修正**：过滤规则档位说明改为 2GB+ 6 个列表
+- **Android App**：本次无改动，继续沿用 1.3.12-1 安装包（versionCode 18）
+- **升级提示**：本次只有界面与文档优化，功能不变，按需升级即可
 
 ### 1.3.12-1
 
