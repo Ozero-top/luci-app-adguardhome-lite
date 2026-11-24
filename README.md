@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.11-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.11-2_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.11-1` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.11-2` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.11-1 -m https://gh-proxy.org
+sh install.sh -v 1.3.11-2 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -487,6 +487,11 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.11-2
+
+- **DNS 劫持兼容**：部分 25.12 固件（KuWrt / iStoreOS）的 DNSMasq 内置「DNS 劫持」（`dns_redirect`）优先级高于插件接管规则，会把客户端查询直接送到 1745 的 DNSMasq，导致「接管 53」下过滤失效；现在启用「接管 53」「PassWall 前置」时自动关闭并记录，停止、切换或卸载时恢复原值
+- **Android App**：功能无变化，沿用 `1.3.10-1` 安装包
 
 ### 1.3.11-1
 

@@ -136,6 +136,7 @@ cancel_dns_mode_apply() {
     log_msg "$1"
     restore_original
     dhcp_option_restore
+    dns_redirect_restore
     uci -q set "$CONF.main.mode_applied=none"
     uci -q commit "$CONF" 2>/dev/null
     return 1
@@ -214,6 +215,31 @@ dhcp_option_restore() {
     uci -q commit dhcp 2>/dev/null
     uci -q commit "$CONF" 2>/dev/null
     log_msg "已移除插件自动下发的 DNS（$_added）。"
+}
+
+# KuWrt / iStoreOS 25.12 的 DNSMasq 内置「DNS 劫持」（dns_redirect=1）会以 -105 优先级
+# 把所有 53 查询送到 DNSMasq(1745)，抢在接管规则之前，导致客户端查询绕过 AdGuard Home。
+# 接管 53 / PassWall 前置时关闭它并记录，停止/切换/卸载时还原。
+dns_redirect_disable() {
+    [ "$(get_uci dhcp.@dnsmasq[0].dns_redirect)" = "1" ] || return 0
+    uci -q set "$CONF.main.added_dns_redirect=1"
+    uci -q set dhcp.@dnsmasq[0].dns_redirect=0
+    uci -q commit dhcp 2>/dev/null
+    uci -q commit "$CONF" 2>/dev/null
+    log_msg "已关闭 DNSMasq 内置的 DNS 劫持（dns_redirect），避免客户端查询绕过 AdGuard Home。"
+    restart_dnsmasq
+    sleep 1
+}
+
+dns_redirect_restore() {
+    [ "$(get_uci "$CONF.main.added_dns_redirect")" = "1" ] || return 0
+    uci -q set dhcp.@dnsmasq[0].dns_redirect=1
+    uci -q delete "$CONF.main.added_dns_redirect"
+    uci -q commit dhcp 2>/dev/null
+    uci -q commit "$CONF" 2>/dev/null
+    log_msg "已恢复 DNSMasq 内置的 DNS 劫持（dns_redirect）。"
+    restart_dnsmasq
+    sleep 1
 }
 
 # 接管 53 端口模式：Clash 的 DNS 劫持会把设备的 53 查询直接拽到 DNSMasq（1745），
@@ -471,8 +497,14 @@ apply_mode() {
     # DNSMasq 在 1745 时不会自动下发 DNS，需要给 LAN 的 DHCP 补 option 6；
     # 不再接管时只撤掉插件自己补的那条。
     case "$dns_mode" in
-        takeover|passwall) dhcp_option_add ;;
-        *) dhcp_option_restore ;;
+        takeover|passwall)
+            dhcp_option_add
+            dns_redirect_disable
+            ;;
+        *)
+            dhcp_option_restore
+            dns_redirect_restore
+            ;;
     esac
 
     if mode_is_applied; then
@@ -709,6 +741,7 @@ revert_mode() {
 
     # 只移除插件自己补的 DHCP DNS 下发，用户手动配置的保持不动
     dhcp_option_restore
+    dns_redirect_restore
 
     if [ "$_applied" = "clashfirst" ]; then
         clashfirst_openclash_restore
@@ -775,6 +808,8 @@ show_status() {
     echo "dnsmasq_server=$(get_uci dhcp.@dnsmasq[0].server)"
     echo "lan_dhcp_option=$(get_uci dhcp.lan.dhcp_option)"
     echo "added_dhcp_option=$(get_uci "$CONF.main.added_dhcp_option")"
+    echo "dnsmasq_dns_redirect=$(get_uci dhcp.@dnsmasq[0].dns_redirect)"
+    echo "added_dns_redirect=$(get_uci "$CONF.main.added_dns_redirect")"
     echo "clash_dns_port=$clash_dns_port"
     echo "openclash_hijack_port=$(openclash_hijack_port)"
     echo "openclash_redirect=$(get_uci openclash.config.enable_redirect_dns)"
