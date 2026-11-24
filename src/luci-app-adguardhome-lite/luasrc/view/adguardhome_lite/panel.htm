@@ -30,7 +30,7 @@
 			background: #141517;
 		}
 	</style>
-	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126d">
+	<link rel="stylesheet" href="<%=resource%>/adguardhome-lite/panel.css?v=20261126h">
 	<script>
 		window.AGH = {
 			token: "<%=_token%>",
@@ -381,8 +381,7 @@
 				<form id="agh-cache-form" class="agh-form" autocomplete="off">
 					<div class="agh-field agh-field-switch">
 						<div>
-							<label for="agh-set-cache-enabled">启用 DNS 缓存</label>
-							<p class="agh-hint">老版本升级会保留当前设置。</p>
+							<div class="agh-label-row"><label for="agh-set-cache-enabled">启用 DNS 缓存</label><span class="agh-hint">老版本升级会保留当前设置。</span></div>
 						</div>
 						<span class="agh-switch-state" data-for="agh-set-cache-enabled">已关闭</span>
 						<label class="agh-switch">
@@ -415,8 +414,7 @@
 					</div>
 					<div class="agh-field agh-field-switch">
 						<div>
-							<label for="agh-set-cache-optimistic">乐观缓存</label>
-							<p class="agh-hint">过期先返回旧记录再后台刷新；Clash fake-IP 不建议开启。</p>
+							<div class="agh-label-row"><label for="agh-set-cache-optimistic">乐观缓存</label><span class="agh-hint">过期先返回旧记录再后台刷新；Clash fake-IP 不建议开启。</span></div>
 						</div>
 						<label class="agh-switch">
 							<input type="checkbox" id="agh-set-cache-optimistic">
@@ -483,7 +481,6 @@
 							<span class="agh-switch-state" data-for="agh-filter-enabled" data-on="已生效" data-off="未生效">未生效</span>
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-enabled"><span></span></label>
 						</div>
-						<p class="agh-hint">关闭后下方所有订阅和自定义规则停止生效，规则本身保留。</p>
 					</div>
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
@@ -491,7 +488,6 @@
 							<span class="agh-switch-state" data-for="agh-filter-adult">已关闭</span>
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-adult"><span></span></label>
 						</div>
-						<p class="agh-hint">追加或移除 HaGeZi NSFW 订阅，命中计入「已拦截」；与「家长控制」互斥，开启会关闭家长控制。</p>
 					</div>
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
@@ -499,7 +495,6 @@
 							<span class="agh-switch-state" data-for="agh-filter-parental">已关闭</span>
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-parental"><span></span></label>
 						</div>
-						<p class="agh-hint">内置家长控制，需能访问 AdGuard 服务端；连不上会自动关闭避免断网；与成人内容拦截互斥。</p>
 					</div>
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
@@ -507,7 +502,6 @@
 							<span class="agh-switch-state" data-for="agh-filter-safesearch">已关闭</span>
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-safesearch"><span></span></label>
 						</div>
-						<p class="agh-hint">强制搜索引擎启用安全搜索。</p>
 					</div>
 					<div class="agh-field agh-field-switch agh-field-switch-stack">
 						<div class="agh-switch-head">
@@ -515,7 +509,6 @@
 							<span class="agh-switch-state" data-for="agh-filter-safebrowsing">已关闭</span>
 							<label class="agh-switch"><input type="checkbox" id="agh-filter-safebrowsing"><span></span></label>
 						</div>
-						<p class="agh-hint">拦截恶意软件和钓鱼站点。</p>
 					</div>
 				</div>
 
@@ -657,16 +650,12 @@
 						<button type="button" id="agh-yaml-save" class="agh-btn agh-btn-primary agh-small-btn">校验并保存</button>
 					</div>
 				</div>
-				<p class="agh-hint">
-					直接编辑 AdGuard Home 官方配置文件 <code id="agh-yaml-path">/etc/AdGuardHome.yaml</code>。
-					保存前会调用官方 <code>--check-config</code> 校验，失败不会覆盖原文件；每次保存保留 <code>.bak</code> 备份。
-				</p>
-				<p class="agh-hint">过滤器、上游 DNS、家长控制等大部分功能可以直接在 AdGuard Home 面板中设置，通常不需要修改本页。</p>
 				<textarea id="agh-yaml-editor" class="agh-code" spellcheck="false" placeholder="正在加载配置..."></textarea>
 				<div class="agh-form-actions">
 					<span id="agh-yaml-msg" class="agh-hint"></span>
 					<span id="agh-yaml-count" class="agh-hint agh-ml-auto"></span>
 				</div>
+				<p class="agh-hint agh-mt-8">这里改 AGH 官方配置文件 <code id="agh-yaml-path">/etc/AdGuardHome.yaml</code>。保存前自动校验，不通过不覆盖原文件；每次保存 <code>.bak</code> 备份。过滤规则、上游 DNS 等设置建议在插件或 AGH 面板修改，不建议手动修改！</p>
 			</div>
 		</section>
 
@@ -770,11 +759,25 @@
 				</div>
 				<ul class="agh-tips">
 					<li><b>概览：</b>看 DNS 查询、拦截数量和服务状态；「DNS 自检」可检查内核、进程、面板端口和本机 DNS 是否正常。</li>
-					<li><b>过滤规则：</b>开关安全搜索、家长控制、成人内容拦截，管理订阅和自定义规则，修改后立即生效。</li>
+					<li><b>过滤规则：</b>5 个过滤开关、订阅列表和自定义规则都在这里，修改后立即生效，具体见下一节。</li>
 					<li><b>运行日志：</b>出问题先看这里；可筛选错误、查看内核更新日志和查询日志。</li>
 					<li><b>版本更新：</b>点顶部的版本号检查更新，发现新版可在页面内升级；升级前会自动备份配置。</li>
 				</ul>
 				<p class="agh-hint"><b>建议：</b>开启「拦截 DoH 服务器」，防止浏览器或 App 使用加密 DNS 绕过过滤；设备自己开了「私人 DNS / DoH」时，过滤不会生效。</p>
+			</div>
+
+			<div class="agh-card">
+				<div class="agh-card-head">
+					<h3>过滤规则 5 个开关分别管什么</h3>
+				</div>
+				<ul class="agh-tips">
+					<li><b>过滤规则生效：</b>总开关。关掉后所有订阅和自定义规则都不再拦截，但规则不会删除，重新打开即恢复。</li>
+					<li><b>成人内容拦截：</b>自动加一份成人内容规则，拦截次数算入「已拦截」。与「家长控制」只能开一个。</li>
+					<li><b>家长控制：</b>用 AdGuard Home 自带的家长控制，需要能连上它的服务端；连不上会自动关闭，避免断网。与「成人内容拦截」只能开一个。</li>
+					<li><b>安全搜索：</b>让搜索引擎强制开启安全搜索，过滤成人结果。</li>
+					<li><b>浏览安全：</b>拦截恶意软件和钓鱼网站；依赖境外服务，如果解析变慢可以关掉。</li>
+				</ul>
+				<p class="agh-hint">订阅列表和自定义规则在下方「订阅 / 规则列表」管理，改完立即生效；总开关关闭时，其余 4 个开关会变灰不能点。</p>
 			</div>
 
 			<div class="agh-card">
@@ -884,7 +887,7 @@
 </div>
 
 <script src="<%=resource%>/adguardhome-lite/twin-bcrypt.min.js?v=20261108b"></script>
-<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261126d"></script>
+<script src="<%=resource%>/adguardhome-lite/panel.js?v=20261126i"></script>
 <script>
 	// 向内嵌它的 LuCI 页面上报真实高度，外层不再轮询 iframe DOM
 	(function () {

@@ -724,12 +724,12 @@ code {
 	align-items: stretch;
 }
 
-/* 五列时压缩卡片内边距，标题不换行 */
+/* 五列时压缩卡片内边距，标题不换行；无说明文字，按内容高度显示 */
 .agh-form-grid-5 .agh-field-switch-stack {
 	padding: 10px;
 	gap: 5px;
-	min-height: 104px;
-	justify-content: flex-start;
+	min-height: 0;
+	justify-content: center;
 }
 
 .agh-form-grid-5 .agh-switch-head {
@@ -1333,12 +1333,32 @@ code {
 	flex: 1;
 	min-width: 0;
 	font-size: 12.5px;
-	word-break: break-all;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .agh-rule-meta {
 	color: var(--agh-muted);
 	font-size: 11px;
+}
+
+/* 条数固定在名称右侧，名称过长只截断名称 */
+.agh-rule-count {
+	flex: none;
+	white-space: nowrap;
+}
+
+/* 订阅来源标签：jsDelivr / GitHub / 自定义域名 */
+.agh-rule-source {
+	flex: none;
+	padding: 1px 7px;
+	border: 1px solid var(--agh-border);
+	border-radius: 6px;
+	background: var(--agh-surface);
+	color: var(--agh-muted);
+	font-size: 10.5px;
+	white-space: nowrap;
 }
 
 .agh-rule-tag {

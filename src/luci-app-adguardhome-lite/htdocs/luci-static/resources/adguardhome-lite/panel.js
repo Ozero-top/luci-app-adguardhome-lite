@@ -257,8 +257,9 @@
 	function htmlResponseError(r, text) {
 		var raw = String(text || '');
 		var snippet = raw
-			.replace(/<script[\s\S]*?<\/script>/gi, ' ')
-			.replace(/<style[\s\S]*?<\/style>/gi, ' ')
+			// 闭合标签可能带属性（如 </script >），不能用固定的 </script> 匹配
+			.replace(/<script[\s\S]*?<\/script[^>]*>/gi, ' ')
+			.replace(/<style[\s\S]*?<\/style[^>]*>/gi, ' ')
 			.replace(/<[^>]+>/g, ' ')
 			.replace(/\s+/g, ' ')
 			.trim();
@@ -388,16 +389,16 @@
 		var cdp = d.clash_dns_port || '7874';
 		if (d.dns_mode === 'takeover') {
 			return d.openclash_running
-				? '客户端 → 53 AdGuard Home → 1745 DNSMasq → Clash / WAN DNS'
-				: '客户端 → 53 AdGuard Home → 1745 DNSMasq → WAN DNS';
+				? '客户端 → 53 AGH → 1745 DNSMasq → Clash / WAN DNS'
+				: '客户端 → 53 AGH → 1745 DNSMasq → WAN DNS';
 		}
 		if (d.dns_mode === 'passwall') {
-			return '客户端 → 53 AdGuard Home → ' + (d.passwall_dns_port || '11400') + ' PassWall DNS → 分流';
+			return '客户端 → 53 AGH → ' + (d.passwall_dns_port || '11400') + ' PassWall DNS → 分流';
 		}
-		if (d.dns_mode === 'openclash') return '客户端 → 53 DNSMasq → 5333 AdGuard Home → ' + cdp + ' Clash DNS';
-		if (d.dns_mode === 'clashfirst') return '客户端 → Clash 劫持 → ' + cdp + ' Clash DNS → 5335 AdGuard Home → 真实 DNS';
+		if (d.dns_mode === 'openclash') return '客户端 → 53 DNSMasq → 5333 AGH → ' + cdp + ' Clash DNS';
+		if (d.dns_mode === 'clashfirst') return '客户端 → Clash 劫持 → ' + cdp + ' Clash DNS → 5335 AGH → 真实 DNS';
 		if (d.dns_mode === 'none') return '不接管 DNS，仅保留管理面板';
-		return '客户端 → 53 DNSMasq → 5333 AdGuard Home → 自动选择上游';
+		return '客户端 → 53 DNSMasq → 5333 AGH → 自动选择上游';
 	}
 
 	function channelLabel(channel) {
@@ -1009,6 +1010,20 @@
 		return out;
 	}
 
+	// 总开关关闭时，其余功能开关置灰且不可点，避免误以为单项仍在生效
+	function applyFilterMasterLock() {
+		var master = $('agh-filter-enabled');
+		var on = !master || master.checked;
+		['agh-filter-adult', 'agh-filter-parental', 'agh-filter-safesearch', 'agh-filter-safebrowsing']
+			.forEach(function (id) {
+				var el = $(id);
+				if (!el) return;
+				el.disabled = !on;
+				var field = el.closest ? el.closest('.agh-field') : null;
+				if (field) field.classList.toggle('is-locked', !on);
+			});
+	}
+
 	function setFilterFlags(d) {
 		var map = {
 			filtering_enabled: 'agh-filter-enabled',
@@ -1047,6 +1062,7 @@
 			}
 			dohEl.checked = hit === DOH_RULES.length;
 		}
+		applyFilterMasterLock();
 		updateSwitchStates();
 	}
 
@@ -1104,6 +1120,16 @@
 		return filtersAction({ action: 'rules', rules: out.join('\n') });
 	}
 
+	// 订阅来源标签：内置列表走 CDN / GitHub，自定义列表显示域名，方便区分订阅从哪来
+	function filterSource(url) {
+		var u = String(url || '');
+		if (u.indexOf('cdn.jsdelivr.net') >= 0) return 'jsDelivr';
+		if (u.indexOf('gh-proxy') >= 0 || u.indexOf('ghproxy') >= 0 || u.indexOf('ghfast') >= 0) return 'GitHub 反代';
+		if (u.indexOf('github.com') >= 0) return 'GitHub';
+		var m = u.match(/^[a-z]+:\/\/([^\/?#]+)/i);
+		return m ? m[1] : '';
+	}
+
 	function renderFilters(d) {
 		var list = $('agh-filter-list');
 		if (!list) return;
@@ -1118,10 +1144,12 @@
 			var f = filters[i];
 			var wl = f.whitelist ? '1' : '0';
 			var tag = f.whitelist ? ' <span class="agh-rule-tag">白名单</span>' : '';
-			html += '<div class="agh-rule" data-url="' + esc(f.url) + '" data-name="' + esc(f.name || f.url) + '" data-whitelist="' + wl + '">' +
+			var src = filterSource(f.url);
+			html += '<div class="agh-rule" data-url="' + esc(f.url) + '" data-name="' + esc(f.name || f.url) + '" data-whitelist="' + wl + '" title="' + esc(f.url) + '">' +
 				'<input type="checkbox" class="agh-filter-toggle" ' + (f.enabled ? 'checked' : '') + '>' +
-				'<span class="agh-rule-name">' + esc(f.name || f.url) + tag +
-				'<br><span class="agh-rule-meta">' + esc(f.url) + '　' + (f.rules_count || 0) + ' 条</span></span>' +
+				'<span class="agh-rule-name">' + esc(f.name || f.url) + tag + '</span>' +
+				(src ? '<span class="agh-rule-source">' + esc(src) + '</span>' : '') +
+				'<span class="agh-rule-meta agh-rule-count">' + (f.rules_count || 0) + ' 条</span>' +
 				'<button type="button" class="agh-ghost-btn agh-small-btn agh-filter-remove">删除</button>' +
 				'</div>';
 		}
@@ -1192,6 +1220,7 @@
 		var el = $(id);
 		if (!el) return;
 		el.onchange = function () {
+			if (id === 'agh-filter-enabled') applyFilterMasterLock();
 			filtersAction({ action: 'feature', feature: feature, value: el.checked ? '1' : '0' });
 		};
 	}
