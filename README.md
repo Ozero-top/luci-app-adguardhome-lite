@@ -5,7 +5,7 @@ OpenWrt / ImmortalWrt / iStoreOS 的 AdGuard Home LuCI 管理中心：安装、D
 > 插件负责安装、DNS 接管、过滤与统计；更细的高级项仍可在 AdGuard Home 面板调整。
 
 <div align=center>
-<img src="https://ozero.top/media/2026/11/6b069b585a1141.23583855.png" width="600" height="394">
+<img src="https://ozero.top/media/2026/11/6b069b585a1141.23583855.png" width="800" height="525">
 </div>
 
 ## 目录
