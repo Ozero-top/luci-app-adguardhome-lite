@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.12-4_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.13-1_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.12-4` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.13-1` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.12-4 -m https://gh-proxy.org
+sh install.sh -v 1.3.13-1 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -489,6 +489,15 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.13-1
+
+- **全新界面**：改为顶栏 + 页签式操作台（概览 / 基础设置 / 过滤规则 / 高级配置 / 运行日志 / 使用说明），深浅色主题一键切换
+- **布局更紧凑**：说明文字并入标题同一行，设置项标签与控件左右对齐；概览拆成状态带、过滤统计、初始化步骤与服务控制
+- **过滤规则独立成页**：5 个开关单行排列，订阅列表与自定义规则集中管理
+- **修复**：暗色主题下面板两侧出现黑边；初始化配置不再自动收起
+- **Android App**：本次无改动，继续沿用 1.3.12-1 安装包
+- **升级提示**：本次只有界面与文案调整，功能不变，按需升级即可
 
 ### 1.3.12-4
 
