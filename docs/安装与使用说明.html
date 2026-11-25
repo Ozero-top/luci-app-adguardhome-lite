@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AdGuard Home 管理中心 使用说明 · 1.3.13-1</title>
+<title>AdGuard Home 管理中心 使用说明 · 1.3.13-2</title>
 <meta name="description" content="AdGuard Home 管理中心使用说明：安装、三步启用、常用设置、DNS 接管方式、常见问题与卸载回滚。">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -185,7 +185,7 @@ footer{
 <header class="topbar">
   <div class="brand"><span class="brand-mark">AGH</span>AdGuard Home 管理中心 <small>使用说明</small></div>
   <div class="spacer"></div>
-  <span class="pill"><span class="dot"></span>1.3.13-1</span>
+  <span class="pill"><span class="dot"></span>1.3.13-2</span>
 </header>
 
 <div class="layout">
@@ -211,7 +211,7 @@ footer{
       <h1>AdGuard Home 管理中心 使用说明</h1>
       <p>本插件负责<strong>安装、DNS 接管、过滤、看护与统计</strong>；更细的高级项仍可在 AdGuard Home 面板中设置。</p>
       <div class="meta">
-        <span>适用版本 1.3.13-1</span>
+        <span>适用版本 1.3.13-2</span>
         <span>OpenWrt / ImmortalWrt / iStoreOS</span>
       </div>
     </div>
@@ -536,11 +536,11 @@ python tools/build_apk.py      # 实验性 apk（需在 25.12 实测）
 python tools/build_run.py      # 离线 .run + manifest-&lt;版本&gt;.txt</code></pre>
       <p>输出在 <code>dist/</code>：</p>
       <ul>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.13-1_all.ipk</code></li>
-        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.13-1-legacy_all.ipk</code></li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.13-1_all.apk</code>（实验性）</li>
-        <li><code>dist/luci-app-adguardhome-lite_1.3.13-1.run</code></li>
-        <li><code>dist/manifest-1.3.13-1.txt</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.13-2_all.ipk</code></li>
+        <li><code>dist/legacy/luci-app-adguardhome-lite_1.3.13-2-legacy_all.ipk</code></li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.13-2_all.apk</code>（实验性）</li>
+        <li><code>dist/luci-app-adguardhome-lite_1.3.13-2.run</code></li>
+        <li><code>dist/manifest-1.3.13-2.txt</code></li>
         <li><code>dist/SHA256SUMS</code></li>
       </ul>
       <p>使用 OpenWrt SDK：</p>
@@ -567,6 +567,10 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
         <table>
           <thead><tr><th>版本</th><th>主要变化</th></tr></thead>
           <tbody>
+            <tr>
+              <td><span class="tag">1.3.13-2</span></td>
+              <td>界面优化，功能不变，按需升级：导航独立成行，标题栏文字与按钮放大适配，窄屏自动换行；移除顶栏重复的内核版本徽标；「上游来源」下拉与「当前生效」紧贴标签，自定义上游列表与来源同一行横向并列；过滤统计线条加粗并改用主题色；面板自动跟随 LuCI 明暗主题；精简「DNS 自检」说明；Android App 沿用 1.3.12-1</td>
+            </tr>
             <tr>
               <td><span class="tag">1.3.13-1</span></td>
               <td>界面改版：顶栏 + 页签式操作台（概览 / 基础设置 / 过滤规则 / 高级配置 / 运行日志 / 使用说明），深浅色主题可切换；说明文字并入标题行，设置项标签与控件左右对齐；过滤规则独立成页，5 个开关单行排列；修复暗色主题两侧黑边；初始化配置不再自动收起。功能不变，按需升级即可；Android App 沿用 1.3.12-1</td>
@@ -691,7 +695,7 @@ make package/luci-app-adguardhome-lite/compile</code></pre>
   </main>
 </div>
 
-<footer>AdGuard Home 管理中心 · 使用说明 1.3.13-1 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
+<footer>AdGuard Home 管理中心 · 使用说明 1.3.13-2 · 适用于 OpenWrt / ImmortalWrt / iStoreOS</footer>
 
 <script>
 (function () {

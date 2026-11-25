@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.13-1_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.13-2_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.13-1` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.13-2` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.13-1 -m https://gh-proxy.org
+sh install.sh -v 1.3.13-2 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -489,6 +489,17 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.13-2
+
+- **标题栏适配**：导航独立成行，标题、状态与按钮的字号和高度放大到合适比例，窄屏自动换行
+- **顶栏精简**：移除重复的内核版本徽标，内核版本仍在「运行状态」显示
+- **DNS 解析更顺手**：「上游来源」下拉与「当前生效」紧贴标签；选「自定义」后，自定义上游列表与上游来源同一行横向并列，窄屏自动堆叠
+- **视觉统一**：过滤统计区块线条加粗，颜色与标题 Logo 一致
+- **外层主题**：面板自动跟随 LuCI 明暗主题，顶部留白与卡片底色衔接更自然
+- **文案**：精简「DNS 自检」说明
+- **Android App**：本次无改动，继续沿用 1.3.12-1 安装包
+- **升级提示**：本次只有界面与文案调整，功能不变，按需升级即可
 
 ### 1.3.13-1
 
