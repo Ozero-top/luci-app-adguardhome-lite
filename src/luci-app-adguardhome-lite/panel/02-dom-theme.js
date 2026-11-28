@@ -87,7 +87,9 @@
 		var nodes = document.querySelectorAll('.agh-switch-state');
 		for (var i = 0; i < nodes.length; i++) {
 			var el = nodes[i];
-			var input = $(el.getAttribute('data-for'));
+			// 用 getElementById 而非本地 $()：避免 CodeQL 把 $ 当成 jQuery 的 HTML 解析入口（js/xss-through-dom）
+			var target = el.getAttribute('data-for');
+			var input = target ? document.getElementById(target) : null;
 			var on = !!(input && input.checked);
 			el.textContent = on
 				? (el.getAttribute('data-on') || '已开启')
