@@ -2,11 +2,16 @@
 """前后端契约：视图声明的路由必须由 Lua 控制器提供，写操作必须校验 CSRF 令牌。"""
 
 import re
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "luci-app-adguardhome-lite"
+
+sys.path.insert(0, str(ROOT / "tools"))
+import build_panel  # noqa: E402
+
 CTRL = SRC / "luasrc" / "controller" / "adguardhome_lite.lua"
 VIEW = SRC / "luasrc" / "view" / "adguardhome_lite" / "panel.htm"
 AGH = SRC / "luasrc" / "model" / "adguardhome_lite" / "agh.lua"
@@ -28,7 +33,7 @@ MUTATIONS = [
 class RoutesTest(unittest.TestCase):
     def setUp(self):
         self.controller = CTRL.read_text(encoding="utf-8")
-        self.view = VIEW.read_text(encoding="utf-8")
+        self.view = build_panel.assemble_htm(str(SRC))
 
     def controller_routes(self):
         return set(re.findall(

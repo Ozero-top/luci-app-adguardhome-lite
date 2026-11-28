@@ -46,6 +46,14 @@ check("next minor beta newer than release", util.version_newer("1.1.0-b.1", "1.0
 check("old beta lower than new release", util.version_newer("0.108.0-b.91", "1.0.0"), false)
 check("clean tag", util.clean_tag(" v1.2.3 "), "1.2.3")
 
+-- 配置内容校验和：同内容同结果，任意改动都要变化
+check("hash stable", util.hash_text("a\nb\n"), util.hash_text("a\nb\n"))
+check("hash differs", util.hash_text("a") ~= util.hash_text("b"), true)
+check("hash length suffix", util.hash_text("abc"):match("^%x+%-%d+$") ~= nil, true)
+check("hash of empty", util.hash_text(nil):match("%-0$") ~= nil, true)
+-- 32 位无符号哈希可能越过 int32 上限，部分 Lua 构建的 string.format("%x") 会直接报错
+check("hash beyond int32", util.hash_text(("x"):rep(16)), "e47c8e85-16")
+
 -- 词表
 check("split", table.concat(util.split_words("a bb  ccc"), ","), "a,bb,ccc")
 check("join table", util.join_words({"a", "bb"}), "a bb")

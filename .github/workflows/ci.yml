@@ -24,7 +24,8 @@ jobs:
       - name: 安装静态检查工具
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck lua5.1
+          sudo apt-get install -y shellcheck lua5.1 luarocks
+          sudo luarocks install luacheck
 
       - name: Shell 语法与静态检查
         run: |
@@ -38,11 +39,19 @@ jobs:
       - name: Lua 语法检查
         run: find src -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
 
+      - name: Lua 静态检查
+        run: luacheck --config .luacheckrc src/luci-app-adguardhome-lite/luasrc
+
       - name: Lua 单元测试
-        run: lua5.1 tests/lua/test_util.lua
+        run: |
+          lua5.1 tests/lua/test_util.lua
+          lua5.1 tests/lua/test_yaml.lua
+          lua5.1 tests/lua/test_tasks.lua
 
       - name: 前端语法检查
-        run: node --check src/luci-app-adguardhome-lite/htdocs/luci-static/resources/adguardhome-lite/panel.js
+        run: |
+          python tools/build_panel.py --check
+          node --check src/luci-app-adguardhome-lite/htdocs/luci-static/resources/adguardhome-lite/panel.js
 
       - name: 单元测试
         run: python -m unittest discover -s tests -t . -v

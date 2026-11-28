@@ -159,7 +159,7 @@ wget -qO- https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/
 curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
 ```
 
-脚本依次尝试 `gh-proxy.org`、`ghfast.top`、`gh-proxy.com` 与 GitHub 直连，`curl` / `wget` 均支持；安装前自动清理旧版插件文件与旧内核（备份到 `/etc/adguardhome_lite/legacy-backup-时间戳/`），`--keep-old` 可跳过。
+脚本依次尝试 `gh-proxy.org`、`ghfast.top`、`gh-proxy.com` 与 GitHub 直连，`curl` / `wget` 均支持；安装前自动清理旧版插件文件、旧内核与 opkg 遗留的旧配置模板（`/etc/config/adguardhome_lite-opkg`，备份到 `/etc/adguardhome_lite/legacy-backup-时间戳/`），`--keep-old` 可跳过。
 
 **强制更新**（不升版也能覆盖同版本文件，直接装 main 分支最新代码）：
 
@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.13-2_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.13-4_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.13-2` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.13-4` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.13-2 -m https://gh-proxy.org
+sh install.sh -v 1.3.13-4 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -290,7 +290,7 @@ PassWall（含 PassWall2）默认开着 DNS 劫持，会把局域网 53 查询�
 - PassWall 未启用时上游回退 `127.0.0.1:1745`，不会断网；
 - 该模式不支持「排除接口 / 客户端」，排除的设备直接落到 PassWall 劫持，有分流但不经过 AdGuard Home。
 
-PassWall 重启或切换 PassWall / PassWall2 导致 DNS 端口变化时，看护进程每 10 秒检查一次，会自动把上游改到新端口并重启 AdGuard Home（约 10 秒；SIGHUP 不会应用上游变更），不重启 PassWall，也不影响自定义上游；概览会在跟随前给出提示。
+PassWall 重启或切换 PassWall / PassWall2 导致 DNS 端口变化时，看护进程每 10 秒检查一次；新端口需连续稳定 25 秒才判定有效，随后自动把上游改到新端口并重启 AdGuard Home（SIGHUP 不会应用上游变更），不重启 PassWall，也不影响自定义上游；端口短暂消失（PassWall 重启期）不会触发反复重启，概览会在跟随前给出提示。
 
 ### 排除接口与客户端（仅「接管 53」）
 
@@ -489,6 +489,24 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.13-4
+
+- **切换代理不再断网**：切换到 PassWall / PassWall2 时同步更新 AdGuard Home 上游，不再残留已失效的旧 DNS 端口；原先只有保存设置才会同步上游，直接切换模式会导致解析全部失败
+- **按实际监听判断**：上游跟随改为检测 PassWall 的 DNS 端口是否真的在监听，而不是只看 `enabled` 标志；`/etc/init.d/passwall stop` 不会改写 `enabled`，旧逻辑会继续指向已无人监听的端口
+- **防抖与自愈**：新上游需连续稳定 25 秒才落盘，避开 PassWall 重启期端口短暂消失造成的反复切换；管理端口未就绪时不再重启内核，修复连续 crash loop
+- **自检三态**：自检结果区分「正常 / 提示 / 异常」，本机查询被 PassWall/Clash 劫持且目标端口有服务时仅提示，端口无人监听才判定异常，不再误报整体失败
+- **Android App**：本次无改动，继续沿用 1.3.12-1 安装包
+- **升级提示**：涉及 DNS 接管与代理联动，使用 PassWall / PassWall2 的用户建议升级
+
+### 1.3.13-3
+
+- **并发安全**：保存设置、切换接管方式与停止服务改为串行执行（`flock` + 轮询等待），避免并发下 DNSMasq 与内核抢 53 端口导致反复重启
+- **禁用不再断网**：`enabled=0` 且残留「接管 53」时，启动流程先恢复 DNSMasq 再退出
+- **旧配置模板清理**：opkg 升级会把旧 conffile 另存为 `/etc/config/adguardhome_lite-opkg`，安装后自动删除；概览「旧版残留检测」与 `install.sh` 也会识别并备份后清理，不触碰当前配置
+- **状态可监控**：新增 `dns_mode.sh status-json`，输出单行 JSON，供外部监控与脚本消费
+- **Android App**：本次无改动，继续沿用 1.3.12-1 安装包
+- **升级提示**：涉及 DNS 接管与配置安全，建议升级
 
 ### 1.3.13-2
 

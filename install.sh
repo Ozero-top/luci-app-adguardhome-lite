@@ -9,7 +9,7 @@
 #   curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci-app-adguardhome-lite/main/install.sh | sh -s -- -m https://gh-proxy.org
 #
 # 常用参数：
-#   -v VERSION   指定版本（默认 1.3.13-2），可写 latest 取最新 Release
+#   -v VERSION   指定版本（默认 1.3.13-4），可写 latest 取最新 Release
 #   -m URL       指定 GitHub 反代（可重复），默认依次尝试 gh-proxy.org / ghfast.top / gh-proxy.com
 #   --no-deps    不自动安装依赖
 #   --src DIR    从本地源码目录安装（开发调试用）
@@ -26,7 +26,7 @@ set -u
 REPO="Ozero-top/luci-app-adguardhome-lite"
 PKG="luci-app-adguardhome-lite"
 # 版本以 src/luci-app-adguardhome-lite/VERSION 为准；本脚本需独立下载，保留字面值并由 CI 校验一致性
-VERSION="1.3.13-2"
+VERSION="1.3.13-4"
 MIRRORS=""
 NO_DEPS=0
 SRC_DIR=""
@@ -45,7 +45,7 @@ usage() {
 	cat <<'EOF'
 AdGuard Home 管理中心 安装脚本
 
-  -v VERSION   指定版本号（默认 1.3.13-2，latest 表示最新 Release）
+  -v VERSION   指定版本号（默认 1.3.13-4，latest 表示最新 Release）
   -f, --force  强制更新：忽略版本标签，直接用 main 分支最新代码覆盖安装
   -m URL       指定 GitHub 反代，可重复，例如 -m https://gh-proxy.org
   --no-deps    跳过依赖安装
@@ -97,6 +97,9 @@ OLD_LEGACY_FILES="/usr/lib/lua/luci/controller/adguardhome.lua
 /usr/share/luci/menu.d/luci-app-adguardhome.json
 /usr/share/rpcd/acl.d/luci-app-adguardhome.json"
 
+# opkg 升级遗留的旧 conffile：无任何代码引用，且卸载时不会删除
+OLD_CONF_RESIDUE="/etc/config/adguardhome_lite-opkg /etc/config/adguardhome-opkg"
+
 legacy_pkg_installed() {
 	case "$PKG_MGR" in
 		apk) apk info -e "$1" >/dev/null 2>&1 ;;
@@ -121,6 +124,11 @@ detect_legacy() {
 	for k in /usr/bin/AdGuardHome /usr/sbin/AdGuardHome; do
 		[ -f "$k" ] || continue
 		log "  - 旧内核：$k"
+		LEGACY_FOUND=1
+	done
+	for c in $OLD_CONF_RESIDUE; do
+		[ -f "$c" ] || continue
+		log "  - 旧配置模板：$c"
 		LEGACY_FOUND=1
 	done
 }
@@ -166,6 +174,14 @@ cleanup_legacy() {
 		[ -f "$k" ] || continue
 		mkdir -p "$bk$(dirname "$k")" 2>/dev/null
 		mv "$k" "$bk$k" >/dev/null 2>&1
+	done
+
+	# 旧 conffile 残留：只备份后删除，绝不改动当前 /etc/config/adguardhome_lite
+	for c in $OLD_CONF_RESIDUE; do
+		[ -f "$c" ] || continue
+		mkdir -p "$bk$(dirname "$c")" 2>/dev/null
+		cp -a "$c" "$bk$c" >/dev/null 2>&1
+		rm -f "$c"
 	done
 
 	if [ "$PURGE_OLD" = "1" ]; then

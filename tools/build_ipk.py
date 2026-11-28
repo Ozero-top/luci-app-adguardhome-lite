@@ -25,6 +25,10 @@ import sys
 import tarfile
 import tempfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_panel  # noqa: E402
+import build_po2lmo  # noqa: E402
+
 SOURCE_DATE_EPOCH = 1794096000  # 2026-11-08 00:00:00 UTC，保证构建结果可复现
 
 PKG_NAME = "luci-app-adguardhome-lite"
@@ -123,6 +127,28 @@ def stage_data(src_root: str, staging: str):
     htdocs = os.path.join(src_root, "htdocs")
     if os.path.isdir(htdocs):
         copy_tree(htdocs, os.path.join(staging, "www"))
+
+    # po/<lang>/<PKG>.po -> /usr/lib/lua/luci/i18n/<PKG>.<lang>.lmo
+    po_dir = os.path.join(src_root, "po")
+    if os.path.isdir(po_dir):
+        for lang in sorted(os.listdir(po_dir)):
+            po_file = os.path.join(po_dir, lang, "luci-app-adguardhome-lite.po")
+            if not os.path.isfile(po_file):
+                continue
+            lmo_path = os.path.join(staging, "usr", "lib", "lua", "luci", "i18n",
+                                    "adguardhome_lite.%s.lmo" % lang)
+            os.makedirs(os.path.dirname(lmo_path), exist_ok=True)
+            with open(lmo_path, "wb") as f:
+                f.write(build_po2lmo.convert(po_file))
+
+    # panel.js / panel.css 由 panel/ 分片拼装而成，打包时重新生成，避免把过期产物装进包里
+    static_dir = os.path.join(staging, "www", "luci-static", "resources", "adguardhome-lite")
+    for name, text in (("panel.js", build_panel.assemble(src_root)),
+                       ("panel.css", build_panel.assemble_css(src_root))):
+        dst = os.path.join(static_dir, name)
+        with open(dst, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        os.chmod(dst, 0o644)
 
 
 def add_path(tar: tarfile.TarFile, full_path: str, arcname: str, mode: int):
@@ -255,6 +281,9 @@ chmod 755 /etc/init.d/adguardhome_lite 2>/dev/null
 chmod 755 /usr/share/adguardhome-lite/*.sh 2>/dev/null
 rm -f /usr/share/adguardhome-lite/install_source 2>/dev/null
 rm -f /tmp/luci-indexcache /tmp/luci-indexcache.* 2>/dev/null
+# opkg 升级会把新包的默认 conffile 存成 <包名>-opkg，没有代码引用它，
+# 留着只会被误当成当前配置编辑；用户配置在 /etc/config/adguardhome_lite 中不受影响。
+rm -f /etc/config/adguardhome_lite-opkg 2>/dev/null
 # 手动安装/升级包时清掉运行时版本缓存，面板立即显示新版本
 rm -f /var/run/adguardhome_lite_plugin_version /var/run/adguardhome_lite_plugin_update 2>/dev/null
 

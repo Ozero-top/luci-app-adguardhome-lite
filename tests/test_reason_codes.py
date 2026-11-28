@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """reason code、日志级别与 API 设置写入的静态契约。"""
 
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "luci-app-adguardhome-lite"
-CONTROLLER = (SRC / "luasrc" / "controller" / "adguardhome_lite.lua").read_text(encoding="utf-8")
+
+sys.path.insert(0, str(ROOT / "tools"))
+import build_panel  # noqa: E402
+
+RUNTIME = (SRC / "luasrc" / "model" / "adguardhome_lite" / "runtime.lua").read_text(encoding="utf-8")
 SETTINGS = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "settings.lua").read_text(encoding="utf-8")
 LOGS_ACTION = (SRC / "luasrc" / "model" / "adguardhome_lite" / "actions" / "logs.lua").read_text(encoding="utf-8")
 CODES = (SRC / "luasrc" / "model" / "adguardhome_lite" / "codes.lua").read_text(encoding="utf-8")
@@ -14,7 +19,7 @@ COMMON = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "common.sh").rea
 APPLY = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "apply_settings.sh").read_text(encoding="utf-8")
 UPDATE = (SRC / "root" / "usr" / "share" / "adguardhome-lite" / "update_core.sh").read_text(encoding="utf-8")
 PANEL_JS = (SRC / "htdocs" / "luci-static" / "resources" / "adguardhome-lite" / "panel.js").read_text(encoding="utf-8")
-PANEL_HTM = (SRC / "luasrc" / "view" / "adguardhome_lite" / "panel.htm").read_text(encoding="utf-8")
+PANEL_HTM = build_panel.assemble_htm(str(SRC))
 
 
 class ReasonCodeTest(unittest.TestCase):
@@ -24,8 +29,8 @@ class ReasonCodeTest(unittest.TestCase):
             self.assertIn(code, CODES)
 
     def test_json_error_returns_reason(self):
-        self.assertIn("reason = reason or default_reason(status)", CONTROLLER)
-        self.assertIn("level = codes.level(reason)", CONTROLLER)
+        self.assertIn("reason = reason or M.default_reason(status)", RUNTIME)
+        self.assertIn("level = codes.level(reason)", RUNTIME)
 
     def test_state_files_use_codes(self):
         self.assertIn("failed:config_restore_failed", APPLY)

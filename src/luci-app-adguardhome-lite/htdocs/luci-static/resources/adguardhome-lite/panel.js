@@ -84,6 +84,7 @@
 		settings: null,
 		filters: [],
 		yamlLoaded: false,
+		yamlHash: '',
 		settingsSubtab: 'svc',
 		logSubtab: 'sys',
 		logLevel: '',
@@ -108,7 +109,6 @@
 		pluginTimer: null,
 		pluginMiss: 0,
 		busy: false,
-		passShown: false,
 		openclash: false,
 		passwall: false,
 		passwallEnabled: false,
@@ -397,6 +397,7 @@
 		if (json && json.ok === false) {
 			var err = new Error(json.error || '操作失败');
 			if (json.reason === 'auth_required') err.login = true;
+			err.reason = json.reason || '';
 			throw err;
 		}
 		return json;
@@ -633,23 +634,6 @@
 		el.textContent = '已停止';
 	}
 
-	function attachPasswordActions(pass) {
-		var toggle = $('agh-pass-toggle');
-		var copy = $('agh-pass-copy');
-		if (toggle) {
-			toggle.onclick = function () {
-				state.passShown = !state.passShown;
-				renderStatus();
-			};
-		}
-		if (copy) {
-			copy.onclick = function () {
-				copyText(pass);
-			};
-		}
-	}
-
-	// 点击「可更新」跳转到初始化配置的内核安装按钮
 	function attachCoreUpdateAction() {
 		var links = document.querySelectorAll('.agh-core-update');
 		for (var i = 0; i < links.length; i++) {
@@ -673,12 +657,14 @@
 		}
 
 		var panel = panelUrl(d.web_port);
-		var pass = d.admin_pass || '';
-		var passHtml = pass
-			? '<span class="agh-pass-wrap"><span id="agh-pass-text">' + (state.passShown ? esc(pass) : '••••••••') + '</span>' +
-				'<button type="button" class="agh-mini-btn" id="agh-pass-toggle">' + (state.passShown ? '隐藏' : '显示') + '</button>' +
-				'<button type="button" class="agh-mini-btn" id="agh-pass-copy">复制</button></span>'
-			: '<span class="agh-warn">未设置</span>';
+		var passHtml;
+		if (d.admin_pass_default) {
+			passHtml = '<span class="agh-warn">仍是默认密码，请在下方「基础设置」-「修改密码」中重设</span>';
+		} else if (d.admin_pass_set) {
+			passHtml = '<span class="agh-ok">已设置（忘记可在下方重设）</span>';
+		} else {
+			passHtml = '<span class="agh-warn">未设置</span>';
+		}
 
 		var rows = [
 			['服务状态', d.running ? '<span class="agh-ok">运行中</span>' : '<span class="agh-bad">已停止</span>'],
@@ -716,7 +702,7 @@
 				var upsPort = (ups.match(/:(\d+)\s*$/) || [])[1] || '';
 				if (pswPort && d.upstream_source !== 'custom' && upsPort !== pswPort) {
 					rows.push(['配置建议', '<span class="agh-warn">AdGuard Home 上游未指向当前 PassWall DNS 端口（' + esc(pswPort) +
-						'），插件会在 10 秒内自动跟随（会短暂重启一次 AdGuard Home）。</span>']);
+						'），插件会在端口稳定约 25 秒后自动跟随（短暂重启一次 AdGuard Home）。</span>']);
 				}
 			}
 		}
@@ -763,7 +749,6 @@
 		var grid = $('agh-status-grid');
 		if (grid) grid.innerHTML = html;
 
-		attachPasswordActions(pass);
 		attachCoreUpdateAction();
 		updateSteps(d);
 
@@ -971,8 +956,11 @@
 			return;
 		}
 		list.innerHTML = checks.map(function (c) {
-			var mark = c.ok ? '正常' : '异常';
-			var cls = c.ok ? '' : ' style="color:#c0392b"';
+			// level 优先：warn 是「提示」，不影响整体结论，不能显示成异常
+			var lv = c.level || (c.ok ? 'ok' : 'fail');
+			var mark = lv === 'ok' ? '正常' : (lv === 'warn' ? '提示' : '异常');
+			var color = lv === 'ok' ? '' : (lv === 'warn' ? '#b8860b' : '#c0392b');
+			var cls = color ? ' style="color:' + color + '"' : '';
 			return '<li><b' + cls + '>' + mark + ' · ' + esc(c.label) + '</b><br>'
 				+ '<span class="agh-hint">' + esc(c.detail || '') + '</span></li>';
 		}).join('');
@@ -2103,6 +2091,7 @@
 			setSelectValue('agh-set-dns-mode', d.dns_mode);
 			var port = $('agh-set-webport');
 			if (port) port.value = d.webport;
+			setSelectValue('agh-set-webaddr', d.webaddr || '0.0.0.0');
 			setSelectValue('agh-set-binpath', d.binpath);
 			setSelectValue('agh-set-workdir', d.workdir);
 			setSelectValue('agh-set-channel', d.channel);
@@ -2253,6 +2242,7 @@
 			enabled: $('agh-set-enabled').checked ? '1' : '0',
 			dns_mode: $('agh-set-dns-mode').value,
 			webport: String(n),
+			webaddr: $('agh-set-webaddr') ? $('agh-set-webaddr').value : '0.0.0.0',
 			binpath: $('agh-set-binpath').value,
 			workdir: $('agh-set-workdir').value,
 			channel: $('agh-set-channel').value,
@@ -2299,6 +2289,7 @@
 			var path = $('agh-yaml-path');
 			if (path && d.path) path.textContent = d.path;
 			state.yamlLoaded = true;
+			state.yamlHash = d.hash || '';
 			setMsg(msgEl, d.yaml ? '' : '配置文件尚未生成，请先启用服务。', d.yaml ? '' : 'bad');
 		} catch (err) {
 			handleApiError(err, msgEl);
@@ -2320,7 +2311,7 @@
 		if (btn) btn.disabled = true;
 		setMsg(msgEl, '正在校验配置...', '');
 		try {
-			await apiPost(U.yamlSave, { yaml: editor.value });
+			await apiPost(U.yamlSave, { yaml: editor.value, base_hash: state.yamlHash });
 			setMsg(msgEl, '配置已保存，正在重启服务...', 'ok');
 			showToast('配置已保存，正在重启服务...', 'ok');
 			pollAction(function () {
@@ -2330,6 +2321,16 @@
 			});
 		} catch (err) {
 			if (btn) btn.disabled = false;
+			// 409 冲突：磁盘配置已被其他页面或 AGH 面板改过，覆盖会丢对方修改。
+			// 不自动重载，避免静默丢弃用户当前正在编辑的内容。
+			if (err && err.reason === 'yaml_conflict') {
+				handleApiError(err, msgEl);
+				if (await aghConfirm('配置文件已被其他操作修改，继续保存会覆盖对方的改动。\n是否重新加载最新配置？（当前未保存的修改将丢失）')) {
+					await loadYaml();
+					setMsg(msgEl, '已加载最新配置，请确认后重新保存。', 'ok');
+				}
+				return;
+			}
 			handleApiError(err, msgEl);
 		}
 	}
@@ -2424,28 +2425,6 @@
 		a.download = 'adguardhome-lite-log-' + stamp + '.txt';
 		a.click();
 		URL.revokeObjectURL(a.href);
-	}
-
-	function copyText(text) {
-		if (!text) return;
-		if (navigator.clipboard && window.isSecureContext) {
-			navigator.clipboard.writeText(text);
-			showToast('密码已复制到剪贴板', 'ok');
-			return;
-		}
-		var ta = document.createElement('textarea');
-		ta.value = text;
-		ta.style.position = 'fixed';
-		ta.style.left = '-9999px';
-		document.body.appendChild(ta);
-		ta.select();
-		try {
-			document.execCommand('copy');
-			showToast('密码已复制到剪贴板', 'ok');
-		} catch (e) {
-			showToast('浏览器不支持自动复制，请手动选择密码', 'bad');
-		}
-		document.body.removeChild(ta);
 	}
 
 	async function savePassword(event) {
