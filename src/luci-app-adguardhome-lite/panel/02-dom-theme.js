@@ -5,7 +5,6 @@
 	// 旧版会把主题自动写进 agh-theme，导致外层主题变了面板也不再跟随，
 	// 这里只把手动选择存到 agh-theme-pin，并清掉旧的自动值
 	var THEME_PIN = 'agh-theme-pin';
-	var CORE_KEY = 'agh-core-version';
 
 	// 外层 LuCI / Argon 主题（wrapper 通过 agh_theme 参数与 postMessage 下发），
 	// 手动切换后切回与外层一致时，自动恢复跟随

@@ -29,6 +29,13 @@
 		if ($('agh-theme-toggle')) $('agh-theme-toggle').onclick = toggleTheme;
 		if ($('agh-legacy-clean')) $('agh-legacy-clean').onclick = cleanLegacy;
 		if ($('agh-selftest-btn')) $('agh-selftest-btn').onclick = runSelftest;
+		if ($('agh-selftest-close')) $('agh-selftest-close').onclick = closeSelftestModal;
+		if ($('agh-selftest-mask')) $('agh-selftest-mask').onclick = closeSelftestModal;
+		if ($('agh-selftest-retry')) $('agh-selftest-retry').onclick = runSelftest;
+		document.addEventListener('keydown', function (e) {
+			var selftest = $('agh-selftest-modal');
+			if (e.key === 'Escape' && selftest && !selftest.hidden) closeSelftestModal();
+		});
 		if ($('agh-install-btn')) $('agh-install-btn').onclick = installCore;
 		if ($('agh-enable-btn')) $('agh-enable-btn').onclick = function () {
 			postService('bootstrap', '将启动 AdGuard Home 并接管路由器 DNS。确定继续？');

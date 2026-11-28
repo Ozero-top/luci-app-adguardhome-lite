@@ -36,6 +36,21 @@
 	</div>
 </div>
 
+<div class="agh-modal" id="agh-selftest-modal" hidden>
+	<div class="agh-modal-mask" id="agh-selftest-mask"></div>
+	<div class="agh-modal-body" role="dialog" aria-modal="true" aria-labelledby="agh-selftest-modal-title">
+		<h3 id="agh-selftest-modal-title"><%:DNS Self-Test%></h3>
+		<p class="agh-hint" id="agh-selftest-summary"></p>
+		<ul class="agh-tips" id="agh-selftest-list">
+			<li class="agh-hint">检测中...</li>
+		</ul>
+		<div class="agh-modal-actions">
+			<button type="button" class="agh-btn agh-btn-secondary" id="agh-selftest-close"><%:Close%></button>
+			<button type="button" class="agh-btn agh-btn-primary" id="agh-selftest-retry"><%:Run Test%></button>
+		</div>
+	</div>
+</div>
+
 <div class="agh-modal" id="agh-confirm-modal" hidden>
 	<div class="agh-modal-mask" id="agh-confirm-mask"></div>
 	<div class="agh-modal-body agh-confirm-body" role="dialog" aria-modal="true" aria-labelledby="agh-confirm-title">

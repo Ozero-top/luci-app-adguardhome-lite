@@ -2,7 +2,6 @@
 		var d = state.status;
 		updateHeaderStatus();
 		updatePluginVersion(d);
-		updateHeroCore(d);
 		if (!d) {
 			var grid = $('agh-status-grid');
 			if (grid) grid.innerHTML = '<div class="agh-empty">无法读取状态</div>';

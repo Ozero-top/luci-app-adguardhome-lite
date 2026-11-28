@@ -53,13 +53,6 @@ state_write() {
     return 0
 }
 
-# 读取持久化状态；不存在时输出空行
-state_read() {
-    _st_file="/etc/adguardhome_lite/state/$1"
-    [ -f "$_st_file" ] || return 0
-    head -n 1 "$_st_file" 2>/dev/null
-}
-
 # 读取插件配置。所有变量均使用全局变量，供调用脚本直接使用。
 load_conf() {
     if command -v config_load >/dev/null 2>&1; then
@@ -639,26 +632,6 @@ openclash_forward_del() {
         $0 == e { skip = 0; next }
         skip != 1 { print }
     ' "$OC_CONF" > "$OC_CONF.tmp.$$" && mv -f "$OC_CONF.tmp.$$" "$OC_CONF"
-}
-
-openclash_forward_add() {
-    _ocdir="$(dnsmasq_confdir)"
-    mkdir -p "$_ocdir" 2>/dev/null || return 1
-
-    openclash_forward_del
-
-    {
-        printf '%s\n' "$OC_BEGIN"
-        # strict-order：DNSMasq 有多个上游时按顺序优先查询 AdGuard Home，
-        # 避免轮询到 WAN DNS 造成过滤被绕过；AdGuard Home 不可用时仍可回退。
-        printf 'strict-order\n'
-        if dnsmasq_hash_rule_supported; then
-            printf 'server=/#/127.0.0.1#%s\n' "$dnsport"
-        else
-            printf 'server=/./127.0.0.1#%s\n' "$dnsport"
-        fi
-        printf '%s\n' "$OC_END"
-    } > "$_ocdir/$OC_FILE"
 }
 
 # 读取 YAML 中某个两空格缩进的列表，返回空格分隔的一行

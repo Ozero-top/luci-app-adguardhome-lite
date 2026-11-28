@@ -138,43 +138,6 @@
 		}
 	}
 
-	function applyHeroCore(version, installed) {
-		var el = $('agh-hero-core');
-		if (!el) return;
-		if (installed === false) {
-			el.textContent = '未安装内核';
-			el.title = '尚未安装 AdGuard Home 内核';
-			return;
-		}
-		if (version) {
-			el.textContent = version;
-			el.title = '当前内核版本';
-			return;
-		}
-		el.textContent = '读取中';
-		el.title = '正在读取内核版本';
-	}
-
-	// 先用缓存渲染，避免刷新瞬间显示成占位文案
-	function initHeroCore() {
-		var saved = '';
-		try { saved = localStorage.getItem(CORE_KEY) || ''; } catch (e) { /* 忽略 */ }
-		applyHeroCore(saved, true);
-	}
-
-	function updateHeroCore(d) {
-		if (!d) return;
-		if (!d.core) {
-			applyHeroCore('', false);
-			try { localStorage.removeItem(CORE_KEY); } catch (e) { /* 忽略 */ }
-			return;
-		}
-		applyHeroCore(d.version || '', true);
-		if (d.version) {
-			try { localStorage.setItem(CORE_KEY, d.version); } catch (e) { /* 忽略 */ }
-		}
-	}
-
 	function updateHeaderStatus() {
 		var el = $('agh-header-status');
 		if (!el) return;

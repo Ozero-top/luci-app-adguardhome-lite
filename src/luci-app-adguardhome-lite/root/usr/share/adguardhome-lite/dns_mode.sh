@@ -681,18 +681,6 @@ apply_mode() {
                 log_msg "PassWall 未启用：查询会经 AdGuard Home 转给本机 DNSMasq（1745），不走 PassWall 分流。"
             fi
             ;;
-        openclash)
-            # 保留 Clash 的 53 劫持，但 DNSMasq 必须留在 53：
-            # 这样即使 Clash 重启/更新导致劫持规则消失，客户端仍有 DNS。
-            if ! openclash_forward_add; then
-                log_msg "无法写入 DNSMasq 转发规则，已取消 Clash 串联模式。"
-                restore_original
-                uci -q set "$CONF.main.mode_applied=none"
-                uci -q commit "$CONF" 2>/dev/null
-                return 1
-            fi
-            ensure_safe_dnsmasq_layout
-            ;;
         clashfirst)
             if ! set_dnsmasq_port 53; then
                 cancel_dns_mode_apply "无法将 DNSMasq 端口写为 53，已取消本次 DNS 接管。"

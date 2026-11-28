@@ -50,7 +50,6 @@ class ReliabilityTest(unittest.TestCase):
 
     def test_state_helpers_are_atomic(self):
         self.assertIn("state_write()", COMMON)
-        self.assertIn("state_read()", COMMON)
         self.assertIn("mv -f", COMMON)
 
     def test_apply_refuses_broken_config(self):

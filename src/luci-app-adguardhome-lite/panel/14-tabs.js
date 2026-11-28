@@ -50,5 +50,9 @@
 		if (updateHash !== false && window.history && window.history.replaceState) {
 			window.history.replaceState(null, '', '#' + name);
 		}
+		// 面板在内层 iframe 中，#hash 会随外层刷新丢失，用 sessionStorage 兜底
+		if (updateHash !== false) {
+			try { window.sessionStorage.setItem('agh-tab', name); } catch (e) {}
+		}
 	}
 

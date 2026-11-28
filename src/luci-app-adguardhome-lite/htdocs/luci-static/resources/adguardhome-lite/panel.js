@@ -126,7 +126,6 @@
 	// 旧版会把主题自动写进 agh-theme，导致外层主题变了面板也不再跟随，
 	// 这里只把手动选择存到 agh-theme-pin，并清掉旧的自动值
 	var THEME_PIN = 'agh-theme-pin';
-	var CORE_KEY = 'agh-core-version';
 
 	// 外层 LuCI / Argon 主题（wrapper 通过 agh_theme 参数与 postMessage 下发），
 	// 手动切换后切回与外层一致时，自动恢复跟随
@@ -569,43 +568,6 @@
 		}
 	}
 
-	function applyHeroCore(version, installed) {
-		var el = $('agh-hero-core');
-		if (!el) return;
-		if (installed === false) {
-			el.textContent = '未安装内核';
-			el.title = '尚未安装 AdGuard Home 内核';
-			return;
-		}
-		if (version) {
-			el.textContent = version;
-			el.title = '当前内核版本';
-			return;
-		}
-		el.textContent = '读取中';
-		el.title = '正在读取内核版本';
-	}
-
-	// 先用缓存渲染，避免刷新瞬间显示成占位文案
-	function initHeroCore() {
-		var saved = '';
-		try { saved = localStorage.getItem(CORE_KEY) || ''; } catch (e) { /* 忽略 */ }
-		applyHeroCore(saved, true);
-	}
-
-	function updateHeroCore(d) {
-		if (!d) return;
-		if (!d.core) {
-			applyHeroCore('', false);
-			try { localStorage.removeItem(CORE_KEY); } catch (e) { /* 忽略 */ }
-			return;
-		}
-		applyHeroCore(d.version || '', true);
-		if (d.version) {
-			try { localStorage.setItem(CORE_KEY, d.version); } catch (e) { /* 忽略 */ }
-		}
-	}
-
 	function updateHeaderStatus() {
 		var el = $('agh-header-status');
 		if (!el) return;
@@ -649,7 +611,6 @@
 		var d = state.status;
 		updateHeaderStatus();
 		updatePluginVersion(d);
-		updateHeroCore(d);
 		if (!d) {
 			var grid = $('agh-status-grid');
 			if (grid) grid.innerHTML = '<div class="agh-empty">无法读取状态</div>';
@@ -966,23 +927,57 @@
 		}).join('');
 	}
 
+	function openSelftestModal() {
+		var modal = $('agh-selftest-modal');
+		if (modal) modal.hidden = false;
+	}
+
+	function closeSelftestModal() {
+		var modal = $('agh-selftest-modal');
+		if (modal) modal.hidden = true;
+	}
+
+	function selftestSummary(checks) {
+		var fail = 0;
+		var warn = 0;
+		checks.forEach(function (c) {
+			var lv = c.level || (c.ok ? 'ok' : 'fail');
+			if (lv === 'fail') fail++;
+			else if (lv === 'warn') warn++;
+		});
+		if (!fail && !warn) return '全部检查正常。';
+		var parts = [];
+		if (fail) parts.push(fail + ' 项异常');
+		if (warn) parts.push(warn + ' 项提示');
+		return '发现 ' + parts.join('、') + '。';
+	}
+
 	async function runSelftest() {
 		var btn = $('agh-selftest-btn');
+		var retry = $('agh-selftest-retry');
+		var summary = $('agh-selftest-summary');
+		var list = $('agh-selftest-list');
+		openSelftestModal();
+		if (list) list.innerHTML = '<li class="agh-hint">检测中...</li>';
+		if (summary) summary.textContent = '';
 		if (btn) {
 			btn.disabled = true;
 			btn.textContent = '检测中...';
 		}
+		if (retry) retry.disabled = true;
 		try {
 			var d = await apiGet(U.selftest);
 			renderSelftest(d);
-			showToast(d.ok ? '自检通过' : '自检发现问题，请查看下方结果', d.ok ? 'ok' : '');
+			if (summary) summary.textContent = selftestSummary((d && d.checks) || []);
 		} catch (err) {
-			handleApiError(err, $('agh-selftest-list'));
+			if (summary) summary.textContent = '检测失败。';
+			handleApiError(err, list);
 		} finally {
 			if (btn) {
 				btn.disabled = false;
 				btn.textContent = '开始检测';
 			}
+			if (retry) retry.disabled = false;
 		}
 	}
 
@@ -2527,6 +2522,10 @@
 		if (updateHash !== false && window.history && window.history.replaceState) {
 			window.history.replaceState(null, '', '#' + name);
 		}
+		// 面板在内层 iframe 中，#hash 会随外层刷新丢失，用 sessionStorage 兜底
+		if (updateHash !== false) {
+			try { window.sessionStorage.setItem('agh-tab', name); } catch (e) {}
+		}
 	}
 
 	function initEvents() {
@@ -2560,6 +2559,13 @@
 		if ($('agh-theme-toggle')) $('agh-theme-toggle').onclick = toggleTheme;
 		if ($('agh-legacy-clean')) $('agh-legacy-clean').onclick = cleanLegacy;
 		if ($('agh-selftest-btn')) $('agh-selftest-btn').onclick = runSelftest;
+		if ($('agh-selftest-close')) $('agh-selftest-close').onclick = closeSelftestModal;
+		if ($('agh-selftest-mask')) $('agh-selftest-mask').onclick = closeSelftestModal;
+		if ($('agh-selftest-retry')) $('agh-selftest-retry').onclick = runSelftest;
+		document.addEventListener('keydown', function (e) {
+			var selftest = $('agh-selftest-modal');
+			if (e.key === 'Escape' && selftest && !selftest.hidden) closeSelftestModal();
+		});
 		if ($('agh-install-btn')) $('agh-install-btn').onclick = installCore;
 		if ($('agh-enable-btn')) $('agh-enable-btn').onclick = function () {
 			postService('bootstrap', '将启动 AdGuard Home 并接管路由器 DNS。确定继续？');
@@ -2820,10 +2826,13 @@
 	function init() {
 		initTheme();
 		initThemeSync();
-		initHeroCore();
 		initEvents();
 		updateSwitchStates();
-		var hash = (window.location.hash || '#overview').replace('#', '');
+		var hash = (window.location.hash || '').replace('#', '');
+		// 外层 LuCI 刷新会用固定地址重建 iframe，#hash 丢失时沿用上次页签
+		if (!hash) {
+			try { hash = window.sessionStorage.getItem('agh-tab') || ''; } catch (e) {}
+		}
 		if (!hash) hash = 'overview';
 		switchTab(hash, false);
 		refreshStatus();

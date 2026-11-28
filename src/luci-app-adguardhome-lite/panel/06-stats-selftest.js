@@ -100,23 +100,57 @@
 		}).join('');
 	}
 
+	function openSelftestModal() {
+		var modal = $('agh-selftest-modal');
+		if (modal) modal.hidden = false;
+	}
+
+	function closeSelftestModal() {
+		var modal = $('agh-selftest-modal');
+		if (modal) modal.hidden = true;
+	}
+
+	function selftestSummary(checks) {
+		var fail = 0;
+		var warn = 0;
+		checks.forEach(function (c) {
+			var lv = c.level || (c.ok ? 'ok' : 'fail');
+			if (lv === 'fail') fail++;
+			else if (lv === 'warn') warn++;
+		});
+		if (!fail && !warn) return '全部检查正常。';
+		var parts = [];
+		if (fail) parts.push(fail + ' 项异常');
+		if (warn) parts.push(warn + ' 项提示');
+		return '发现 ' + parts.join('、') + '。';
+	}
+
 	async function runSelftest() {
 		var btn = $('agh-selftest-btn');
+		var retry = $('agh-selftest-retry');
+		var summary = $('agh-selftest-summary');
+		var list = $('agh-selftest-list');
+		openSelftestModal();
+		if (list) list.innerHTML = '<li class="agh-hint">检测中...</li>';
+		if (summary) summary.textContent = '';
 		if (btn) {
 			btn.disabled = true;
 			btn.textContent = '检测中...';
 		}
+		if (retry) retry.disabled = true;
 		try {
 			var d = await apiGet(U.selftest);
 			renderSelftest(d);
-			showToast(d.ok ? '自检通过' : '自检发现问题，请查看下方结果', d.ok ? 'ok' : '');
+			if (summary) summary.textContent = selftestSummary((d && d.checks) || []);
 		} catch (err) {
-			handleApiError(err, $('agh-selftest-list'));
+			if (summary) summary.textContent = '检测失败。';
+			handleApiError(err, list);
 		} finally {
 			if (btn) {
 				btn.disabled = false;
 				btn.textContent = '开始检测';
 			}
+			if (retry) retry.disabled = false;
 		}
 	}
 

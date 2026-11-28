@@ -175,14 +175,14 @@ curl -fsSL https://gh-proxy.org/https://raw.githubusercontent.com/Ozero-top/luci
 已用 ipk 安装的设备可以强制重装：
 
 ```sh
-opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.13-4_all.ipk
+opkg install --force-reinstall /tmp/luci-app-adguardhome-lite_1.3.13-5_all.ipk
 ```
 
 **常用参数**
 
 | 参数 | 作用 |
 |---|---|
-| `-v 1.3.13-4` | 指定版本；`-v latest` 取最新 Release |
+| `-v 1.3.13-5` | 指定版本；`-v latest` 取最新 Release |
 | `-f, --force` | 强制更新：忽略版本标签，用 main 分支最新代码覆盖安装 |
 | `-m https://gh-proxy.org` | 指定反代，可重复 |
 | `--no-deps` | 跳过依赖检查（依赖已装好时更快） |
@@ -200,7 +200,7 @@ sh install.sh --uninstall
 sh install.sh -f
 
 # 安装指定版本并指定反代
-sh install.sh -v 1.3.13-4 -m https://gh-proxy.org
+sh install.sh -v 1.3.13-5 -m https://gh-proxy.org
 ```
 
 > 💡 脚本安装不会出现在 `apk` 已安装列表，升级 / 卸载请继续用 `install.sh`；配置与内核重复安装时保留。
@@ -489,6 +489,14 @@ make package/luci-app-adguardhome-lite/compile V=s
 ---
 
 ## 更新日志
+
+### 1.3.13-5
+
+- **页签记忆**：刷新页面后停留在当前页签，不再跳回概览
+- **自检弹窗**：DNS 自检结果改为弹窗显示，页面更清爽
+- **加密上游布局**：修复「自定义上游」输入框与提示挤压的问题
+- **代码清理**：移除无引用的旧逻辑与不可达分支
+- **Android App**：无改动，继续沿用 1.3.12-1 安装包
 
 ### 1.3.13-4
 
