@@ -96,7 +96,7 @@ function M.core_update_info(binpath, channel)
     -- 三个通道各自独立：正式版只取正式标签，预发布版只取预发布标签，
     -- 旧版本只取上一条正式版本线。不能把 beta 和 stable 混在一起比大小，
     -- 否则 1.0.0 会盖掉 1.0.0-b.2，导致选了预发布版却安装正式版。
-    local latest = ""
+    local latest
     if channel == "beta" then
         latest = beta_tag ~= "" and beta_tag or stable
     elseif channel == "legacy" then

@@ -142,7 +142,7 @@ function M.filters_save(ctx)
         return
     end
 
-    local path, body
+    local req_path, body
     if act == "add" then
         local url = (http.formvalue("url") or ""):gsub("^%s+", ""):gsub("%s+$", "")
         local name = (http.formvalue("name") or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -159,7 +159,7 @@ function M.filters_save(ctx)
         if name == "" then
             name = url
         end
-        path = "/control/filtering/add_url"
+        req_path = "/control/filtering/add_url"
         body = jsonc.stringify({ name = name, url = url, whitelist = whitelist })
     elseif act == "toggle" then
         local url = http.formvalue("url") or ""
@@ -170,7 +170,7 @@ function M.filters_save(ctx)
             json_error("缺少规则地址。", nil, "invalid_rule_source")
             return
         end
-        path = "/control/filtering/set_url"
+        req_path = "/control/filtering/set_url"
         body = jsonc.stringify({
             url = url,
             whitelist = whitelist,
@@ -183,7 +183,7 @@ function M.filters_save(ctx)
             json_error("缺少规则地址。", nil, "invalid_rule_source")
             return
         end
-        path = "/control/filtering/remove_url"
+        req_path = "/control/filtering/remove_url"
         body = jsonc.stringify({ url = url, whitelist = whitelist })
     elseif act == "rules" then
         local raw = http.formvalue("rules") or ""
@@ -194,7 +194,7 @@ function M.filters_save(ctx)
                 rules[#rules + 1] = line
             end
         end
-        path = "/control/filtering/set_rules"
+        req_path = "/control/filtering/set_rules"
         body = jsonc.stringify({ rules = rules })
     elseif act == "preset_source" then
         -- 切换预置规则下载源：保存选择，并把已有的内置列表改到新源
@@ -454,7 +454,7 @@ function M.filters_save(ctx)
             local _, sresp = agh_api("/control/filtering/status", "GET")
             local st = jsonc.parse(sresp)
             local interval = st and tonumber(st.interval) or 24
-            path = "/control/filtering/config"
+            req_path = "/control/filtering/config"
             body = jsonc.stringify({ enabled = value, interval = interval })
         elseif feature == "safesearch" then
             -- 安全搜索：v1.0.0 移除了 /control/safesearch/enable|disable，
@@ -479,16 +479,16 @@ function M.filters_save(ctx)
                 end
             end
             -- 更老的内核没有 settings 接口时退回旧写法
-            path = "/control/safesearch/" .. (value and "enable" or "disable")
+            req_path = "/control/safesearch/" .. (value and "enable" or "disable")
         else
-            path = string.format("/control/%s/%s", feature, value and "enable" or "disable")
+            req_path = string.format("/control/%s/%s", feature, value and "enable" or "disable")
         end
     else
         json_error("不支持的操作。", nil, "rule_action_failed")
         return
     end
 
-    local code, resp = agh_api(path, "POST", body)
+    local code, resp = agh_api(req_path, "POST", body)
     if code ~= "200" then
         local detail = tostring(resp or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
         if #detail > 120 then
